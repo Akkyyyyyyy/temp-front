@@ -114,12 +114,12 @@ export async function loginUser(userType: 'company' | 'member', payload: LoginPa
 
 // api/company.ts
 export const requestPasswordReset = async (userType: "company" | "member", data: { email: string }) => {
-  const response = await apiFetch(`${baseUrl}/${userType}/forgot-password`, {
+  const response = await apiFetch(`${baseUrl}/auth/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, userType }),
   });
   const res = await response.json();
   
@@ -127,23 +127,23 @@ export const requestPasswordReset = async (userType: "company" | "member", data:
 };
 
 export const verifyOTP = async (userType: "company" | "member", data: { email: string; otp: string; token: string }) => {
-  const response = await apiFetch(`${baseUrl}/${userType}/verify-otp`, {
+  const response = await apiFetch(`${baseUrl}/auth/verify-otp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, userType }),
   });
   return await response.json();
 };
 
 export const resetPassword = async (userType: "company" | "member", data: { token: string; newPassword: string }) => {
-  const response = await apiFetch(`${baseUrl}/${userType}/reset-password`, {
+  const response = await apiFetch(`${baseUrl}/auth/reset-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, userType }),
   });
   return await response.json();
 };
