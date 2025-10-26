@@ -538,6 +538,7 @@ export function GanttChart() {
 
   };
   const addNewTeamMember = async (memberData: {
+    active: boolean;
     profilePhoto: any; name: string; email: string; role: string; photo: string
   }) => {
     try {
@@ -571,6 +572,7 @@ export function GanttChart() {
         profilePhoto: memberData.profilePhoto,
         email: memberData.email,
         role: memberData.role,
+        active: memberData.active,
         projects: response.member?.projects || [],
       };
 
@@ -725,6 +727,7 @@ export function GanttChart() {
         teamMembers={filteredTeamMembers}
         refreshMembers={refreshMembers}
         onDialogCloseTrigger={dialogCloseTrigger}
+        onDateClick={handleJumpToToday}
       />
 
       {/* Main Content */}
@@ -804,6 +807,7 @@ export function GanttChart() {
           isOpen={!!selectedMember}
           onClose={() => setSelectedMember(null)}
           member={selectedMember}
+          refreshMembers={refreshMembers}
           onUpdateMember={async (memberId, updates) => {
             refreshMembers();
             // setTeamMembersState(prev => prev.map(member =>

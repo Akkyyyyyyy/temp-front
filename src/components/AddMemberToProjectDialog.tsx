@@ -223,7 +223,9 @@ export function AddMemberToProjectDialog({
                       </Avatar>
                       <div className="flex flex-col flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium truncate">{member.name}</span>
+                          <span className="text-sm font-medium truncate">{member.name} - </span>
+                          <span className="text-sm font-normal truncate"> {member.role}</span>
+
                           {member.availabilityStatus === 'unavailable' && (
                             <Badge variant="destructive" className="text-xs">
                               Unavailable

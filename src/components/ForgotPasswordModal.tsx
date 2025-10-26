@@ -28,9 +28,9 @@ const otpSchema = yup.object({
 
 const newPasswordSchema = yup.object({
     newPassword: yup.string().required("New password is required").matches(
-            /^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d).{6,}$/,
-            "Password must be at least 6 characters and include at least 1 uppercase letter, 1 letter and number."
-        ),
+        /^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d).{6,}$/,
+        "Password must be at least 6 characters and include at least 1 uppercase letter, 1 letter and number."
+    ),
     confirmPassword: yup.string()
         .oneOf([yup.ref('newPassword')], "Passwords must match")
         .required("Please confirm your password"),
@@ -74,13 +74,13 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
     // Timer effect for resend OTP
     useEffect(() => {
         let interval: NodeJS.Timeout;
-        
+
         if (resendTimer > 0) {
             interval = setInterval(() => {
                 setResendTimer((prev) => prev - 1);
             }, 1000);
         }
-        
+
         return () => {
             if (interval) clearInterval(interval);
         };
@@ -243,12 +243,12 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                             <div key={stepName} className="flex items-center">
                                 <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step === stepName
+                                        ? 'bg-primary text-primary-foreground'
+                                        : step === 'otp' && index < 1
                                             ? 'bg-primary text-primary-foreground'
-                                            : step === 'otp' && index < 1
+                                            : step === 'newPassword' && index < 2
                                                 ? 'bg-primary text-primary-foreground'
-                                                : step === 'newPassword' && index < 2
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-muted text-muted-foreground'
+                                                : 'bg-muted text-muted-foreground'
                                         }`}
                                 >
                                     {index + 1}
@@ -256,8 +256,8 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                                 {index < 2 && (
                                     <div
                                         className={`w-8 h-0.5 mx-2 ${(step === 'otp' && index === 0) || (step === 'newPassword' && index < 2)
-                                                ? 'bg-primary'
-                                                : 'bg-muted'
+                                            ? 'bg-primary'
+                                            : 'bg-muted'
                                             }`}
                                     />
                                 )}
@@ -304,11 +304,18 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                                 <Input
                                     id="otp"
                                     type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
                                     placeholder="Enter 6-digit code"
                                     maxLength={6}
                                     className="text-center text-lg font-mono tracking-widest"
                                     {...otpForm.register("otp")}
+                                    onInput={(e: React.FormEvent<HTMLInputElement>) => {
+                                        const input = e.currentTarget;
+                                        input.value = input.value.replace(/\D/g, ""); // keep only digits
+                                    }}
                                 />
+
                                 {otpForm.formState.errors.otp && (
                                     <p className="text-sm text-destructive">
                                         {otpForm.formState.errors.otp.message}
@@ -368,62 +375,62 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                     {step === 'newPassword' && (
                         <form onSubmit={newPasswordForm.handleSubmit(handleResetPassword)} className="space-y-4">
                             <div className="space-y-2">
-    <Label htmlFor="newPassword">New Password</Label>
-    <div className="relative">
-        <Input
-            id="newPassword"
-            type={showNewPassword ? "text" : "password"}
-            placeholder="Enter new password"
-            {...newPasswordForm.register("newPassword")}
-            className="pr-10"
-        />
-        <button
-            type="button"
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
-            onClick={() => setShowNewPassword(!showNewPassword)}
-        >
-            {showNewPassword ? (
-                <EyeOff className="h-4 w-4" />
-            ) : (
-                <Eye className="h-4 w-4" />
-            )}
-        </button>
-    </div>
-    {newPasswordForm.formState.errors.newPassword && (
-        <p className="text-sm text-destructive">
-            {newPasswordForm.formState.errors.newPassword.message}
-        </p>
-    )}
-</div>
+                                <Label htmlFor="newPassword">New Password</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="newPassword"
+                                        type={showNewPassword ? "text" : "password"}
+                                        placeholder="Enter new password"
+                                        {...newPasswordForm.register("newPassword")}
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                                        onClick={() => setShowNewPassword(!showNewPassword)}
+                                    >
+                                        {showNewPassword ? (
+                                            <EyeOff className="h-4 w-4" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                </div>
+                                {newPasswordForm.formState.errors.newPassword && (
+                                    <p className="text-sm text-destructive">
+                                        {newPasswordForm.formState.errors.newPassword.message}
+                                    </p>
+                                )}
+                            </div>
 
-<div className="space-y-2">
-    <Label htmlFor="confirmPassword">Confirm Password</Label>
-    <div className="relative">
-        <Input
-            id="confirmPassword"
-            type={showConfirmPassword ? "text" : "password"}
-            placeholder="Confirm new password"
-            {...newPasswordForm.register("confirmPassword")}
-            className="pr-10"
-        />
-        <button
-            type="button"
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
-            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-        >
-            {showConfirmPassword ? (
-                <EyeOff className="h-4 w-4" />
-            ) : (
-                <Eye className="h-4 w-4" />
-            )}
-        </button>
-    </div>
-    {newPasswordForm.formState.errors.confirmPassword && (
-        <p className="text-sm text-destructive">
-            {newPasswordForm.formState.errors.confirmPassword.message}
-        </p>
-    )}
-</div>
+                            <div className="space-y-2">
+                                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="confirmPassword"
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        placeholder="Confirm new password"
+                                        {...newPasswordForm.register("confirmPassword")}
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                    >
+                                        {showConfirmPassword ? (
+                                            <EyeOff className="h-4 w-4" />
+                                        ) : (
+                                            <Eye className="h-4 w-4" />
+                                        )}
+                                    </button>
+                                </div>
+                                {newPasswordForm.formState.errors.confirmPassword && (
+                                    <p className="text-sm text-destructive">
+                                        {newPasswordForm.formState.errors.confirmPassword.message}
+                                    </p>
+                                )}
+                            </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>
                                 {loading ? (

@@ -30,6 +30,7 @@ import { Input } from "../ui/input";
 import { Checkbox } from "../ui/checkbox";
 
 interface EditProjectFormData {
+    name: string;
     color?: string;
     location?: string;
     startDate: string;
@@ -75,6 +76,7 @@ export function EditProjectDialog({
     const [isSaving, setIsSaving] = useState(false);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [editFormData, setEditFormData] = useState<EditProjectFormData>({
+        name: '',
         color: '#3b82f6',
         location: '',
         startDate: '',
@@ -90,6 +92,7 @@ export function EditProjectDialog({
     useEffect(() => {
         if (project) {
             setEditFormData({
+                name: project.name || '',
                 color: project.color || '#3b82f6',
                 location: project.location || '',
                 startDate: project.startDate,
@@ -118,6 +121,11 @@ export function EditProjectDialog({
     // Validate form
     const validateForm = (): boolean => {
         const errors: Record<string, string> = {};
+
+        // Project name validation
+        if (!editFormData.name?.trim()) {
+            errors.name = "Project name is required";
+        }
 
         // Required fields validation
         if (!editFormData.startDate) {
@@ -169,6 +177,7 @@ export function EditProjectDialog({
         try {
             const updateData: any = {
                 projectId: project.id,
+                name: editFormData.name.trim(),
                 startDate: editFormData.startDate,
                 endDate: editFormData.endDate,
                 startHour: editFormData.startHour,
@@ -202,7 +211,6 @@ export function EditProjectDialog({
             if (response.success) {
                 onOpenChange(false);
                 onProjectUpdated();
-                toast.success("Project updated successfully");
             } else {
                 setEditErrors({ submit: response.message });
                 toast.error(response.message || "Failed to update project");
@@ -221,6 +229,7 @@ export function EditProjectDialog({
         if (!newOpen) {
             // Reset form when closing
             setEditFormData({
+                name: project.name || '',
                 color: project.color || '#3b82f6',
                 location: project.location || '',
                 startDate: project.startDate,
@@ -236,12 +245,27 @@ export function EditProjectDialog({
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-lg max-h-[95vh] overflow-hidden">
+            <DialogContent className="sm:max-w-xl max-h-[95vh] overflow-hidden">
                 <DialogHeader>
                     <DialogTitle>Edit Project Details</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="h-full max-h-[calc(90vh-8rem)]">
-                    <div className="space-y-4 py-4 pr-4">
+                    <div className="space-y-4 p-4 pr-4">
+                        {/* Project Name */}
+                        <div className="space-y-2">
+                            <Label htmlFor="projectName">Project Name *</Label>
+                            <Input
+                                id="projectName"
+                                value={editFormData.name}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                                placeholder="Enter project name"
+                                className={`bg-background ${editErrors.name ? 'border-red-500' : 'border-border'}`}
+                            />
+                            {editErrors.name && (
+                                <p className="text-red-500 text-sm">{editErrors.name}</p>
+                            )}
+                        </div>
+
                         {/* Project Color */}
                         <div className="space-y-3">
                             <Label className="text-sm font-medium">Color</Label>

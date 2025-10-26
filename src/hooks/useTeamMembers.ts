@@ -19,6 +19,7 @@ export function useTeamMembers({
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] =  useState<boolean>(true);
+    
 
     const refresh = useCallback(async () => {
         if(isRefreshing)setLoading(true);
@@ -63,8 +64,9 @@ export function useTeamMembers({
                     skills: m.skills || [],
                     companyId: companyId,
                     projects: m.projects || [],
+                    active:m.active
                 }));
-
+                
                 setTeamMembers(transformed);
                 return;
             }
@@ -101,6 +103,7 @@ export function useTeamMembers({
                     skills: m.skills || [],
                     companyId: companyId,
                     projects: m.projects || [],
+                    active: m.active,
                 }));
 
                 setTeamMembers(transformed);

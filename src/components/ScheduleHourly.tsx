@@ -100,19 +100,6 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
           behavior: 'smooth',
           block: 'start'
         });
-        
-        // Alternative approach using container scrolling if needed
-        // if (containerRef.current && projectDetailsRef.current) {
-        //   const container = containerRef.current;
-        //   const target = projectDetailsRef.current;
-        //   const offset = 20; // Adjust this value as needed
-        //   const targetPosition = target.offsetTop - container.offsetTop - offset;
-        //   
-        //   container.scrollTo({
-        //     top: targetPosition,
-        //     behavior: 'smooth'
-        //   });
-        // }
       }
     };
 
@@ -126,9 +113,6 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     const handleProjectClick = (projectId: string) => {
       const newSelectedProject = selectedProject === projectId ? null : projectId;
       setSelectedProject(newSelectedProject);
-      
-      // If we're selecting a project (not deselecting), scroll to project details
-      // Note: The useEffect above will handle the scrolling automatically
     };
 
     if (!selectedDay) {
@@ -145,14 +129,17 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     const uniqueProjects = Array.from(uniqueProjectsMap.values());
 
     return (
-      <div ref={containerRef} className="mt-8 space-y-6">
-        <div className="p-6 bg-muted/30 rounded-lg border border-border/20">
-          <div className="space-y-4 mb-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-foreground">
+      <div ref={containerRef} className="mt-4 sm:mt-6 lg:mt-8 space-y-4 sm:space-y-6">
+        <div className="p-4 sm:p-6 bg-muted/30 rounded-lg border border-border/20">
+          <div className="space-y-3 sm:space-y-4 mb-4">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground text-center sm:text-left w-full sm:w-auto">
                 {monthNames[currentMonth - 1]} {selectedDay}, {currentYear} - {showAvailable ? "Who's Available" : "Who's Working Today"}
               </h3>
-              <div className="flex items-center gap-2">
+              
+              {/* Toggle Switch */}
+              <div className="flex justify-center sm:justify-end w-full sm:w-auto">
                 <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1 border border-border shadow-sm relative">
                   <div
                     className={`
@@ -161,119 +148,152 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       w-[calc(50%-4px)] h-[calc(100%-8px)] 
                     `}
                   />
-
                   {['working', 'available'].map((view) => (
                     <Button
                       key={view}
                       onClick={() => setShowAvailable(view === 'available')}
                       size="sm"
                       className={`
-                        relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
+                        relative capitalize px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-full transition-all duration-300
                         hover:bg-transparent
-                        ${
-                          showAvailable === (view === 'available')
-                            ? 'text-primary-foreground'
-                            : 'bg-transparent text-muted-foreground hover:text-foreground'
+                        ${showAvailable === (view === 'available')
+                          ? 'text-primary-foreground'
+                          : 'bg-transparent text-muted-foreground hover:text-foreground'
                         }
                       `}
                       variant="ghost"
                     >
-                      {view === 'working' ? 'Show Working' : 'Show Available'}
+                      {view === 'working' ? 'Working' : 'Available'}
                     </Button>
                   ))}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              {/* Search bar for day details */}
-              <div className="relative flex-1">
+            {/* Search and Filters Section */}
+            <div className="flex flex-col gap-3 sm:gap-4">
+              {/* Search Bar */}
+              <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input placeholder="Search team members..." className="pl-10" />
+                <Input 
+                  placeholder="Search team members..." 
+                  className="pl-10 w-full text-sm sm:text-base"
+                />
               </div>
 
-              {/* Project filter buttons */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Projects:</span>
-                {uniqueProjects.map((project: any) => (
-                  <Button
-                    key={project.id}
-                    variant={selectedProject === project.id ? "default" : "outline"}
-                    size="sm"
-                    className={`
-                      text-xs
-                      px-3
-                      py-1.5
-                      h-8
-                      flex
-                      items-center
-                      ${selectedProject === project.id ? 'bg-primary border border-transparent' : 'bg-background text-foreground border border-gray-800'}
-                    `}
-                    onClick={() => handleProjectClick(project.id)}
-                  >
-                    <div className={`w-2 h-2 rounded-full mr-2`}
-                    style={{ backgroundColor: project.color }}></div>
-                    {project.name}
-                  </Button>
-                ))}
+              {/* Project Filter Buttons */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+                <span className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">Projects:</span>
+                <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+                  {uniqueProjects.map((project: any) => (
+                    <Button
+                      key={project.id}
+                      variant={selectedProject === project.id ? "default" : "outline"}
+                      size="sm"
+                      className={`
+                        text-xs px-2 sm:px-3 py-1 h-7 sm:h-8 flex items-center flex-shrink-0
+                        ${selectedProject === project.id 
+                          ? 'bg-primary border border-transparent' 
+                          : 'bg-background text-foreground border border-gray-800'
+                        }
+                      `}
+                      onClick={() => handleProjectClick(project.id)}
+                    >
+                      <div 
+                        className="w-2 h-2 rounded-full mr-1 sm:mr-2 flex-shrink-0"
+                        style={{ backgroundColor: project.color }}
+                      />
+                      <span className="truncate max-w-[80px] sm:max-w-none">
+                        {project.name}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
 
+          {/* Team Members Grid */}
           {(showAvailable ? availableToday : workersToday).length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {(showAvailable ? availableToday : workersToday).map(worker => (
-                <div key={worker.id} className="bg-background rounded-lg p-4 border border-border/20 ">
-                  <div className="flex items-center gap-3 mb-3 cursor-pointer" onClick={() => setSelectedMember(worker)}>
-                    <Avatar className="w-10 h-10 ring-1 ring-green-500" 
-                    style={{
-                            borderColor: worker.ringColor || 'hsl(var(--muted))',
-                            boxShadow: `0 0 0 2px ${worker.ringColor || 'hsl(var(--muted))'}`
-                          }}>
+                <div 
+                  key={worker.id} 
+                  className="bg-background rounded-lg p-3 sm:p-4 border border-border/20 hover:border-border/40 transition-colors"
+                >
+                  <div 
+                    className="flex items-center gap-3 mb-3 cursor-pointer" 
+                    onClick={() => setSelectedMember(worker)}
+                  >
+                    <Avatar 
+                      className="w-8 h-8 sm:w-10 sm:h-10 ring-1 ring-green-500 flex-shrink-0"
+                      style={{
+                        borderColor: worker.ringColor || 'hsl(var(--muted))',
+                        boxShadow: `0 0 0 2px ${worker.ringColor || 'hsl(var(--muted))'}`
+                      }}
+                    >
                       <AvatarImage
                         src={`${S3_URL}/${worker.profilePhoto}`}
                         alt={worker.name}
                         className="object-cover"
                       />
-                      <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold">
+                      <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-xs">
                         {worker.name.slice(0, 2).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-foreground">{worker.name}</h4>
-                      <p className="text-sm text-muted-foreground">{worker.role}</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-foreground text-sm sm:text-base truncate">
+                        {worker.name}
+                      </h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                        {worker.role}
+                      </p>
                     </div>
                   </div>
 
                   {!showAvailable && (worker as any).activeProjects && (
                     <div className="space-y-2">
-                      <h5 className="text-sm font-medium text-muted-foreground">Active Projects:</h5>
-                      {(worker as any).activeProjects.map((project: any) => (
-                        <div key={project.id} className="flex items-center gap-2 text-sm">
-                          <div className={`w-2 h-2 rounded-full`}
-                          style={{ backgroundColor: project.color }}></div>
-                          <span className="text-foreground">{project.name}</span>
-                          {project.time && <span className="text-muted-foreground ml-auto">{project.time}</span>}
-                        </div>
-                      ))}
+                      <h5 className="text-xs sm:text-sm font-medium text-muted-foreground">
+                        Active Projects:
+                      </h5>
+                      <div className="space-y-1">
+                        {(worker as any).activeProjects.map((project: any) => (
+                          <div key={project.id} className="flex items-center gap-2 text-xs sm:text-sm">
+                            <div 
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: project.color }}
+                            />
+                            <span className="text-foreground truncate flex-1">
+                              {project.name}
+                            </span>
+                            {project.time && (
+                              <span className="text-muted-foreground text-xs whitespace-nowrap ml-2">
+                                {project.time}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
                   {showAvailable && (
-                    <div className="text-sm text-green-600 font-medium">Available all day</div>
+                    <div className="text-xs sm:text-sm text-green-600 font-medium">
+                      Available all day
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm sm:text-base">
               No {showAvailable ? 'available' : 'working'} team members for this day
             </div>
           )}
 
-          {/* Project Details Section with ref */}
+          {/* Project Details Section */}
           {selectedProject && (
-            <div ref={projectDetailsRef} className="mt-8">
+            <div ref={projectDetailsRef} className="mt-6 sm:mt-8">
               <ProjectDetails
                 projectId={selectedProject}
                 teamMembers={teamMembers}
@@ -284,8 +304,8 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
             </div>
           )}
 
-          {/* Day Calendar with ref */}
-          <div ref={dayCalendarRef} className="mt-8">
+          {/* Day Calendar Section */}
+          <div ref={dayCalendarRef} className="mt-6 sm:mt-8">
             <DayCalendar
               date={`${monthNames[currentMonth - 1]} ${selectedDay}, ${currentYear}`}
               day={selectedDay}

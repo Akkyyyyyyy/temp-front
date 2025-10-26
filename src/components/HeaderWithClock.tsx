@@ -271,16 +271,10 @@ export function HeaderWithClock({ timeView, onDateClick }: HeaderWithClockProps)
   const badgeConfig = getBadgeConfig();
 
   return (
-    <div className="lg:flex justify-between items-center mb-4">
-      <div className="hidden lg:block">
+    <div className="hidden lg:flex justify-between items-center mb-4">
+      <div className="lg:block">
         <h1 className="text-2xl font-semibold text-foreground mb-1">The VIP Studio</h1>
-        <div className="flex items-center gap-4">
-          <p className="text-muted-foreground">{companyDetails.name}</p>
-          <div className="w-px h-4 bg-border"></div>
-          <p className={`text-sm font-medium ${user?.type === 'member' ? 'text-blue-600' : 'text-purple-600'}`}>
-            {user?.type === 'member' ? 'Member' : 'Administrator'}
-          </p>
-        </div>
+        
       </div>
 
       {/* Date Display */}
@@ -295,7 +289,7 @@ export function HeaderWithClock({ timeView, onDateClick }: HeaderWithClockProps)
             {currentTime.toLocaleDateString('en-US', { weekday: 'long' })}
           </p>
           <p className="text-foreground font-medium">
-            {currentTime.toLocaleDateString('en-US', {
+            {currentTime.toLocaleDateString('en-UK', {
               year: 'numeric',
               month: 'long',
               day: 'numeric'

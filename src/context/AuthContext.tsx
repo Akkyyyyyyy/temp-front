@@ -53,9 +53,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const logout = () => {
         const rememberedEmail = localStorage.getItem("rememberedEmail");
+        const userType = localStorage.getItem("user-type");
+
         localStorage.clear();
         if (rememberedEmail) {
             localStorage.setItem("rememberedEmail", rememberedEmail);
+            localStorage.setItem("user-type", userType);
+
         }
         setUser(null);
         navigate("/login");

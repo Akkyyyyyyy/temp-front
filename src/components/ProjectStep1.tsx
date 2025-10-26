@@ -281,7 +281,7 @@ export function ProjectStep1({
                                         const onlyDigits = e.target.value.replace(/\D/g, '');
                                         updateClientField('mobile', onlyDigits);
                                     }}
-                                    placeholder="+1 (555) 123-4567"
+                                    placeholder=""
                                     className={errors.clientMobile ? 'border-red-500' : ''}
                                     maxLength={15}
                                 />

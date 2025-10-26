@@ -197,7 +197,7 @@ export function ProjectStep2({
 
             <Button type="button" size='sm' variant='outline' onClick={onAddTeamMember} className="cursor-pointer hover:bg-transparent hover:text-foreground">
               <Plus />
-              Add Member
+              Add New Member
             </Button>
           </div>
 

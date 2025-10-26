@@ -16,6 +16,7 @@ export interface Member {
   companyId: string;
   ringColor?: string;
   projects?: Project[];
+  active:boolean;
 }
 
 export interface Project {
@@ -150,6 +151,14 @@ export interface UpdateRingColorResponse {
   message: string;
   member?: Member;
 }
+// Add to your existing interfaces
+export interface ToggleMemberStatusResponse {
+  success: boolean;
+  message: string;
+  member?: Member;
+  newStatus: boolean;
+}
+
 
 export async function addMember(request: AddMemberRequest): Promise<AddMemberResponse> {
   try {
@@ -481,6 +490,48 @@ export async function updateMemberRingColor(
     return {
       success: false,
       message: error.message || "Failed to update ring color"
+    };
+  }
+}
+
+
+// Add this function to your existing API functions
+export async function toggleMemberStatus(
+  memberId: string
+): Promise<ToggleMemberStatusResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    const response = await apiFetch(`${baseUrl}/member/${memberId}/toggle-status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to toggle member status");
+    }
+
+    const statusMessage = data.newStatus ? "activated" : "deactivated";
+    // toast.success(`Member ${statusMessage} successfully`);
+    
+    return {
+      success: true,
+      message: data.message,
+      member: data.member,
+      newStatus: data.newStatus
+    };
+  } catch (error: any) {
+    console.error("Error toggling member status:", error);
+    toast.error(error.message || "Failed to toggle member status");
+    return {
+      success: false,
+      message: error.message || "Failed to toggle member status",
+      newStatus: false
     };
   }
 }

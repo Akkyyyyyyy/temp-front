@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Project, updateMember } from "@/api/member";
+import { Project, toggleMemberStatus, updateMember } from "@/api/member";
 import { toast } from "sonner";
 import { TeamMember } from "./TeamMembers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -19,6 +19,7 @@ import * as yup from 'yup';
 import { format } from "date-fns";
 import { removeMemberPhoto, updateMemberProfile, uploadMemberPhoto } from "@/api/member";
 import { removeMemberFromProject } from "@/api/project";
+import { Switch } from "./ui/switch";
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
@@ -34,6 +35,7 @@ interface TeamMemberProfileProps {
   onUpdateProject: (memberId: string, projectId: string, updates: Partial<Project>) => void;
   onAddProject: (memberId: string, project: Omit<Project, 'id'>) => void;
   onDeleteProject: (memberId: string, projectId: string) => void;
+  refreshMembers: () => void;
 }
 
 // Yup validation schemas
@@ -112,7 +114,8 @@ export function TeamMemberProfile({
   onDeleteMember,
   onUpdateProject,
   onAddProject,
-  onDeleteProject
+  onDeleteProject,
+  refreshMembers
 }: TeamMemberProfileProps) {
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingProject, setEditingProject] = useState<string | null>(null);
@@ -154,6 +157,31 @@ export function TeamMemberProfile({
     skills: member?.skills || [],
     photo: member?.profilePhoto || '',
   });
+  const [togglingStatus, setTogglingStatus] = useState(false);
+  
+// Add this handler function
+const handleToggleStatus = async () => {
+  setTogglingStatus(true);
+  try {
+    const result = await toggleMemberStatus(member.id);
+    if (result.success && result.member) {
+       const updatedMember = {
+        ...member,
+        active: result.member.active
+      };
+      
+      // Update the parent component's state
+      onUpdateMember(member.id, { active: result.member.active });
+      
+        refreshMembers();
+
+    }
+  } catch (error) {
+    console.error('Failed to toggle member status:', error);
+  } finally {
+    setTogglingStatus(false);
+  }
+};
 
   useEffect(() => {
     setProfileData({
@@ -703,25 +731,7 @@ export function TeamMemberProfile({
                   </>
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  {member.name} - Profile & Schedule
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete member</span>
-                  </Button>
-                </div>
-                {editingProfile && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Click avatar to change photo
-                  </p>
-                )}
-              </div>
+              
             </DialogTitle>
           </div>
         </DialogHeader>
@@ -729,23 +739,53 @@ export function TeamMemberProfile({
         <div className="flex-1 overflow-auto space-y-6 scrollbar-hide">
           {/* Profile Information Card */}
           <Card className="shadow-sm hover:shadow-md transition-all duration-200 border-border/50">
-            <CardHeader className="flex flex-row items-center justify-between pb-4 space-y-0 border-b bg-gradient-to-r from-muted/20 to-muted/10">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <User className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl font-semibold">
-                    Profile Information
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    Manage your personal and professional details
-                  </CardDescription>
-                </div>
-              </div>
+              <CardHeader className="flex flex-row items-center justify-between pb-4 space-y-0 border-b bg-gradient-to-r from-muted/20 to-muted/10">
+    <div className="flex items-center gap-3">
+      <div className="p-2 rounded-lg bg-primary/10">
+        <User className="w-5 h-5 text-primary" />
+      </div>
+      <div>
+        <CardTitle className="text-xl font-semibold">Profile Information</CardTitle>
+        <CardDescription className="mt-1">
+          Manage personal and professional details
+        </CardDescription>
+      </div>
+    </div>
 
+    {/* Action buttons with toggle switch */}
+    <div className="flex items-center gap-2">
+      {/* Toggle Status Switch */}
+      <div className="flex items-center gap-2 mr-2">
+        <Switch
+  checked={member.active} // This controls the switch position
+  onCheckedChange={handleToggleStatus} // This fires when user toggles
+  disabled={togglingStatus}
+  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+    member.active 
+      ? 'bg-green-500 hover:bg-green-600' 
+      : 'bg-red-500 hover:bg-red-600'
+  } ${togglingStatus ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+>
+  <span
+    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+      member.active ? 'translate-x-6' : 'translate-x-1'
+    } ${togglingStatus ? 'animate-pulse' : ''}`}
+  />
+</Switch>
+      </div>
 
-            </CardHeader>
+      {/* Delete Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setShowDeleteDialog(true)}
+        className="h-8 w-8 text-red-500 hover:bg-red-100 hover:text-red-700"
+      >
+        <Trash2 className="h-4 w-4" />
+        <span className="sr-only">Delete member</span>
+      </Button>
+    </div>
+  </CardHeader>
 
             <CardContent className="p-6 space-y-6">
               {/* Photo Upload Section - Enhanced */}
@@ -828,9 +868,6 @@ export function TeamMemberProfile({
                       </Button>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Supports JPG, PNG, GIF, WebP. Max 5MB.
-                  </p>
                 </div>
               </div>
 
@@ -999,7 +1036,8 @@ export function TeamMemberProfile({
                           <Award className="w-4 h-4 text-muted-foreground" />
                           Skills
                         </label>
-                        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-muted/30 rounded-lg border min-h-[60px]">
+                        {profileData.skills.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-muted/30 rounded-lg border">
                           {profileData.skills.map((skill, index) => (
                             <Badge key={index} variant="secondary" className="flex items-center gap-1 px-3 py-1.5 bg-background border shadow-sm">
                               {skill}
@@ -1014,10 +1052,7 @@ export function TeamMemberProfile({
                               </Button>
                             </Badge>
                           ))}
-                          {profileData.skills.length === 0 && (
-                            <span className="text-sm text-muted-foreground italic">No skills added yet</span>
-                          )}
-                        </div>
+                        </div>)}
                         <div className="flex gap-2">
                           <Input
                             placeholder="Add a skill (press Enter to add)"
@@ -1204,9 +1239,6 @@ export function TeamMemberProfile({
                               <div className={`w-3 h-3 rounded-full`}
                               style={{ backgroundColor: project.color }}></div>
                               <h4 className="font-medium">{project.name}</h4>
-                              <Badge variant="outline" className={getColorClasses(project.color)}>
-                                {project.name}
-                              </Badge>
                             </div>
                             <div className="space-y-1 text-sm text-muted-foreground">
                               <div className="flex items-center gap-2">

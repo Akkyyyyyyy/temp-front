@@ -15,6 +15,7 @@ import { AddMemberToProjectDialog } from "./AddMemberToProjectDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { toast } from "sonner";
 import { EditProjectDialog } from "./modals/EditProjectDialog";
+import { ToggleSwitch } from "./ui/ToggleSwitch";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -51,6 +52,36 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [briefSections, setBriefSections] = useState<BriefSection[]>([]);
     const [logisticsSections, setLogisticsSections] = useState<LogisticsSection[]>([]);
+    const [tabWidths, setTabWidths] = useState({});
+    const tabRefs = useRef({});
+
+    useEffect(() => {
+        const widths = {};
+        Object.keys(tabRefs.current).forEach(key => {
+            if (tabRefs.current[key]) {
+                widths[key] = tabRefs.current[key].offsetWidth;
+            }
+        });
+        setTabWidths(widths);
+    }, []);
+
+    const getActiveTabStyle = () => {
+        if (!tabWidths[activeProjectTab]) return {};
+
+        const activeIndex = ['creative-brief', 'logistics'].indexOf(activeProjectTab);
+        let translateX = 0;
+
+        // Calculate translateX based on previous tabs' widths
+        for (let i = 0; i < activeIndex; i++) {
+            const tabKey = ['creative-brief', 'logistics'][i];
+            translateX += (tabWidths[tabKey] || 0) + 8; // 8px for gap
+        }
+
+        return {
+            width: `${tabWidths[activeProjectTab]}px`,
+            transform: `translateX(${translateX}px)`
+        };
+    };
 
     // Store original sections for cancel operation
     const [originalBriefSections, setOriginalBriefSections] = useState<BriefSection[]>([]);
@@ -245,8 +276,8 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
         const newId = Math.max(0, ...(sectionType === 'brief' ? briefSections : logisticsSections).map(s => s.id)) + 1;
         const newSection = {
             id: newId,
-            title: contentType === 'text' ? "New Section" : "New List",
-            content: contentType === 'text' ? "" : [""],
+            title: contentType === 'text' ? "Add Title" : "Add Title",
+            content: contentType === 'text' ? "Add Info" : ["Add Info"],
             type: contentType
         };
 
@@ -454,7 +485,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                 projectName={projectDetails.name}
                 onProjectDeleted={handleProjectDeleted}
             />
-            
+
             <AddMemberToProjectDialog
                 open={isAddingMember}
                 onOpenChange={setIsAddingMember}
@@ -468,7 +499,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                 }}
                 assignedMembers={assignedMembers}
             />
-            
+
             <EditProjectDialog
                 open={isEditingProject}
                 onOpenChange={setIsEditingProject}
@@ -480,7 +511,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             <div className="flex items-center justify-between mb-6 gap-2">
                 <div className="flex flex-col justify-center">
                     <div className="flex items-center gap-2">
-                        <div 
+                        <div
                             className="w-2 h-2 rounded-full"
                             style={{ backgroundColor: projectDetails.color }}
                         />
@@ -488,12 +519,20 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                             {projectDetails.name}
                         </h3>
                     </div>
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground ml-4">
                         {format(new Date(projectDetails.startDate), "MMM d, yyyy")} - {format(new Date(projectDetails.endDate), "MMM d, yyyy")}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        onClick={() => setIsEditingProject(true)}
+                    >
+                        <Edit className="w-4 h-4" />
+                    </Button>
                     {/* Delete Project Button */}
                     <Button
                         variant="ghost"
@@ -504,29 +543,25 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                     >
                         <Trash2 className="w-4 h-4" />
                     </Button>
-
-                    {/* Tab switcher */}
-                    <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1 border border-border shadow-sm relative">
+                    <div className="inline-flex items-center gap-2 bg-muted rounded-full p-1 border border-border shadow-sm relative">
                         <div
-                            className={`
-                                absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out
-                                ${activeProjectTab === 'creative-brief' ? 'left-1' : 'left-1 translate-x-full'}
-                                w-[calc(50%-4px)] h-[calc(100%-8px)] 
-                            `}
+                            className="absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out h-[calc(100%-8px)]"
+                            style={getActiveTabStyle()}
                         />
                         {(['creative-brief', 'logistics']).map((tab) => (
                             <Button
                                 key={tab}
+                                ref={el => tabRefs.current[tab] = el}
                                 onClick={() => setActiveProjectTab(tab)}
                                 size="sm"
                                 className={`
-                                    relative capitalize px-4 pr-10 py-1.5 text-sm rounded-full transition-all duration-300
-                                    hover:bg-transparent
-                                    ${activeProjectTab === tab
-                                        ? 'text-primary-foreground'
+        relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
+        hover:bg-transparent z-10
+        ${activeProjectTab === tab
+                                        ? 'text-primary-foreground bg-studio-gold'
                                         : 'bg-transparent text-muted-foreground hover:text-foreground'
                                     }
-                                `}
+      `}
                                 variant="ghost"
                             >
                                 {tab.split('-').map(word =>
@@ -541,7 +576,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             {/* Tab Content */}
             {activeProjectTab === "creative-brief" && (
                 <div className="bg-background/50 rounded-lg p-6 border border-border/20 mb-6">
-                    <h4 className="font-semibold text-foreground mb-4">Creative Brief</h4>
+                    <h4 className="font-semibold text-foreground mb-4">Add Brief</h4>
                     <div className="space-y-4">
                         {briefSections.map((section) => (
                             <div key={section.id} className="group relative">
@@ -577,7 +612,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     className="flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    Add List Section
+                                    Add Additional Specification
                                 </button>
                             </div>
                         )}
@@ -587,7 +622,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
             {activeProjectTab === "logistics" && (
                 <div className="bg-background/50 rounded-lg p-6 border border-border/20 mb-6">
-                    <h4 className="font-semibold text-foreground mb-4">Logistics</h4>
+                    <h4 className="font-semibold text-foreground mb-4">Add Logistics</h4>
                     <div className="space-y-4">
                         {logisticsSections.map((section) => (
                             <div key={section.id} className="group relative">
@@ -638,12 +673,13 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                     <div className="flex items-center justify-between mb-3">
                         <h4 className="font-medium text-foreground">Assigned Team</h4>
                         <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             className="text-muted-foreground hover:bg-background hover:text-foreground transition-colors"
                             onClick={() => setIsAddingMember(true)}
                         >
                             <UserPlus className="w-4 h-4" />
+                            Add Member
                         </Button>
                     </div>
                     <div className="space-y-3">
@@ -656,7 +692,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     className="flex items-center gap-3 cursor-pointer flex-1"
                                     onClick={() => setSelectedMember(worker)}
                                 >
-                                    <Avatar 
+                                    <Avatar
                                         className="w-10 h-10 ring-2 ring-studio-gold/20"
                                         style={{
                                             borderColor: worker.ringColor || 'hsl(var(--muted))',
@@ -673,15 +709,16 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                         <p className="text-sm text-muted-foreground">{worker.projectRole}</p>
                                     </div>
                                 </div>
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="ghost"
                                     onClick={() => handleRemoveMember(worker.id)}
                                     disabled={isSaving}
-                                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1"
+                                    className="flex items-center gap-2 transition-opacity text-muted-foreground p-1 hover:bg-background hover:text-red-500"
                                     title="Remove from project"
                                 >
                                     <UserMinus className="w-4 h-4" />
-                                </button>
+                                    Remove
+                                </Button>
                             </div>
                         ))}
                         {assignedWorker.length === 0 && (
@@ -696,14 +733,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                 <div>
                     <div className="flex items-center justify-between mb-3">
                         <h4 className="font-medium text-foreground">Project Schedule</h4>
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-muted-foreground hover:bg-background hover:text-foreground transition-colors"
-                            onClick={() => setIsEditingProject(true)}
-                        >
-                            <Edit className="w-4 h-4" />
-                        </Button>
                     </div>
 
                     {/* Display Section */}

@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pencil, Copy, Trash2 } from "lucide-react";
-import { PackageType } from "@/pages/Packages";
+import { PackageType } from "../components/PackagesDialog";
 
 interface PackageListItemProps {
   package: PackageType;

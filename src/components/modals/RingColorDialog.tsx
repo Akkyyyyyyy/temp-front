@@ -96,7 +96,7 @@ export function RingColorDialog({
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2 text-lg font-semibold">
               <Palette className="w-5 h-5 text-primary" />
-              Ring Color
+              {member.name}'s Colour
             </DialogTitle>
             <Button
               variant="ghost"

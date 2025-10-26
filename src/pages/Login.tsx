@@ -44,17 +44,31 @@ const Login = () => {
     formState: { errors },
     reset,
     setValue,
+    watch,
   } = useForm<FormData>({
     resolver: yupResolver(schema),
   });
 
-  // Load remembered email from localStorage on component mount
+  // Load remembered email and user type from localStorage on component mount
   useEffect(() => {
     const rememberedEmail = localStorage.getItem("rememberedEmail");
-    if (rememberedEmail) {
-      setValue("email", rememberedEmail);
-      setValue("rememberMe", true);
-    }
+    const rememberedUserType = localStorage.getItem("user-type") as "company" | "member" | null;
+    
+    // Set initial user type based on localStorage (default to "company" if none)
+    const initialUserType = rememberedUserType && (rememberedUserType === "company" || rememberedUserType === "member") 
+      ? rememberedUserType 
+      : "company";
+    
+    setUserType(initialUserType);
+
+    // Set initial email if user type matches - use setTimeout to ensure state is updated
+    setTimeout(() => {
+      if (rememberedEmail && rememberedUserType === initialUserType) {
+        setValue("email", rememberedEmail);
+        setValue("rememberMe", true);
+      }
+      setIsChecking(false);
+    }, 0);
   }, [setValue]);
 
   const onSubmit = async (formData: FormData) => {
@@ -74,8 +88,10 @@ const Login = () => {
       // Handle remember me functionality
       if (formData.rememberMe) {
         localStorage.setItem("rememberedEmail", formData.email);
+        localStorage.setItem("user-type", userType);
       } else {
         localStorage.removeItem("rememberedEmail");
+        localStorage.removeItem("user-type");
       }
 
       login(userType, response.data);
@@ -84,6 +100,29 @@ const Login = () => {
       toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUserTypeChange = (type: "company" | "member") => {
+    const rememberedEmail = localStorage.getItem("rememberedEmail");
+    const rememberedUserType = localStorage.getItem("user-type");
+    
+    // Clear the form when switching user types
+    reset({
+      email: "",
+      password: "",
+      rememberMe: false,
+    });
+    
+    setUserType(type);
+    
+    // Only set email if the selected type matches the remembered type
+    if (rememberedEmail && rememberedUserType === type) {
+      // Use setTimeout to ensure the reset has completed
+      setTimeout(() => {
+        setValue("email", rememberedEmail);
+        setValue("rememberMe", true);
+      }, 0);
     }
   };
 
@@ -118,10 +157,7 @@ const Login = () => {
                   ? "text-primary font-semibold"
                   : "text-muted-foreground hover:text-foreground"
                   }`}
-                onClick={() => {
-                  setUserType("company");
-                  reset();
-                }}
+                onClick={() => handleUserTypeChange("company")}
               >
                 Company
                 {userType === "company" && (
@@ -133,10 +169,7 @@ const Login = () => {
                   ? "text-primary font-semibold"
                   : "text-muted-foreground hover:text-foreground"
                   }`}
-                onClick={() => {
-                  setUserType("member");
-                  reset();
-                }}
+                onClick={() => handleUserTypeChange("member")}
               >
                 Member
                 {userType === "member" && (
