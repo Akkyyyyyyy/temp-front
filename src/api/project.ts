@@ -90,7 +90,7 @@ export interface DeleteProjectResponse {
 export interface IAddMemberToProjectRequest {
   projectId: string;
   memberId: string;
-  role: string;
+  roleId: string;
 }
 
 export interface IAddMemberToProjectResponse {
@@ -115,7 +115,7 @@ export async function createProject(booking: Omit<EditableBooking, 'id'>) {
       companyId: companyDetails.id,
       assignments: booking.teamAssignments.map(assignment => ({
         memberId: assignment.id,
-        role: assignment.responsibility
+        roleId: assignment.roleId
       })),
       // Add client data if provided
       ...(booking.client && {
@@ -206,7 +206,7 @@ export async function addMemberToProject(
       return { success: false, message: "Project ID and Member ID are required" };
     }
 
-    if (!request.role?.trim()) {
+    if (!request.roleId?.trim()) {
       toast.error("Role is required");
       return { success: false, message: "Role is required" };
     }

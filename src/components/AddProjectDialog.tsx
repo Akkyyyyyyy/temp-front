@@ -71,7 +71,8 @@ export function AddProjectDialog({
     memberId: '',
     memberName: '',
     memberPhoto: '',
-    responsibility: ''
+    responsibility: '',
+    roleId: ''
   });
 
   const { user, isCompany } = useAuth();
@@ -229,7 +230,8 @@ export function AddProjectDialog({
           id: currentMember.memberId,
           memberName: currentMember.memberName,
           responsibility: currentMember.responsibility,
-          memberId: currentMember.memberId
+          memberId: currentMember.memberId,
+          roleId:  currentMember.roleId
         }
       ]);
 
@@ -237,7 +239,8 @@ export function AddProjectDialog({
         memberId: '',
         memberName: '',
         memberPhoto: '',
-        responsibility: ''
+        responsibility: '',
+        roleId: ''
       });
     }
   };
@@ -310,7 +313,8 @@ export function AddProjectDialog({
       memberId: '',
       memberName: '',
       memberPhoto: '',
-      responsibility: ''
+      responsibility: '',
+      roleId: ''
     });
     setErrors({});
     setIncludeClient(false);

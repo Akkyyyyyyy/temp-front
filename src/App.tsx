@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "./router/AppRoutes";
 import { AuthProvider } from "./context/AuthContext";
+import { RolesProvider } from "./context/RolesContext";
 
 const queryClient = new QueryClient();
 
@@ -15,7 +16,9 @@ const App = () => (
       <Sonner position="top-center" />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <RolesProvider>
+            <AppRoutes />
+          </RolesProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

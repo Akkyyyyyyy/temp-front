@@ -8,7 +8,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { addMemberToProject } from "@/api/project";
 import { AvailableMember, AvailableMembersData, getAvailableMembers } from "@/api/member";
-import { ROLES } from "@/constant/constant";
+import { useRoles } from "@/context/RolesContext"; // Import roles context
+import { RoleDropdown } from "./dropdowns/RoleDropdown";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -29,7 +30,7 @@ interface AddMemberDialogProps {
     email: string;
     profilePhoto: string;
     role: string;
-  }>; // Add this prop to receive already assigned members
+  }>;
 }
 
 export function AddMemberToProjectDialog({ 
@@ -38,17 +39,20 @@ export function AddMemberToProjectDialog({
   projectId, 
   onMemberAdded,
   projectDetails,
-  assignedMembers = [] // Default to empty array
+  assignedMembers = []
 }: AddMemberDialogProps) {
   const [addMemberForm, setAddMemberForm] = useState({
     memberId: '',
-    role: ''
+    roleId: '' // Changed from 'role' to 'roleId'
   });
   const [addMemberErrors, setAddMemberErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [availableMembersData, setAvailableMembersData] = useState<AvailableMembersData | null>(null);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const companyId = JSON.parse(localStorage.getItem('user-details') || '{}').id;
+  
+  // Get roles from context to map role names to IDs
+  const { roles } = useRoles();
 
   // Fetch available members when dialog opens
   useEffect(() => {
@@ -62,7 +66,7 @@ export function AddMemberToProjectDialog({
   // Reset form when dialog closes
   useEffect(() => {
     if (!open) {
-      setAddMemberForm({ memberId: '', role: '' });
+      setAddMemberForm({ memberId: '', roleId: '' });
       setAddMemberErrors({});
     }
   }, [open]);
@@ -110,20 +114,25 @@ export function AddMemberToProjectDialog({
     return filteredMembers;
   };
 
-  // Get the selected member's default role
-  const getSelectedMemberDefaultRole = (): string => {
+  // Get the selected member's default role ID
+  const getSelectedMemberDefaultRoleId = (): string => {
     if (!addMemberForm.memberId) return '';
     const selectedMember = getFilteredAvailableMembers().find(member => member.id === addMemberForm.memberId);
-    return selectedMember?.role || '';
+    
+    if (!selectedMember?.role) return '';
+    
+    // Find the role ID by role name
+    const role = roles.find(r => r.name === selectedMember.role);
+    return role?.id || '';
   };
 
   // Update role when member selection changes
   useEffect(() => {
     if (addMemberForm.memberId) {
-      const defaultRole = getSelectedMemberDefaultRole();
-      setAddMemberForm(prev => ({ ...prev, role: defaultRole }));
+      const defaultRoleId = getSelectedMemberDefaultRoleId();
+      setAddMemberForm(prev => ({ ...prev, roleId: defaultRoleId }));
     }
-  }, [addMemberForm.memberId]);
+  }, [addMemberForm.memberId, roles]); // Added roles dependency
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -132,8 +141,8 @@ export function AddMemberToProjectDialog({
       errors.memberId = "Please select a team member";
     }
 
-    if (!addMemberForm.role.trim()) {
-      errors.role = "Role is required";
+    if (!addMemberForm.roleId.trim()) { // Changed from 'role' to 'roleId'
+      errors.roleId = "Role is required"; // Changed from 'role' to 'roleId'
     }
 
     setAddMemberErrors(errors);
@@ -148,12 +157,12 @@ export function AddMemberToProjectDialog({
       const response = await addMemberToProject({
         projectId,
         memberId: addMemberForm.memberId,
-        role: addMemberForm.role
+        roleId: addMemberForm.roleId // Changed from 'role' to 'roleId'
       });
 
       if (response.success) {
         onOpenChange(false);
-        setAddMemberForm({ memberId: '', role: '' });
+        setAddMemberForm({ memberId: '', roleId: '' }); // Changed from 'role' to 'roleId'
         setAddMemberErrors({});
         onMemberAdded();
       } else {
@@ -169,7 +178,7 @@ export function AddMemberToProjectDialog({
 
   const handleClose = () => {
     onOpenChange(false);
-    setAddMemberForm({ memberId: '', role: '' });
+    setAddMemberForm({ memberId: '', roleId: '' }); // Changed from 'role' to 'roleId'
     setAddMemberErrors({});
     setAvailableMembersData(null);
   };
@@ -231,7 +240,6 @@ export function AddMemberToProjectDialog({
                               Unavailable
                             </Badge>
                           )}
-                          {/* Show badge for already assigned members (shouldn't appear due to filtering) */}
                           {assignedMembers.some(assigned => assigned.id === member.id) && (
                             <Badge variant="secondary" className="text-xs">
                               Already Assigned
@@ -261,29 +269,20 @@ export function AddMemberToProjectDialog({
 
           <div className="space-y-2">
             <Label htmlFor="role">Role *</Label>
-            <Select
-              value={addMemberForm.role}
-              onValueChange={(value) => {
-                setAddMemberForm(prev => ({ ...prev, role: value }));
-                if (addMemberErrors.role) {
-                  setAddMemberErrors({ ...addMemberErrors, role: '' });
+            <RoleDropdown
+              selected={addMemberForm.roleId} // Changed from 'role' to 'roleId'
+              onChange={(roleId) => {
+                setAddMemberForm(prev => ({ ...prev, roleId: roleId })); // Changed from 'role' to 'roleId'
+                if (addMemberErrors.roleId) { // Changed from 'role' to 'roleId'
+                  setAddMemberErrors({ ...addMemberErrors, roleId: '' }); // Changed from 'role' to 'roleId'
                 }
               }}
               disabled={isLoading || !addMemberForm.memberId}
-            >
-              <SelectTrigger className={`bg-background ${addMemberErrors.role ? 'border-red-500' : 'border-border'}`}>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border-border">
-                {ROLES.map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {role}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {addMemberErrors.role && (
-              <p className="text-red-500 text-sm">{addMemberErrors.role}</p>
+              placeholder="Select a role"
+              className={`bg-background ${addMemberErrors.roleId ? 'border-red-500' : 'border-border'}`} // Changed from 'role' to 'roleId'
+            />
+            {addMemberErrors.roleId && ( // Changed from 'role' to 'roleId'
+              <p className="text-red-500 text-sm">{addMemberErrors.roleId}</p> // Changed from 'role' to 'roleId'
             )}
           </div>
 
@@ -307,7 +306,7 @@ export function AddMemberToProjectDialog({
               filteredAvailableMembers.length === 0 || 
               !projectDetails ||
               addMemberForm.memberId === '' ||
-              addMemberForm.role === '' ||
+              addMemberForm.roleId === '' || // Changed from 'role' to 'roleId'
               // Disable if selected member is unavailable
               (addMemberForm.memberId && 
                filteredAvailableMembers.find(m => m.id === addMemberForm.memberId)?.availabilityStatus === 'unavailable')

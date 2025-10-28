@@ -554,15 +554,15 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                 ref={el => tabRefs.current[tab] = el}
                                 onClick={() => setActiveProjectTab(tab)}
                                 size="sm"
+                                variant="tab"
                                 className={`
-        relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
-        hover:bg-transparent z-10
-        ${activeProjectTab === tab
+            relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
+            z-10
+            ${activeProjectTab === tab
                                         ? 'text-primary-foreground bg-studio-gold'
-                                        : 'bg-transparent text-muted-foreground hover:text-foreground'
+                                        : 'text-muted-foreground'
                                     }
-      `}
-                                variant="ghost"
+        `}
                             >
                                 {tab.split('-').map(word =>
                                     word.charAt(0).toUpperCase() + word.slice(1)

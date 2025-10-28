@@ -17,6 +17,7 @@ export interface Member {
   ringColor?: string;
   projects?: Project[];
   active:boolean;
+  roleId:string;
 }
 
 export interface Project {
@@ -124,8 +125,11 @@ interface ApiResponse<T> {
 interface AddMemberRequest {
   name: string;
   email: string;
-  role: string;
+  role?: string;
+  roleId?: string;
   companyId: string;
+  phone?:string;
+  countryCode?:string;
 }
 
 interface AddMemberResponse {

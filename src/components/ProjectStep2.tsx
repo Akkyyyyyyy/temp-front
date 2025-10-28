@@ -4,23 +4,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Users, UserPlus, X, AlertCircle, Plus } from 'lucide-react';
-import { colorOptions, MAX_TEAM_MEMBERS_PER_PROJECT, ROLES } from '@/constant/constant';
+import { colorOptions, MAX_TEAM_MEMBERS_PER_PROJECT } from '@/constant/constant';
 import { ProjectFormData } from './AddProjectDialog';
 
 import { AvailableMember } from '@/api/member';
 import { useEffect, useRef, useState } from 'react';
+import { useRoles } from '@/context/RolesContext'; // Import roles context
+import { RoleDropdown } from './dropdowns/RoleDropdown';
 
 export interface TeamAssignment {
   id: string;
   memberName: string;
-  responsibility: string;
+  responsibility: string; // This should store role ID
   memberId: string;
+  roleId: string;
 }
 export interface CurrentMember {
   memberId: string;
   memberName: string;
   memberPhoto: string;
-  responsibility: string;
+  responsibility: string; // This should store role ID
+  roleId: string;
 }
 interface ProjectStep2Props {
   formData: ProjectFormData;
@@ -29,6 +33,7 @@ interface ProjectStep2Props {
   setErrors: (errors: Record<string, string>) => void;
   teamAssignments: TeamAssignment[];
   currentMember: {
+    roleId: string;
     memberId: string;
     memberName: string;
     memberPhoto: string;
@@ -64,6 +69,7 @@ export function ProjectStep2({
   onDialogCloseTrigger
 }: ProjectStep2Props) {
   const colorInputRef = useRef<HTMLInputElement>(null);
+  const { roles } = useRoles(); // Get roles from context
 
   const handleDialogCloseLocally = () => {
     checkMemberAvailability();
@@ -80,6 +86,46 @@ export function ProjectStep2({
     colorInputRef.current?.click();
   };
 
+  // Get role name from role ID for display
+  const getRoleName = (roleId: string): string => {
+    const role = roles.find(r => r.id === roleId);
+    return role?.name || roleId; // Fallback to ID if role not found
+  };
+
+  const handleResponsibilityChange = (roleId: string) => {
+    // Find the role object to get both ID and name
+    const selectedRole = roles.find(role => role.id === roleId);
+
+    if (selectedRole) {
+      // Update both responsibility (name) and roleId (ID)
+      updateCurrentMember('responsibility', selectedRole.name);
+      updateCurrentMember('roleId', selectedRole.id);
+    }
+  };
+  // When member selection changes, set their default role
+  const handleMemberChange = (memberId: string) => {
+    const selectedMember = filteredAvailableMembers.find(member => member.id === memberId);
+    if (selectedMember) {
+      // Update both ID and name to keep them in sync
+      updateCurrentMember('memberId', selectedMember.id);
+      updateCurrentMember('memberName', selectedMember.name);
+
+      // Find the role by name to get the role ID
+      const memberRole = roles.find(role => role.name === selectedMember.role);
+      if (memberRole) {
+        updateCurrentMember('responsibility', memberRole.name); // Store role name for display
+        updateCurrentMember('roleId', memberRole.id); // Store role ID for backend
+      } else {
+        // Fallback: if role not found, use the member's role as name and try to find ID
+        updateCurrentMember('responsibility', selectedMember.role);
+
+        // Try to find a role ID that matches the role name, or use the name as fallback
+        const fallbackRole = roles.find(role => role.name.toLowerCase() === selectedMember.role.toLowerCase());
+        updateCurrentMember('roleId', fallbackRole?.id || selectedMember.role);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -88,7 +134,7 @@ export function ProjectStep2({
           {/* Color Picker */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Color</Label>
-            
+
             {/* Custom Color Picker */}
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
@@ -103,7 +149,7 @@ export function ProjectStep2({
                     className="absolute inset-0 w-12 h-12 opacity-0 cursor-pointer"
                     style={{ zIndex: 10 }}
                   />
-                  
+
                   {/* Color preview that sits behind the input */}
                   <span
                     className={`
@@ -113,7 +159,7 @@ export function ProjectStep2({
                     style={{ backgroundColor: formData.color }}
                   />
                 </div>
-                
+
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-mono text-muted-foreground">
@@ -212,15 +258,7 @@ export function ProjectStep2({
                 <Label className="text-xs">Team Member</Label>
                 <Select
                   value={currentMember.memberId}
-                  onValueChange={(value) => {
-                    // Find the selected member by ID
-                    const selectedMember = filteredAvailableMembers.find(member => member.id === value);
-                    if (selectedMember) {
-                      // Update both ID and name to keep them in sync
-                      updateCurrentMember('memberId', selectedMember.id);
-                      updateCurrentMember('memberName', selectedMember.name);
-                    }
-                  }}
+                  onValueChange={handleMemberChange} // Use the new handler
                   disabled={isLoadingAvailableMembers}
                 >
                   <SelectTrigger className="bg-background border-border truncate">
@@ -263,21 +301,12 @@ export function ProjectStep2({
 
               <div className="space-y-2">
                 <Label className="text-xs">Responsibility</Label>
-                <Select
-                  value={currentMember.responsibility}
-                  onValueChange={(value) => updateCurrentMember('responsibility', value)}
-                >
-                  <SelectTrigger className="bg-background border-border">
-                    <SelectValue placeholder="Select responsibility" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border-border shadow-lg">
-                    {ROLES.map((responsibility) => (
-                      <SelectItem key={responsibility} value={responsibility} className="hover:bg-muted">
-                        {responsibility}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <RoleDropdown
+                  selected={currentMember.roleId}
+                  onChange={handleResponsibilityChange}
+                  placeholder="Select responsibility"
+                  className="bg-background border-border"
+                />
               </div>
             </div>
 
@@ -320,7 +349,9 @@ export function ProjectStep2({
                       ></div>
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm text-gray-500">{ta.memberName}</span>
-                        <span className="text-muted-foreground text-sm">- {ta.responsibility}</span>
+                        <span className="text-muted-foreground text-sm">
+                          - {getRoleName(ta.responsibility)} {/* Display role name instead of ID */}
+                        </span>
                       </div>
                     </div>
                     <Button

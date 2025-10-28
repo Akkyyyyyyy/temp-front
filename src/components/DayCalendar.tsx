@@ -76,7 +76,7 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
 
   const deleteBooking = (id: string) => {
     // You can implement this if you want deleting later
-    console.log('Delete booking:', id);
+    // console.log('Delete booking:', id);
   };
 
   const formatHour = (hour: number) => {

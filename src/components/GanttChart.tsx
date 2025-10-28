@@ -538,8 +538,10 @@ export function GanttChart() {
 
   };
   const addNewTeamMember = async (memberData: {
+    roleId: string;
     active: boolean;
-    profilePhoto: any; name: string; email: string; role: string; photo: string
+    profilePhoto: any; name: string; email: string; role: string; photo: string;countryCode?: string;
+    phone?: string;
   }) => {
     try {
       const response = await addMember({
@@ -547,6 +549,9 @@ export function GanttChart() {
         email: memberData.email,
         role: memberData.role,
         companyId: companyDetails.id,
+        countryCode: memberData.countryCode,
+        phone: memberData.phone,
+
       });
 
       if (!response.success) {
@@ -573,6 +578,9 @@ export function GanttChart() {
         email: memberData.email,
         role: memberData.role,
         active: memberData.active,
+        countryCode: memberData.countryCode,
+        phone: memberData.phone,
+        roleId: memberData.roleId,
         projects: response.member?.projects || [],
       };
 

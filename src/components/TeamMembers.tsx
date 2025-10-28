@@ -16,6 +16,7 @@ import { useTeamMembers } from "@/hooks/useTeamMembers";
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
 export interface TeamMember {
+  role: any;
   profilePhoto?: any;
   id: string;
   name: string;
@@ -24,10 +25,11 @@ export interface TeamMember {
   location?: string;
   bio?: string;
   skills?: string[];
-  role: string;
   projects?: Project[];
   ringColor?: string;
   active: boolean;
+  roleId: string;
+  countryCode?:string;
 }
 
 interface TeamMembersProps {

@@ -64,7 +64,8 @@ export function useTeamMembers({
                     skills: m.skills || [],
                     companyId: companyId,
                     projects: m.projects || [],
-                    active:m.active
+                    active:m.active,
+                    roleId:m.roleId
                 }));
                 
                 setTeamMembers(transformed);
@@ -104,6 +105,7 @@ export function useTeamMembers({
                     companyId: companyId,
                     projects: m.projects || [],
                     active: m.active,
+                    roleId:m.roleId
                 }));
 
                 setTeamMembers(transformed);

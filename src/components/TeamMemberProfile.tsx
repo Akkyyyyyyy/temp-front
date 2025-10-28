@@ -7,19 +7,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Project, toggleMemberStatus, updateMember } from "@/api/member";
 import { toast } from "sonner";
 import { TeamMember } from "./TeamMembers";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { ROLES } from "@/constant/constant";
-import { getNames } from 'country-list';
 import countries from "world-countries";
 import * as yup from 'yup';
 import { format } from "date-fns";
 import { removeMemberPhoto, updateMemberProfile, uploadMemberPhoto } from "@/api/member";
 import { removeMemberFromProject } from "@/api/project";
 import { Switch } from "./ui/switch";
+import { useRoles } from "@/context/RolesContext";
+import { RoleDropdown } from "./dropdowns/RoleDropdown";
+import { Label } from "./ui/label";
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
@@ -37,6 +36,9 @@ interface TeamMemberProfileProps {
   onDeleteProject: (memberId: string, projectId: string) => void;
   refreshMembers: () => void;
 }
+interface Country {
+  code: string;
+}
 
 // Yup validation schemas
 const profileSchema = yup.object({
@@ -51,8 +53,7 @@ const profileSchema = yup.object({
     .max(50, 'Name must be at most 50 characters'),
   role: yup
     .string()
-    .required('Role is required')
-    .oneOf(ROLES, 'Invalid role'),
+    .required('Role is required'),
   email: yup
     .string()
     .email('Invalid email format')
@@ -62,9 +63,7 @@ const profileSchema = yup.object({
     .test('is-valid-phone', 'Invalid phone number format', value => {
       if (!value) return true; // skip if empty or undefined
       return /^\+?[\d\s-()]+$/.test(value);
-    })
-    .nullable()
-    .notRequired(),
+    }),
   location: yup
     .string()
     .nullable()
@@ -136,11 +135,8 @@ export function TeamMemberProfile({
     const stored = localStorage.getItem('memberDetails');
     return stored ? JSON.parse(stored) : null;
   });
+  const { roles } = useRoles();
 
-  const countryOptions = countries.map((country) => ({
-    label: country.name.common,
-    value: country.cca2,
-  }));
   const formatHour12 = (hour) => {
     const h = hour % 12 === 0 ? 12 : hour % 12;
     const suffix = hour < 12 || hour === 24 ? 'AM' : 'PM';
@@ -152,36 +148,114 @@ export function TeamMemberProfile({
     role: member?.role || '',
     email: member?.email || '',
     phone: member?.phone || '',
+    countryCode: member?.countryCode || '',
     location: member?.location || '',
     bio: member?.bio || '',
     skills: member?.skills || [],
     photo: member?.profilePhoto || '',
+    roleId: member?.roleId || '',
   });
   const [togglingStatus, setTogglingStatus] = useState(false);
-  
-// Add this handler function
-const handleToggleStatus = async () => {
-  setTogglingStatus(true);
-  try {
-    const result = await toggleMemberStatus(member.id);
-    if (result.success && result.member) {
-       const updatedMember = {
-        ...member,
-        active: result.member.active
-      };
-      
-      // Update the parent component's state
-      onUpdateMember(member.id, { active: result.member.active });
-      
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [isLoadingCountries, setIsLoadingCountries] = useState(false);
+
+  // Add this useEffect to fetch countries
+  useEffect(() => {
+    fetchCountries();
+  }, []);
+
+  // Copy the fetchCountries function from your dialog
+  const fetchCountries = async () => {
+    setIsLoadingCountries(true);
+    try {
+      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,idd');
+      const data = await response.json();
+
+      const countryCodeSet = new Set<string>();
+
+      data.forEach((country: any) => {
+        if (country.idd?.root && country.idd?.suffixes) {
+          country.idd.suffixes.forEach((suffix: string) => {
+            const callingCode = `${country.idd.root}${suffix}`;
+            if (callingCode.length <= 5 && callingCode !== '+') {
+              countryCodeSet.add(callingCode);
+            }
+          });
+        } else if (country.idd?.root) {
+          const callingCode = country.idd.root;
+          if (callingCode.length <= 5 && callingCode !== '+') {
+            countryCodeSet.add(callingCode);
+          }
+        }
+      });
+
+      const uniqueCodes = Array.from(countryCodeSet);
+      const sortedCountries = uniqueCodes
+        .map(code => ({ code }))
+        .sort((a, b) => {
+          if (a.code === "+1") return -1;
+          if (b.code === "+1") return 1;
+          if (a.code === "+44") return -1;
+          if (b.code === "+44") return 1;
+          const numA = parseInt(a.code.replace('+', '')) || 0;
+          const numB = parseInt(b.code.replace('+', '')) || 0;
+          return numA - numB;
+        });
+
+      setCountries(sortedCountries);
+    } catch (error) {
+      console.error("Failed to fetch countries:", error);
+      setCountries(getCommonCountryCodes());
+    } finally {
+      setIsLoadingCountries(false);
+    }
+  };
+
+  // Copy the fallback function
+  const getCommonCountryCodes = (): Country[] => {
+    const commonCodes = [
+      "+1", "+44", "+91", "+61", "+49", "+33", "+81", "+86",
+      "+55", "+7", "+34", "+39", "+82", "+52", "+27"
+    ];
+
+    const uniqueCodes = [...new Set(commonCodes)]
+      .map(code => ({ code }))
+      .sort((a, b) => {
+        if (a.code === "+1") return -1;
+        if (b.code === "+1") return 1;
+        if (a.code === "+44") return -1;
+        if (b.code === "+44") return 1;
+        const numA = parseInt(a.code.replace('+', '')) || 0;
+        const numB = parseInt(b.code.replace('+', '')) || 0;
+        return numA - numB;
+      });
+
+    return uniqueCodes;
+  };
+
+  // Add this handler function
+  const handleToggleStatus = async () => {
+    setTogglingStatus(true);
+    try {
+      const result = await toggleMemberStatus(member.id);
+      if (result.success && result.member) {
+        const updatedMember = {
+          ...member,
+          active: result.member.active
+        };
+
+        // Update the parent component's state
+        onUpdateMember(member.id, { active: result.member.active });
+
         refreshMembers();
 
+      }
+    } catch (error) {
+      console.error('Failed to toggle member status:', error);
+    } finally {
+      setTogglingStatus(false);
     }
-  } catch (error) {
-    console.error('Failed to toggle member status:', error);
-  } finally {
-    setTogglingStatus(false);
-  }
-};
+  };
 
   useEffect(() => {
     setProfileData({
@@ -189,10 +263,12 @@ const handleToggleStatus = async () => {
       role: member?.role || '',
       email: member?.email || '',
       phone: member?.phone || '',
+      countryCode: member?.countryCode || '',
       location: member?.location || '',
       bio: member?.bio || '',
       skills: member?.skills || [],
-      photo: member?.profilePhoto || '',
+      roleId: member?.roleId || '',
+      photo: member?.profilePhoto || ''
     });
   }, [member]);
 
@@ -386,10 +462,12 @@ const handleToggleStatus = async () => {
         name: profileData.name,
         role: profileData.role,
         phone: profileData.phone,
+        countryCode: profileData.countryCode,
         location: profileData.location,
         bio: profileData.bio,
         skills: JSON.stringify(profileData.skills), // Convert to string for form-data
-        profilePhoto: profileData.photo
+        profilePhoto: profileData.photo,
+        roleId: profileData.roleId,
       };
 
       const result = await updateMemberProfile(member.id, updateData);
@@ -402,14 +480,17 @@ const handleToggleStatus = async () => {
 
         const updatedMember = {
           name: result.member.name,
-          role: result.member.role,
+          role: result.member.role.name,
           email: result.member.email || '',
           phone: result.member.phone || '',
+          countryCode: result.member.countryCode || '',
           location: result.member.location || '',
           bio: result.member.bio || '',
           skills: result.member.skills || [],
-          photo: result.member.profilePhoto || profileData.photo
+          photo: result.member.profilePhoto || profileData.photo,
+          roleId: result.member.role.id || '',
         };
+
 
         if (memberDetails) {
           localStorage.setItem('memberDetails', JSON.stringify(result.member));
@@ -545,33 +626,6 @@ const handleToggleStatus = async () => {
     }
   };
 
-  const getColorClasses = (colorClass: string) => {
-    const colorMap: { [key: string]: string } = {
-      'bg-blue-500': 'bg-blue-100 text-blue-800 border-blue-200',
-      'bg-purple-500': 'bg-purple-100 text-purple-800 border-purple-200',
-      'bg-orange-500': 'bg-orange-100 text-orange-800 border-orange-200',
-      'bg-green-500': 'bg-green-100 text-green-800 border-green-200',
-      'bg-red-500': 'bg-red-100 text-red-800 border-red-200',
-      'bg-indigo-500': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      'bg-yellow-500': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'bg-pink-500': 'bg-pink-100 text-pink-800 border-pink-200',
-      'bg-teal-500': 'bg-teal-100 text-teal-800 border-teal-200',
-      'bg-cyan-500': 'bg-cyan-100 text-cyan-800 border-cyan-200',
-      'bg-lime-500': 'bg-lime-100 text-lime-800 border-lime-200',
-      'bg-rose-500': 'bg-rose-100 text-rose-800 border-rose-200',
-      'bg-violet-500': 'bg-violet-100 text-violet-800 border-violet-200',
-      'bg-emerald-500': 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      'bg-amber-500': 'bg-amber-100 text-amber-800 border-amber-200',
-      'bg-fuchsia-500': 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
-      'bg-sky-500': 'bg-sky-100 text-sky-800 border-sky-200',
-      'bg-orange-600': 'bg-orange-100 text-orange-800 border-orange-200',
-      'bg-purple-600': 'bg-purple-100 text-purple-800 border-purple-200',
-      'bg-blue-600': 'bg-blue-100 text-blue-800 border-blue-200',
-      'bg-gray-500': 'bg-gray-100 text-gray-800 border-gray-200',
-      'bg-red-600': 'bg-red-100 text-red-800 border-red-200'
-    };
-    return colorMap[colorClass] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
 
   // Helper function to get full image URL from S3 key
   const getImageUrl = (s3Key: string) => {
@@ -731,7 +785,7 @@ const handleToggleStatus = async () => {
                   </>
                 )}
               </div>
-              
+
             </DialogTitle>
           </div>
         </DialogHeader>
@@ -739,53 +793,51 @@ const handleToggleStatus = async () => {
         <div className="flex-1 overflow-auto space-y-6 scrollbar-hide">
           {/* Profile Information Card */}
           <Card className="shadow-sm hover:shadow-md transition-all duration-200 border-border/50">
-              <CardHeader className="flex flex-row items-center justify-between pb-4 space-y-0 border-b bg-gradient-to-r from-muted/20 to-muted/10">
-    <div className="flex items-center gap-3">
-      <div className="p-2 rounded-lg bg-primary/10">
-        <User className="w-5 h-5 text-primary" />
-      </div>
-      <div>
-        <CardTitle className="text-xl font-semibold">Profile Information</CardTitle>
-        <CardDescription className="mt-1">
-          Manage personal and professional details
-        </CardDescription>
-      </div>
-    </div>
+            <CardHeader className="flex flex-row items-center justify-between pb-4 space-y-0 border-b bg-gradient-to-r from-muted/20 to-muted/10">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <User className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-semibold">Profile Information</CardTitle>
+                  <CardDescription className="mt-1">
+                    Manage personal and professional details
+                  </CardDescription>
+                </div>
+              </div>
 
-    {/* Action buttons with toggle switch */}
-    <div className="flex items-center gap-2">
-      {/* Toggle Status Switch */}
-      <div className="flex items-center gap-2 mr-2">
-        <Switch
-  checked={member.active} // This controls the switch position
-  onCheckedChange={handleToggleStatus} // This fires when user toggles
-  disabled={togglingStatus}
-  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-    member.active 
-      ? 'bg-green-500 hover:bg-green-600' 
-      : 'bg-red-500 hover:bg-red-600'
-  } ${togglingStatus ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
->
-  <span
-    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-      member.active ? 'translate-x-6' : 'translate-x-1'
-    } ${togglingStatus ? 'animate-pulse' : ''}`}
-  />
-</Switch>
-      </div>
+              {/* Action buttons with toggle switch */}
+              <div className="flex items-center gap-2">
+                {/* Toggle Status Switch */}
+                <div className="flex items-center gap-2 mr-2">
+                  <Switch
+                    checked={member.active} // This controls the switch position
+                    onCheckedChange={handleToggleStatus} // This fires when user toggles
+                    disabled={togglingStatus}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${member.active
+                      ? 'bg-green-500 hover:bg-green-600'
+                      : 'bg-red-500 hover:bg-red-600'
+                      } ${togglingStatus ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${member.active ? 'translate-x-6' : 'translate-x-1'
+                        } ${togglingStatus ? 'animate-pulse' : ''}`}
+                    />
+                  </Switch>
+                </div>
 
-      {/* Delete Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => setShowDeleteDialog(true)}
-        className="h-8 w-8 text-red-500 hover:bg-red-100 hover:text-red-700"
-      >
-        <Trash2 className="h-4 w-4" />
-        <span className="sr-only">Delete member</span>
-      </Button>
-    </div>
-  </CardHeader>
+                {/* Delete Button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="h-8 w-8 text-red-500 hover:bg-red-100 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span className="sr-only">Delete member</span>
+                </Button>
+              </div>
+            </CardHeader>
 
             <CardContent className="p-6 space-y-6">
               {/* Photo Upload Section - Enhanced */}
@@ -911,21 +963,17 @@ const handleToggleStatus = async () => {
                           <BriefcaseBusiness className="w-4 h-4 text-muted-foreground" />
                           Role *
                         </label>
-                        <Select
-                          value={profileData.role}
-                          onValueChange={(value) => setProfileData(prev => ({ ...prev, role: value }))}
-                        >
-                          <SelectTrigger className={`w-full transition-colors ${profileErrors.role ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}>
-                            <SelectValue placeholder="Select your role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ROLES.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <RoleDropdown
+                          selected={profileData.roleId}
+                          onChange={(roleId) => {
+                            const selectedRole = roles.find(role => role.id === roleId);
+                            // For now, we'll use the role name as the value
+                            // This will be updated when we modify the API to use role IDs
+                            setProfileData(prev => ({ ...prev, roleId: roleId, role: selectedRole?.name }));
+                          }}
+                          placeholder="Select your role"
+                          className={`w-full transition-colors ${profileErrors.role ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}
+                        />
                         {profileErrors.role && (
                           <p className="text-red-500 text-xs flex items-center gap-1 mt-1">
                             <AlertCircle className="w-3 h-3" />
@@ -954,23 +1002,67 @@ const handleToggleStatus = async () => {
                           Email cannot be changed
                         </p>
                       </div>
-
-                      {/* Phone Field */}
+                      {/* Combined Phone Number Field with Country Code */}
                       <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center gap-2">
                           <Phone className="w-4 h-4 text-muted-foreground" />
-                          Phone
+                          Phone Number
                         </label>
-                        <Input
-                          value={profileData.phone}
-                          onChange={(e) => {
-                            const onlyDigits = e.target.value.replace(/\D/g, '');
-                            setProfileData(prev => ({ ...prev, phone: onlyDigits }));
-                          }}
-                          className={`w-full transition-colors ${profileErrors.phone ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}
-                          maxLength={15}
-                          placeholder="Enter phone number"
-                        />
+                        <div className="flex gap-2">
+                          {/* Country Code Select */}
+                          <div className="relative w-32 flex-shrink-0">
+                            <select
+                              value={profileData.countryCode || "+44"}
+                              onChange={(e) => setProfileData({ ...profileData, countryCode: e.target.value })}
+                              className="appearance-none flex h-10 w-full rounded-md border border-input bg-background px-3 pr-8 py-2 text-sm ring-offset-background
+                 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={isLoadingCountries}
+                            >
+                              <option value="">Select</option>
+                              {countries.map((country) => (
+                                <option key={country.code} value={country.code}>
+                                  {country.code}
+                                </option>
+                              ))}
+                            </select>
+
+                            {/* Custom dropdown arrow */}
+                            <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                              <svg
+                                className="h-4 w-4 text-muted-foreground"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 12a.75.75 0 0 1-.53-.22l-4-4a.75.75 0 1 1 1.06-1.06L10 10.19l3.47-3.47a.75.75 0 0 1 1.06 1.06l-4 4A.75.75 0 0 1 10 12z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+
+                          {/* Phone Number Input */}
+                          <div className="flex-1">
+                            <Input
+                              value={profileData.phone}
+                              onChange={(e) => {
+                                const onlyDigits = e.target.value.replace(/\D/g, '');
+                                setProfileData(prev => ({ ...prev, phone: onlyDigits }));
+                              }}
+                              className={`w-full transition-colors ${profileErrors.phone ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}
+                              maxLength={15}
+                              placeholder="Enter phone number"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Loading and Error Messages */}
+                        {isLoadingCountries && (
+                          <p className="text-xs text-muted-foreground">Loading countries...</p>
+                        )}
                         {profileErrors.phone && (
                           <p className="text-red-500 text-xs flex items-center gap-1 mt-1">
                             <AlertCircle className="w-3 h-3" />
@@ -1037,22 +1129,22 @@ const handleToggleStatus = async () => {
                           Skills
                         </label>
                         {profileData.skills.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-3 p-3 bg-muted/30 rounded-lg border">
-                          {profileData.skills.map((skill, index) => (
-                            <Badge key={index} variant="secondary" className="flex items-center gap-1 px-3 py-1.5 bg-background border shadow-sm">
-                              {skill}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground ml-1"
-                                onClick={() => handleRemoveSkill(index)}
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
-                            </Badge>
-                          ))}
-                        </div>)}
+                          <div className="flex flex-wrap gap-2 mb-3 p-3 bg-muted/30 rounded-lg border">
+                            {profileData.skills.map((skill, index) => (
+                              <Badge key={index} variant="secondary" className="flex items-center gap-1 px-3 py-1.5 bg-background border shadow-sm">
+                                {skill}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground ml-1"
+                                  onClick={() => handleRemoveSkill(index)}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </Badge>
+                            ))}
+                          </div>)}
                         <div className="flex gap-2">
                           <Input
                             placeholder="Add a skill (press Enter to add)"
@@ -1078,66 +1170,79 @@ const handleToggleStatus = async () => {
                   </div>
                 </form>
               ) : (
-                /* View Mode - Enhanced Display */
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 gap-4">
-                      {[
-                        { icon: Mail, label: "Email", value: member.email, color: "blue" },
-                        { icon: Phone, label: "Phone", value: member.phone, color: "green" },
-                        { icon: MapPin, label: "Location", value: member.location, color: "red" }
-                      ].map((item, index) => (
-                        item.value && (
-                          <div key={index} className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors group">
-                            <div className={`flex items-center justify-center w-10 h-10 rounded-full bg-${item.color}-100 group-hover:bg-${item.color}-200 transition-colors`}>
-                              <item.icon className={`w-5 h-5 text-${item.color}-600`} />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
-                              <p className="font-semibold text-foreground break-all">{item.value}</p>
-                            </div>
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  </div>
+              /* View Mode - Enhanced Display */
+<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+  <div className="space-y-6">
+    <div className="grid grid-cols-1 gap-4">
+      {[
+        { 
+          icon: Mail, 
+          label: "Email", 
+          value: member.email, 
+          color: "blue" 
+        },
+        { 
+          icon: Phone, 
+          label: "Phone", 
+          value: member.phone ? `${member.countryCode || '+44'} ${member.phone}` : null, 
+          color: "green" 
+        },
+        { 
+          icon: MapPin, 
+          label: "Location", 
+          value: member.location, 
+          color: "red" 
+        }
+      ].map((item, index) => (
+        item.value && (
+          <div key={index} className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors group">
+            <div className={`flex items-center justify-center w-10 h-10 rounded-full bg-${item.color}-100 group-hover:bg-${item.color}-200 transition-colors`}>
+              <item.icon className={`w-5 h-5 text-${item.color}-600`} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
+              <p className="font-semibold text-foreground break-all">{item.value}</p>
+            </div>
+          </div>
+        )
+      ))}
+    </div>
+  </div>
 
-                  <div className="space-y-6">
-                    {member.bio && (
-                      <div className="p-5 rounded-xl border bg-card shadow-sm">
-                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-lg">
-                          <FileText className="w-5 h-5 text-primary" />
-                          About Me
-                        </h4>
-                        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
-                          {member.bio}
-                        </p>
-                      </div>
-                    )}
+  <div className="space-y-6">
+    {member.bio && (
+      <div className="p-5 rounded-xl border bg-card shadow-sm">
+        <h4 className="font-semibold mb-3 flex items-center gap-2 text-lg">
+          <FileText className="w-5 h-5 text-primary" />
+          About Me
+        </h4>
+        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+          {member.bio}
+        </p>
+      </div>
+    )}
 
-                    {member.skills && member.skills.length > 0 && (
-                      <div className="p-5 rounded-xl border bg-card shadow-sm">
-                        <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
-                          <Award className="w-5 h-5 text-primary" />
-                          Skills & Expertise
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {member.skills.map((skill, index) => (
-                            <Badge
-                              key={index}
-                              variant="secondary"
-                              className="px-3 py-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors"
-                            >
-                              {skill}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-
-                </div>
+    {member.skills && member.skills.length > 0 && (
+      <div className="p-5 rounded-xl border bg-card shadow-sm">
+        <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
+          <Award className="w-5 h-5 text-primary" />
+          Skills & Expertise
+        </h4>
+        <div className="flex flex-wrap gap-2">
+          {member.skills.map((skill, index) => (
+            <Badge
+              key={index}
+              variant="secondary"
+              className="px-3 py-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors"
+            >
+              {skill}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</div>
               )}
               {/* Action Button in Header */}
               <div className="flex items-center justify-end gap-2">
@@ -1153,10 +1258,12 @@ const handleToggleStatus = async () => {
                         role: member.role,
                         email: member.email || '',
                         phone: member.phone || '',
+                        countryCode: member.countryCode || '',
                         location: member.location || '',
                         bio: member.bio || '',
                         skills: member.skills || [],
-                        photo: member.profilePhoto || ''
+                        photo: member.profilePhoto || '',
+                        roleId: member?.roleId || '',
                       });
                     }}
                     className="flex items-center gap-1 border-muted-foreground/30 hover:bg-muted"
@@ -1179,10 +1286,12 @@ const handleToggleStatus = async () => {
                         role: member.role,
                         email: member.email || '',
                         phone: member.phone || '',
+                        countryCode: member.countryCode || '',
                         location: member.location || '',
                         bio: member.bio || '',
                         skills: member.skills || [],
-                        photo: member.profilePhoto || ''
+                        photo: member.profilePhoto || '',
+                        roleId: member?.roleId || '',
                       });
                       setProfileErrors({});
                     }
@@ -1237,7 +1346,7 @@ const handleToggleStatus = async () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <div className={`w-3 h-3 rounded-full`}
-                              style={{ backgroundColor: project.color }}></div>
+                                style={{ backgroundColor: project.color }}></div>
                               <h4 className="font-medium">{project.name}</h4>
                             </div>
                             <div className="space-y-1 text-sm text-muted-foreground">
