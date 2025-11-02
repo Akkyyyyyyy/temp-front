@@ -17,9 +17,11 @@ import { toast } from "sonner";
 import { getISOWeek, isWithinInterval, parseISO } from "date-fns";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useAuth } from "@/context/AuthContext";
+import { useRole } from "@/hooks/useRole";
 import { PackagesDialog } from "./PackagesDialog";
 import { ScheduleHourlyRef } from "./ScheduleHourly";
 import { HeaderWithClock } from "./HeaderWithClock";
+import { preloadCountries } from "@/helper/countryHelpers";
 
 
 const teamMembers: TeamMember[] = [
@@ -255,7 +257,7 @@ const teamMembers: TeamMember[] = [
   //   }]
   // }
 ];
-export type TimeView = 'week' | 'month';
+export type TimeView = 'Day' | 'week' | 'month';
 
 // Generate different time periods
 const augustDates = Array.from({
@@ -267,8 +269,9 @@ export function GanttChart() {
 
 
   const today = new Date();
-  const [timeView, setTimeView] = useState<TimeView>('week');
-  const [selectedDay, setSelectedDay] = useState<number | null>();
+  const { roles } = useRole(); // Get roles to look up role name by ID
+  const [timeView, setTimeView] = useState<TimeView>('month');
+  const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number | null>(today.getFullYear());
   const [selectedWeek, setSelectedWeek] = useState<number | null>(getISOWeek(today));
@@ -395,16 +398,20 @@ export function GanttChart() {
       setIsProjectClick(false); // Reset after scrolling
     }
   }, [selectedProject, isProjectClick]);
+  useEffect(() => {
+    // Preload countries when app starts
+    preloadCountries();
+  }, []);
 
   // Day calendar scrolling effect
-  useEffect(() => {
-    if (hasMounted.current && scheduleHourlyRef.current && isDayClick) {
-      scheduleHourlyRef.current.scrollToDayCalendar();
-      setIsDayClick(false); // Reset after scrolling
-    } else {
-      hasMounted.current = true;
-    }
-  }, [isDayClick]);
+  // useEffect(() => {
+  //   if (hasMounted.current && scheduleHourlyRef.current && isDayClick) {
+  //     scheduleHourlyRef.current.scrollToDayCalendar();
+  //     setIsDayClick(false); // Reset after scrolling
+  //   } else {
+  //     hasMounted.current = true;
+  //   }
+  // }, [isDayClick]);
 
   const { user, isCompany, isMember } = useAuth();
   const companyDetails = isCompany && user?.data
@@ -417,95 +424,6 @@ export function GanttChart() {
 
   const baseUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
-  // // Helper function to refresh members data
-  // const refreshMembers = async () => {
-  //   if (!companyDetails.id && memberDetails) {
-  //     const singleMember: TeamMember = {
-  //       id: memberDetails.id,
-  //       name: memberDetails.name,
-  //       email: memberDetails.email,
-  //       phone: memberDetails.phone,
-  //       location: memberDetails.location,
-  //       bio: memberDetails.bio,
-  //       skills: memberDetails.skills,
-  //       profilePhoto: memberDetails.profilePhoto,
-  //       role: memberDetails.role,
-  //       projects: memberDetails.projects || []
-  //     };
-
-  //     setTeamMembersState([singleMember]);
-  //     return;
-  //   }
-  //   console.log(memberDetails);
-
-  //   try {
-  //     let response: any;
-
-  //     // Determine which API call to make based on view type
-  //     if (timeView === 'week') {
-  //       // Week view call
-  //       response = await getMembersByCompanyId(companyDetails.id, {
-  //         viewType: 'week',
-  //         week: selectedWeek,
-  //         year: selectedYear
-  //       });
-  //     } else {
-  //       // Month view call (default)
-  //       response = await getMembersByCompanyId(companyDetails.id, {
-  //         viewType: 'month',
-  //         month: selectedMonth,
-  //         year: selectedYear
-  //       });
-  //     }
-
-  //     if (response.success && response.data) {
-  //       // Handle different response structures
-  //       let membersData: Member[];
-
-  //       if (Array.isArray(response.data)) {
-  //         // Backward compatibility - response.data is directly the members array
-  //         membersData = response.data;
-  //       } else {
-  //         // New structure - response.data has members property
-  //         membersData = response.data.members || [];
-  //       }
-
-  //       const teamMembersData: TeamMember[] = membersData.map((member: Member) => ({
-  //         id: member.id,
-  //         name: member.name,
-  //         email: member.email,
-  //         phone: member.phone,
-  //         location: member.location,
-  //         bio: member.bio,
-  //         skills: member.skills,
-  //         profilePhoto: member.profilePhoto,
-  //         role: member.role,
-  //         projects: member.projects || []
-  //       }));
-
-  //       setTeamMembersState(teamMembersData);
-  //     } else {
-  //       toast.error(response.message || "Failed to fetch team members");
-  //     }
-  //   } catch (error) {
-  //     console.error("Error fetching members:", error);
-  //     toast.error("Failed to fetch team members");
-  //   }
-  // };
-
-  // Fetch members on component mount
-  // useEffect(() => {
-  //   const fetchMembers = async () => {
-  //     try {
-  //       setLoading(true);
-  //       await refreshMembers();
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   fetchMembers();
-  // }, []);
   useEffect(() => {
     const fetchMembers = async () => {
       try {
@@ -516,7 +434,6 @@ export function GanttChart() {
       }
     };
     fetchMembers();
-
   }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate, companyDetails?.id, memberDetails?.company?.id]);
 
 
@@ -540,18 +457,32 @@ export function GanttChart() {
   const addNewTeamMember = async (memberData: {
     roleId: string;
     active: boolean;
-    profilePhoto: any; name: string; email: string; role: string; photo: string;countryCode?: string;
+    profilePhoto: any;
+    name: string;
+    email: string;
+    role: string;
+    photo: string;
+    countryCode?: string;
     phone?: string;
+    location?: string;
+    bio?: string;
+    skills?: string[];
   }) => {
     try {
+      // Find the role name from the roles array using roleId
+      const selectedRole = roles.find(r => r.id === memberData.roleId);
+      const roleName = selectedRole?.name || memberData.role;
+      
       const response = await addMember({
         name: memberData.name,
         email: memberData.email,
-        role: memberData.role,
+        roleId: memberData.roleId, // Use roleId instead of role
         companyId: companyDetails.id,
         countryCode: memberData.countryCode,
         phone: memberData.phone,
-
+        location: memberData.location,
+        bio: memberData.bio,
+        skills: memberData.skills,
       });
 
       if (!response.success) {
@@ -576,12 +507,15 @@ export function GanttChart() {
         name: memberData.name,
         profilePhoto: memberData.profilePhoto,
         email: memberData.email,
-        role: memberData.role,
+        role: roleName, // Use role name from roles array
         active: memberData.active,
         countryCode: memberData.countryCode,
         phone: memberData.phone,
         roleId: memberData.roleId,
         projects: response.member?.projects || [],
+        location: memberData.location,
+        bio: memberData.bio,
+        skills: memberData.skills || [],
       };
 
       setTeamMembers((prev) => [newMember, ...prev]);
@@ -751,6 +685,7 @@ export function GanttChart() {
 
           {/* Team Members */}
           <TeamMembers
+            refreshMembers={refreshMembers}
             teamMembers={filteredTeamMembers}
             timeView={timeView}
             setTimeView={setTimeView}

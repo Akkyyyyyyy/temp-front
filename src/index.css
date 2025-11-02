@@ -147,3 +147,8 @@
   animation-duration: 0.5s;
   animation-fill-mode: forwards;
 }
+
+.phone-input-custom :focus {
+  outline: none;
+  box-shadow: 0 0 0 2px hsl(var(--ring)), 0 0 0 4px hsl(var(--background));
+}

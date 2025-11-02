@@ -20,6 +20,7 @@ export interface EditableBooking {
   endDate?: string;
   teamAssignments?: any[];
   client?: {
+    cc: string;
     name: string;
     mobile: string;
     email: string;

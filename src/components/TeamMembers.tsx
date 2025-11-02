@@ -12,6 +12,8 @@ import { Project, updateMemberRingColor } from "@/api/member";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { RingColorDialog } from "./modals/RingColorDialog";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
+import { TimeViewToggle } from "./TimeViewToggle";
+import { DayCalendar } from "./DayCalendar";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
@@ -29,12 +31,13 @@ export interface TeamMember {
   ringColor?: string;
   active: boolean;
   roleId: string;
-  countryCode?:string;
+  countryCode?: string;
 }
 
 interface TeamMembersProps {
+  refreshMembers: () => void;
   teamMembers: TeamMember[];
-  timeView: TimeView;
+  timeView: any;
   selectedDay?: number;
   setSelectedDay: (day: number) => void;
   selectedMonth: number;
@@ -48,16 +51,18 @@ interface TeamMembersProps {
   onMonthChange?: (month: number, year: number) => void;
   onWeekChange?: (week: number, year: number) => void;
   loading: boolean;
-  setTimeView: (view: TimeView) => void;
+  setTimeView: (view: any) => void;
   setIsDayClick: (dayClick: boolean) => void;
   setSelectedProject: (projectId: string | null) => void;
   setSearchQuery: (query: string) => void;
   searchQuery: string,
   setIsProjectClick: (projectClick: boolean) => void;
   onRingColorUpdate?: (bool: boolean) => void;
+  onDayChange?: (day: number, month: number, year: number) => void;
 }
 
 export function TeamMembers({
+  refreshMembers,
   teamMembers,
   timeView,
   selectedDay,
@@ -80,6 +85,7 @@ export function TeamMembers({
   searchQuery,
   setIsProjectClick,
   onRingColorUpdate,
+  onDayChange
 }: TeamMembersProps) {
   const minColumnWidth = timeView === "week" ? "40px" : "8px";
 
@@ -137,14 +143,6 @@ export function TeamMembers({
       setIsUpdatingColor(false);
     }
   };
-
-  // Helper function to get current week number
-  function getCurrentWeekNumber(): number {
-    const today = new Date();
-    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
-    const pastDaysOfYear = (today.getTime() - firstDayOfYear.getTime()) / 86400000;
-    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-  }
 
   // Helper function to get date from week number
   function getDateFromWeek(year: number, week: number): Date {
@@ -215,6 +213,10 @@ export function TeamMembers({
       const start = startOfWeek(weekStartDate, { weekStartsOn: 1 });
       const end = endOfWeek(weekStartDate, { weekStartsOn: 1 });
       return eachDayOfInterval({ start, end });
+    } else if (timeView === "day") {
+      // For day view, return just the selected day
+      const dayDate = new Date(selectedYear, selectedMonth - 1, selectedDay);
+      return [dayDate];
     } else {
       const start = startOfMonth(new Date(selectedYear, selectedMonth - 1));
       const end = endOfMonth(new Date(selectedYear, selectedMonth - 1));
@@ -272,7 +274,21 @@ export function TeamMembers({
       setSelectedWeek(newWeek);
       setSelectedYear(newYear);
       onWeekChange?.(newWeek, newYear);
+    } else if (timeView === "day") {
+      const currentDate = new Date(selectedYear, selectedMonth - 1, selectedDay);
+      const previousDate = new Date(currentDate);
+      previousDate.setDate(currentDate.getDate() - 1);
+
+      const newYear = previousDate.getFullYear();
+      const newMonth = previousDate.getMonth() + 1; // Convert to 1-indexed month
+      const newDay = previousDate.getDate();
+
+      setSelectedYear(newYear);
+      setSelectedMonth(newMonth);
+      setSelectedDay(newDay);
+      onDayChange?.(newDay, newMonth, newYear);
     } else {
+      // Month view
       let newMonth = selectedMonth - 1;
       let newYear = selectedYear;
 
@@ -301,7 +317,21 @@ export function TeamMembers({
       setSelectedWeek(newWeek);
       setSelectedYear(newYear);
       onWeekChange?.(newWeek, newYear);
+    } else if (timeView === "day") {
+      const currentDate = new Date(selectedYear, selectedMonth - 1, selectedDay);
+      const nextDate = new Date(currentDate);
+      nextDate.setDate(currentDate.getDate() + 1);
+
+      const newYear = nextDate.getFullYear();
+      const newMonth = nextDate.getMonth() + 1; // Convert to 1-indexed month
+      const newDay = nextDate.getDate();
+
+      setSelectedYear(newYear);
+      setSelectedMonth(newMonth);
+      setSelectedDay(newDay);
+      onDayChange?.(newDay, newMonth, newYear);
     } else {
+      // Month view
       let newMonth = selectedMonth + 1;
       let newYear = selectedYear;
 
@@ -320,17 +350,35 @@ export function TeamMembers({
   const getPeriodTitle = () => {
     if (timeView === "week") {
       const weekStartDate = getDateFromWeek(selectedYear, selectedWeek);
-      const start = startOfWeek(weekStartDate, { weekStartsOn: 1 });
+      const start = startOfWeek(weekStartDate, { weekStartsOn: 1 }); // Monday start for UK
       const end = endOfWeek(weekStartDate, { weekStartsOn: 1 });
 
       if (start.getMonth() === end.getMonth()) {
-        return `Week ${selectedWeek}, ${format(start, "MMM d")} - ${format(end, "d, yyyy")}`;
+        return `${format(start, "d MMM")} - ${format(end, "d, yyyy")}`;
       } else if (start.getFullYear() === end.getFullYear()) {
-        return `Week ${selectedWeek}, ${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+        return `${format(start, "d MMM")} - ${format(end, "d MMM, yyyy")}`;
       } else {
-        return `Week ${selectedWeek}, ${format(start, "MMM d, yyyy")} - ${format(end, "MMM d, yyyy")}`;
+        return `${format(start, "d MMM, yyyy")} - ${format(end, "d MMM, yyyy")}`;
       }
+    } else if (timeView === "day") {
+      // Validate day parameters before creating date
+      const day = selectedDay || new Date().getDate(); // Fallback to current day
+      const month = selectedMonth || new Date().getMonth() + 1; // Fallback to current month
+      const year = selectedYear || new Date().getFullYear(); // Fallback to current year
+
+      // Create a valid date object
+      const dayDate = new Date(year, month - 1, day);
+
+      // Check if the date is valid
+      if (isNaN(dayDate.getTime())) {
+        // Fallback to current date if invalid
+        const currentDate = new Date();
+        return format(currentDate, "EEEE, d MMMM yyyy");
+      }
+
+      return format(dayDate, "EEEE, d MMMM yyyy");
     } else {
+      // Month view
       return `${monthNames[selectedMonth - 1]} ${selectedYear}`;
     }
   };
@@ -340,10 +388,8 @@ export function TeamMembers({
     setIsDayClick(true);
     setSelectedDay(clickedDate);
     setSelectedProject(null);
-
-    if (selectedDay && clickedDate === selectedDay) {
-      setSelectedDay(null);
-    }
+    setTimeView('day');
+   
   };
 
   const isDaySelected = (day: Date) => {
@@ -372,7 +418,7 @@ export function TeamMembers({
         <div className="relative w-full lg:w-96">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search team members, roles, projects"
+            placeholder="Search team members, roles & projects"
             className="pl-10 w-full rounded-full h-12"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -410,40 +456,183 @@ export function TeamMembers({
             </Button>
           </div>
         </div>
-        <div className="w-full border border-gray-700 rounded-full bg-muted sm:w-fit">
-          <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1 border border-border shadow-sm relative">
-            <div
-              className={`
-              absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out
-              ${timeView === 'week' ? 'left-1' : 'left-1 translate-x-full'}
-              w-[calc(50%-4px)] h-[calc(100%-8px)] 
-            `}
-            />
-
-            {(['week', 'month'] as TimeView[]).map((view) => (
-              <Button
-                key={view}
-                onClick={() => setTimeView(view)}
-                size="sm"
-                className={`
-                relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
-                hover:bg-transparent
-                ${timeView === view
-                    ? 'text-primary-foreground'
-                    : 'bg-transparent text-muted-foreground hover:text-foreground'
-                  }
-              `}
-                variant="ghost"
-              >
-                {view}
-              </Button>
-            ))}
-          </div>
-        </div>
+        <TimeViewToggle
+          timeView={timeView}
+          setTimeView={setTimeView}
+          setSelectedDay={setSelectedDay}
+          selectedDay={selectedDay}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          selectedYear={selectedYear}
+          setSelectedYear={setSelectedYear}
+          className="mb-4"
+        />
       </div>
     </div>
   );
 
+  // Render team member list component (used in both day and week/month views)
+  const renderTeamMemberList = () => (
+    <div className="w-[130px] md:w-[180px] shrink-0 space-y-3 mr-3">
+      {/* Empty space for header alignment */}
+      <div className="h-12"></div>
+
+      {loading ? (
+        <div className="space-y-3 mt-2">
+          {Array.from({ length: 2 }).map((_, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2 p-2 rounded-md h-14"
+            >
+              <Skeleton className="w-8 h-8 rounded-full" />
+              <div className="min-w-0 flex-1 space-y-1">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : sortedTeamMembers.length ? sortedTeamMembers.map(member => {
+        const projectRows = getProjectRows(member.projects || []);
+        const timelineHeight = getTimelineHeight(member);
+        const isInactive = !member.active;
+
+        return (
+          <div
+            key={member.id}
+            className={`${timelineHeight} ${isInactive ? 'opacity-50 grayscale' : ''}`}
+          >
+            <div className={`flex gap-2 cursor-pointer p-2 rounded-md transition-colors max-h-16 ${isInactive
+              ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
+              : 'hover:bg-muted/50 hover:text-studio-gold'
+              }`}>
+              <div className="relative">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="cursor-pointer"
+                      onClick={(e) => handleOpenColorDialog(member, e)}
+                    >
+                      <Avatar
+                        className={`w-9 h-9 ring-[2px] transition-all duration-200 ${isInactive ? 'ring-muted-foreground/30' : ''
+                          }`}
+                        style={{
+                          borderColor: isInactive ? 'hsl(var(--muted-foreground) / 0.3)' : member.ringColor || 'hsl(var(--muted))',
+                          boxShadow: isInactive
+                            ? '0 0 0 2px hsl(var(--muted-foreground) / 0.3)'
+                            : `0 0 0 2px ${member.ringColor || 'hsl(var(--muted))'}`
+                        }}
+                      >
+                        <AvatarImage
+                          src={`${S3_URL}/${member.profilePhoto}`}
+                          alt={member.name}
+                          className={isInactive ? 'grayscale object-cover' : 'object-cover'}
+                          
+                        />
+                        <AvatarFallback className={`text-sm font-semibold ${isInactive
+                          ? 'bg-muted-foreground/20 text-muted-foreground'
+                          : 'bg-studio-gold text-studio-dark'
+                          }`}>
+                          {member.name.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {isInactive && (
+                        <div className="absolute -top-1 -right-1 bg-muted-foreground/70 text-white rounded-full p-0.5">
+                          <Ban className="w-3 h-3" />
+                        </div>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isInactive ? 'Inactive member - Click to set ring color' : 'Click to set ring color'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <div
+                className="min-w-0 flex-1"
+                onClick={() => setSelectedMember(member)}
+              >
+                <h3 className={`font-medium transition-colors text-sm truncate ${isInactive ? 'text-muted-foreground' : 'text-foreground'
+                  }`}>
+                  {member.name}
+                  {isInactive && (
+                    <span className="ml-2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      Inactive
+                    </span>
+                  )}
+                </h3>
+                <p className={`text-xs truncate ${isInactive ? 'text-muted-foreground/70' : 'text-muted-foreground'
+                  }`}>
+                  {member.role}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      }) : (
+
+        sortedTeamMembers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-1 text-center mt-2">
+            <div
+              className="w-12 h-12 bg-muted/20 rounded-full flex items-center justify-center mb-2 cursor-pointer hover:bg-muted/40 transition-colors"
+              onClick={() => setShowAddTeamMember?.(true)}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-semibold text-foreground mb-1">No Team Members</h3>
+            <p className="text-muted-foreground text-xs max-w-xs">
+              Add your first team member to organize projects.
+            </p>
+          </div>
+        ) : <></>)}
+    </div>
+  );
+
+  // Render day view - show team member list alongside DayCalendar
+  if (timeView === "day") {
+    return (
+      <div className="space-y-4">
+        {/* Period Navigation */}
+        {periodNavigation}
+
+        {/* Container with team member list and day calendar */}
+        <div className="flex">
+          {/* Team Member List */}
+          {renderTeamMemberList()}
+
+          {/* Day Calendar */}
+          <div className="flex-1">
+            <DayCalendar
+              date={`${monthNames[selectedMonth - 1]} ${selectedDay}, ${selectedYear}`}
+              day={selectedDay}
+              setSelectedDay={setSelectedDay}
+              selectedMonth={selectedMonth}
+              setSelectedMonth={setSelectedMonth}
+              selectedYear={selectedYear}
+              setSelectedYear={setSelectedYear}
+              teamMembers={teamMembers}
+              selectedWeek={selectedWeek}
+              setSelectedWeek={setSelectedWeek}
+              setSelectedProject={setSelectedProject}
+            />
+          </div>
+        </div>
+
+        <RingColorDialog
+          isOpen={colorDialogOpen}
+          onClose={() => setColorDialogOpen(false)}
+          member={selectedMemberForColor}
+          onColorChange={handleRingColorChange}
+          isUpdating={isUpdatingColor}
+          refreshMembers={refreshMembers}
+        />
+      </div>
+    );
+  }
+
+  // Render week/month view - show team member list with grids
   return (
     <div className="space-y-4">
       {/* Period Navigation */}
@@ -451,121 +640,8 @@ export function TeamMembers({
 
       {/* Container with fixed member column and scrollable timeline */}
       <div className="flex">
-        {/* Fixed Team Member Column */}
-        <div className="w-[130px] md:w-[180px] shrink-0 space-y-3 mr-3">
-          {/* Empty space for header alignment */}
-          <div className="h-12"></div>
-
-          {loading ? (
-            <div className="space-y-3 mt-2">
-              {Array.from({ length: 2 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 p-2 rounded-md h-14"
-                >
-                  <Skeleton className="w-8 h-8 rounded-full" />
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : sortedTeamMembers.length ? sortedTeamMembers.map(member => {
-            const projectRows = getProjectRows(member.projects || []);
-            const timelineHeight = getTimelineHeight(member);
-            const isInactive = !member.active;
-
-            return (
-              <div
-                key={member.id}
-                className={`${timelineHeight} ${isInactive ? 'opacity-50 grayscale' : ''}`}
-              >
-                <div className={`flex gap-2 cursor-pointer p-2 rounded-md transition-colors max-h-16 ${isInactive
-                    ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
-                    : 'hover:bg-muted/50 hover:text-studio-gold'
-                  }`}>
-                  <div className="relative">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div
-                          className="cursor-pointer"
-                          onClick={(e) => handleOpenColorDialog(member, e)}
-                        >
-                          <Avatar
-                            className={`w-9 h-9 ring-[2px] transition-all duration-200 ${isInactive ? 'ring-muted-foreground/30' : ''
-                              }`}
-                            style={{
-                              borderColor: isInactive ? 'hsl(var(--muted-foreground) / 0.3)' : member.ringColor || 'hsl(var(--muted))',
-                              boxShadow: isInactive
-                                ? '0 0 0 2px hsl(var(--muted-foreground) / 0.3)'
-                                : `0 0 0 2px ${member.ringColor || 'hsl(var(--muted))'}`
-                            }}
-                          >
-                            <AvatarImage
-                              src={`${S3_URL}/${member.profilePhoto}`}
-                              alt={member.name}
-                              className={isInactive ? 'grayscale' : ''}
-                            />
-                            <AvatarFallback className={`text-sm font-semibold ${isInactive
-                                ? 'bg-muted-foreground/20 text-muted-foreground'
-                                : 'bg-studio-gold text-studio-dark'
-                              }`}>
-                              {member.name.slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {isInactive && (
-                            <div className="absolute -top-1 -right-1 bg-muted-foreground/70 text-white rounded-full p-0.5">
-                              <Ban className="w-3 h-3" />
-                            </div>
-                          )}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{isInactive ? 'Inactive member - Click to set ring color' : 'Click to set ring color'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className="min-w-0 flex-1"
-                    onClick={() => setSelectedMember(member)}
-                  >
-                    <h3 className={`font-medium transition-colors text-sm truncate ${isInactive ? 'text-muted-foreground' : 'text-foreground'
-                      }`}>
-                      {member.name}
-                      {isInactive && (
-                        <span className="ml-2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                          Inactive
-                        </span>
-                      )}
-                    </h3>
-                    <p className={`text-xs truncate ${isInactive ? 'text-muted-foreground/70' : 'text-muted-foreground'
-                      }`}>
-                      {member.role}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            );
-          }) : (
-
-            sortedTeamMembers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-1 text-center mt-2">
-                <div
-                  className="w-12 h-12 bg-muted/20 rounded-full flex items-center justify-center mb-2 cursor-pointer hover:bg-muted/40 transition-colors"
-                  onClick={() => setShowAddTeamMember?.(true)}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <h3 className="text-sm font-semibold text-foreground mb-1">No Team Members</h3>
-                <p className="text-muted-foreground text-xs max-w-xs">
-                  Add your first team member to organize projects.
-                </p>
-              </div>
-            ) : <></>)}
-        </div>
+        {/* Team Member List */}
+        {renderTeamMemberList()}
 
         {/* Scrollable Timeline Area */}
         <div className="flex-1 max-w-[100vw] overflow-x-auto">
@@ -759,18 +835,19 @@ export function TeamMembers({
                   );
                 })
               )}
-
-              <RingColorDialog
-                isOpen={colorDialogOpen}
-                onClose={() => setColorDialogOpen(false)}
-                member={selectedMemberForColor}
-                onColorChange={handleRingColorChange}
-                isUpdating={isUpdatingColor}
-              />
             </div>
           </div>
         </div>
       </div>
+
+      <RingColorDialog
+        isOpen={colorDialogOpen}
+        onClose={() => setColorDialogOpen(false)}
+        member={selectedMemberForColor}
+        onColorChange={handleRingColorChange}
+        isUpdating={isUpdatingColor}
+        refreshMembers={refreshMembers}
+      />
     </div>
   );
 }

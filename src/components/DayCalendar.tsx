@@ -16,12 +16,13 @@ interface DayCalendarProps {
   setSelectedYear: (month: number) => void;
   selectedWeek: number;
   setSelectedWeek: (week: number) => void;
+  setSelectedProject: (projectId: string | null) => void;
 }
 
-export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear, selectedWeek, setSelectedWeek }: DayCalendarProps) {
+export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear, selectedWeek, setSelectedWeek, setSelectedProject }: DayCalendarProps) {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const targetDate = new Date(selectedYear, selectedMonth - 1, day);
-
+  
   const normalizeDate = (date: Date) =>
     new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
@@ -34,7 +35,7 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
 
   // Build editableBookings directly from projects
   const editableBookings: EditableBooking[] = [];
-  
+
   teamMembers.forEach(member => {
     member.projects?.forEach((project, index) => {
       if (!project.startDate || !project.endDate) return;
@@ -45,7 +46,7 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
 
       if (normalizedTarget >= start && normalizedTarget <= end) {
         if (project.startHour === undefined || project.endHour === undefined) return;
-        
+
         editableBookings.push({
           id: `${member.name}-${project.name}-${index}`,
           projectName: project.name,
@@ -128,7 +129,7 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
   // Format date for display
   const formatDisplayDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-UK', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -139,7 +140,7 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
   // Compact format for mobile
   const formatDisplayDateMobile = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
+    return date.toLocaleDateString('en-UK', {
       weekday: 'short',
       month: 'short',
       day: 'numeric'
@@ -147,28 +148,24 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
   };
 
   return (
-    <div className="bg-background rounded-lg border border-border/20 p-4 sm:p-6 my-4 sm:my-5">
+    <div className="bg-background rounded-lg border border-border/20 p-4 sm:p-6">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4">
         <div className="flex items-center gap-2 text-base sm:text-lg font-bold w-full sm:w-auto justify-between sm:justify-start">
           <span className="text-sm sm:text-base lg:text-lg">
             Hourly Schedule
           </span>
-       
+
         </div>
 
         {/* Date Navigation */}
-        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
-          {/* Date Display */}
+        {/* <div className="flex items-center justify-between w-full sm:w-auto gap-2">
           <div className="flex-1 sm:flex-none">
             <h4 className="text-sm sm:text-base font-semibold text-foreground text-left">
-              {/* Show different format on mobile */}
               <span className="sm:hidden">{formatDisplayDateMobile(date)}</span>
               <span className="hidden sm:inline">{formatDisplayDate(date)}</span>
             </h4>
           </div>
-
-          {/* Navigation Buttons */}
           <div className="flex items-center gap-1 sm:gap-2">
             <Button
               variant="outline"
@@ -189,8 +186,8 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
             </Button>
           </div>
 
-        
-        </div>
+
+        </div> */}
       </div>
 
       {/* Calendar Grid */}

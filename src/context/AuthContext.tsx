@@ -1,6 +1,7 @@
 // src/context/AuthContext.tsx
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { getRolesByCompanyId } from "@/api/role";
 
 type UserType = "company" | "member";
 
@@ -16,14 +17,54 @@ interface AuthContextProps {
     logout: () => void;
     isCompany: boolean;
     isMember: boolean;
+    roles: any[];
+    loadingRoles: boolean;
+    refreshRoles: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<AuthUser | null>(null);
+    const [roles, setRoles] = useState<any[]>([]);
+    const [loadingRoles, setLoadingRoles] = useState(false);
     const navigate = useNavigate();
 
+    const loadRoles = useCallback(async () => {
+        if (!user) {
+            setRoles([]);
+            return;
+        }
+
+        try {
+            setLoadingRoles(true);
+            const companyId = user.data?.id || user.data?.company?.id;
+            
+            if (!companyId) {
+                setRoles([]);
+                return;
+            }
+
+            const response = await getRolesByCompanyId(companyId);
+            
+            if (response.success && response.data) {
+                let rolesData: any[] = [];
+                if (Array.isArray(response.data)) {
+                    rolesData = response.data;
+                } else if (response.data?.roles && Array.isArray(response.data.roles)) {
+                    rolesData = response.data.roles;
+                } else if (response.data?.data?.roles && Array.isArray(response.data.data.roles)) {
+                    rolesData = response.data.data.roles;
+                }
+                setRoles(rolesData);
+            }
+        } catch (error) {
+            console.error("Error loading roles:", error);
+            setRoles([]);
+        } finally {
+            setLoadingRoles(false);
+        }
+    }, [user]);
 
     useEffect(() => {
         const token = localStorage.getItem("auth-token");
@@ -38,6 +79,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             });
         }
     }, []);
+
+    // Load roles when user is set
+    useEffect(() => {
+        if (user) {
+            loadRoles();
+        } else {
+            setRoles([]);
+        }
+    }, [user, loadRoles]);
 
     const login = (type: UserType, data: any) => {
         localStorage.setItem("auth-token", data.token);
@@ -73,6 +123,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 logout,
                 isCompany: user?.type === "company",
                 isMember: user?.type === "member",
+                roles,
+                loadingRoles,
+                refreshRoles: loadRoles,
             }}
         >
             {children}

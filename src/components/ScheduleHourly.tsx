@@ -72,7 +72,6 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     // Create refs for scrolling
     const dayCalendarRef = useRef<HTMLDivElement>(null);
     const projectDetailsRef = useRef<HTMLDivElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to project details when selectedProject changes
     useEffect(() => {
@@ -129,15 +128,14 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     const uniqueProjects = Array.from(uniqueProjectsMap.values());
 
     return (
-      <div ref={containerRef} className="mt-4 sm:mt-6 lg:mt-8 space-y-4 sm:space-y-6">
+      <div className="mt-4 sm:mt-6 lg:mt-8 space-y-4 sm:space-y-6">
         <div className="p-4 sm:p-6 bg-muted/30 rounded-lg border border-border/20">
           <div className="space-y-3 sm:space-y-4 mb-4">
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground text-center sm:text-left w-full sm:w-auto">
-                {monthNames[currentMonth - 1]} {selectedDay}, {currentYear} - {showAvailable ? "Who's Available" : "Who's Working Today"}
+                {selectedDay} {monthNames[currentMonth - 1]} {currentYear} - {showAvailable ? "Who's Available" : "Who's Working"}
               </h3>
-              
               {/* Toggle Switch */}
               <div className="flex justify-center sm:justify-end w-full sm:w-auto">
                 <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1 border border-border shadow-sm relative">
@@ -175,8 +173,8 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
               {/* Search Bar */}
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input 
-                  placeholder="Search team members..." 
+                <Input
+                  placeholder="Search team members..."
                   className="pl-10 w-full text-sm sm:text-base"
                 />
               </div>
@@ -192,14 +190,14 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       size="sm"
                       className={`
                         text-xs px-2 sm:px-3 py-1 h-7 sm:h-8 flex items-center flex-shrink-0
-                        ${selectedProject === project.id 
-                          ? 'bg-primary border border-transparent' 
+                        ${selectedProject === project.id
+                          ? 'bg-primary border border-transparent'
                           : 'bg-background text-foreground border border-gray-800'
                         }
                       `}
                       onClick={() => handleProjectClick(project.id)}
                     >
-                      <div 
+                      <div
                         className="w-2 h-2 rounded-full mr-1 sm:mr-2 flex-shrink-0"
                         style={{ backgroundColor: project.color }}
                       />
@@ -217,15 +215,15 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
           {(showAvailable ? availableToday : workersToday).length > 0 ? (
             <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
               {(showAvailable ? availableToday : workersToday).map(worker => (
-                <div 
-                  key={worker.id} 
+                <div
+                  key={worker.id}
                   className="bg-background rounded-lg p-3 sm:p-4 border border-border/20 hover:border-border/40 transition-colors"
                 >
-                  <div 
-                    className="flex items-center gap-3 mb-3 cursor-pointer" 
+                  <div
+                    className="flex items-center gap-3 mb-3 cursor-pointer"
                     onClick={() => setSelectedMember(worker)}
                   >
-                    <Avatar 
+                    <Avatar
                       className="w-8 h-8 sm:w-10 sm:h-10 ring-1 ring-green-500 flex-shrink-0"
                       style={{
                         borderColor: worker.ringColor || 'hsl(var(--muted))',
@@ -259,7 +257,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       <div className="space-y-1">
                         {(worker as any).activeProjects.map((project: any) => (
                           <div key={project.id} className="flex items-center gap-2 text-xs sm:text-sm">
-                            <div 
+                            <div
                               className="w-2 h-2 rounded-full flex-shrink-0"
                               style={{ backgroundColor: project.color }}
                             />
@@ -305,7 +303,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
           )}
 
           {/* Day Calendar Section */}
-          <div ref={dayCalendarRef} className="mt-6 sm:mt-8">
+          {/* <div ref={dayCalendarRef} className="mt-6 sm:mt-8">
             <DayCalendar
               date={`${monthNames[currentMonth - 1]} ${selectedDay}, ${currentYear}`}
               day={selectedDay}
@@ -317,8 +315,9 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
               teamMembers={teamMembers}
               selectedWeek={selectedWeek}
               setSelectedWeek={setSelectedWeek}
+              setSelectedProject={setSelectedProject}
             />
-          </div>
+          </div> */}
         </div>
       </div>
     );

@@ -1,4 +1,8 @@
-// src/api/role.ts
+import { toast } from "sonner";
+import { apiFetch } from "./apiClient";
+
+const baseUrl = import.meta.env.VITE_BACKEND_URL;
+
 export interface Role {
   id: string;
   name: string;
@@ -9,8 +13,21 @@ export interface Role {
 }
 
 export interface RoleWithCounts extends Role {
-  memberCount: number;
-  assignmentCount: number;
+  memberCount?: number;
+  assignmentCount?: number;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  errors?: Record<string, string>;
+}
+
+export interface GetRolesResponse {
+  data: any;
+  roles: RoleWithCounts[];
+  totalCount: number;
 }
 
 export interface CreateRoleRequest {
@@ -25,145 +42,158 @@ export interface UpdateRoleRequest {
   companyId: string;
 }
 
-export interface ApiError {
-  error: string;
-  code?: string;
-  details?: any;
-}
-
-const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-
-class RoleApiService {
-  private async makeRequest<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+export async function getRolesByCompanyId(
+  companyId: string
+): Promise<ApiResponse<GetRolesResponse>> {
+  try {
     const token = localStorage.getItem('auth-token');
-    
-    const response = await fetch(`${API_BASE_URL}/roles${endpoint}`, {
-      ...options,
+
+    if (!companyId?.trim()) {
+      return { success: false, message: "Company ID is required" };
+    }
+
+    const response = await apiFetch(`${baseUrl}/roles/company`, {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
       },
+      body: JSON.stringify({ companyId }),
     });
+
+    const data = await response.json();
 
     if (!response.ok) {
-      const errorData: ApiError = await response.json().catch(() => ({
-        error: 'Network error',
-        code: 'NETWORK_ERROR'
-      }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      return { success: false, message: data.message, errors: data.errors };
     }
 
-    if (response.status === 204) {
-      return {} as T;
-    }
-
-    return response.json();
+    return { success: true, data: data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
   }
-
-  // Get all roles for a company
-  async getCompanyRoles(companyId: string): Promise<RoleWithCounts[]> {
-    return this.makeRequest<RoleWithCounts[]>('/company', {
-      method: 'POST',
-      body: JSON.stringify({ companyId }),
-    });
-  }
-
-  // Get specific role within company
-  async getRoleById(id: string, companyId: string): Promise<Role> {
-    return this.makeRequest<Role>(`/${id}`, {
-      method: 'POST',
-      body: JSON.stringify({ companyId }),
-    });
-  }
-
-  // Create role for a company
-  async createRole(roleData: CreateRoleRequest): Promise<Role> {
-    return this.makeRequest<Role>('', {
-      method: 'POST',
-      body: JSON.stringify(roleData),
-    });
-  }
-
-  // Update role within company
-  async updateRole(id: string, roleData: UpdateRoleRequest): Promise<Role> {
-    return this.makeRequest<Role>(`/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(roleData),
-    });
-  }
-
-  // Delete role within company
-  async deleteRole(id: string, companyId: string): Promise<void> {
-    return this.makeRequest<void>(`/${id}`, {
-      method: 'DELETE',
-      body: JSON.stringify({ companyId }),
-    });
-  }
-
-  // Get role usage within company
-  async getRoleUsage(id: string, companyId: string): Promise<{ memberCount: number; assignmentCount: number }> {
-    return this.makeRequest<{ memberCount: number; assignmentCount: number }>(`/${id}/usage`, {
-      method: 'POST',
-      body: JSON.stringify({ companyId }),
-    });
-  }
-
-  // Utility method to get company ID from current user (if stored in auth)
-  private getCurrentCompanyId(): string {
-    // This depends on how you store user info - adjust based on your auth setup
-    const userData = localStorage.getItem('user-data');
-    if (userData) {
-      try {
-        const user = JSON.parse(userData);
-        return user.companyId;
-      } catch {
-        throw new Error('User data not found or invalid');
-      }
-    }
-    throw new Error('User not authenticated');
-  }
-
-  // Convenience methods using current user's company
-  async getMyCompanyRoles(): Promise<RoleWithCounts[]> {
-    const companyId = this.getCurrentCompanyId();
-    return this.getCompanyRoles(companyId);
-  }
-
-  async getMyRoleById(id: string): Promise<Role> {
-    const companyId = this.getCurrentCompanyId();
-    return this.getRoleById(id, companyId);
-  }
-
-  async createRoleForMyCompany(roleData: Omit<CreateRoleRequest, 'companyId'>): Promise<Role> {
-    const companyId = this.getCurrentCompanyId();
-    return this.createRole({
-      ...roleData,
-      companyId
-    });
-  }
-
-  async updateRoleInMyCompany(id: string, roleData: Omit<UpdateRoleRequest, 'companyId'>): Promise<Role> {
-    const companyId = this.getCurrentCompanyId();
-    return this.updateRole(id, {
-      ...roleData,
-      companyId
-    });
-  }
-
-  async deleteRoleFromMyCompany(id: string): Promise<void> {
-    const companyId = this.getCurrentCompanyId();
-    return this.deleteRole(id, companyId);
-  }
-
-  async getRoleUsageInMyCompany(id: string): Promise<{ memberCount: number; assignmentCount: number }> {
-    const companyId = this.getCurrentCompanyId();
-    return this.getRoleUsage(id, companyId);
-  }
-
 }
 
-export const roleApiService = new RoleApiService();
+export async function createRole(
+  request: CreateRoleRequest
+): Promise<ApiResponse<Role>> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    if (!request.name?.trim()) {
+      toast.error("Role name is required");
+      return { success: false, message: "Role name is required" };
+    }
+
+    if (!request.companyId?.trim()) {
+      toast.error("Company ID is required");
+      return { success: false, message: "Company ID is required" };
+    }
+
+    const response = await apiFetch(`${baseUrl}/roles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(request)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      toast.error(result.message || "Failed to create role");
+      return { success: false, message: result.message || "Failed to create role", errors: result.errors };
+    }
+
+    toast.success("Role created successfully");
+    return { success: true, data: result.role || result };
+  } catch (error: any) {
+    console.error("Error creating role:", error);
+    toast.error(error.message || "Network error while creating role");
+    return { success: false, message: error.message || "Network error while creating role" };
+  }
+}
+
+export async function updateRole(
+  roleId: string,
+  request: UpdateRoleRequest
+): Promise<ApiResponse<Role>> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    if (!roleId?.trim()) {
+      toast.error("Role ID is required");
+      return { success: false, message: "Role ID is required" };
+    }
+
+    if (!request.companyId?.trim()) {
+      toast.error("Company ID is required");
+      return { success: false, message: "Company ID is required" };
+    }
+
+    const response = await apiFetch(`${baseUrl}/roles/update/${roleId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(request)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      toast.error(result.message || "Failed to update role");
+      return { success: false, message: result.message || "Failed to update role", errors: result.errors };
+    }
+
+    toast.success("Role updated successfully");
+    return { success: true, data: result.role || result };
+  } catch (error: any) {
+    console.error("Error updating role:", error);
+    toast.error(error.message || "Network error while updating role");
+    return { success: false, message: error.message || "Network error while updating role" };
+  }
+}
+
+export async function deleteRole(
+  roleId: string,
+  companyId: string
+): Promise<ApiResponse<void>> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    if (!roleId?.trim()) {
+      toast.error("Role ID is required");
+      return { success: false, message: "Role ID is required" };
+    }
+
+    if (!companyId?.trim()) {
+      toast.error("Company ID is required");
+      return { success: false, message: "Company ID is required" };
+    }
+
+    const response = await apiFetch(`${baseUrl}/roles/delete/${roleId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ companyId })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      toast.error(result.message || "Failed to delete role");
+      return { success: false, message: result.message || "Failed to delete role", errors: result.errors };
+    }
+
+    toast.success("Role deleted successfully");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error deleting role:", error);
+    toast.error(error.message || "Network error while deleting role");
+    return { success: false, message: error.message || "Network error while deleting role" };
+  }
+}

@@ -8,6 +8,8 @@ import { CalendarIcon, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ProjectFormData } from './AddProjectDialog';
 import { useState } from 'react';
+import { PhoneInput } from 'react-international-phone';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ProjectStep1Props {
     formData: ProjectFormData;
@@ -50,7 +52,7 @@ export function ProjectStep1({
                 startDate: format(range.from!, "yyyy-MM-dd"),
                 endDate: format(range.to!, "yyyy-MM-dd")
             }));
-            
+
             // Clear errors and close calendar
             if (errors.startDate || errors.endDate) {
                 setErrors({ ...errors, startDate: '', endDate: '' });
@@ -76,8 +78,12 @@ export function ProjectStep1({
         // Don't close the calendar - let user pick new dates immediately
     };
 
-    const handleCloseCalendar = () => {
-        setIsCalendarOpen(false);
+    const handlePhoneChange = (phone: string) => {
+        updateClientField('mobile', phone);
+        // Clear mobile error when user starts typing
+        if (errors.clientMobile) {
+            setErrors({ ...errors, clientMobile: '' });
+        }
     };
 
     return (
@@ -103,7 +109,7 @@ export function ProjectStep1({
                 )}
             </div>
 
-               {/* Date Range Section */}
+            {/* Date Range Section */}
             <div className="space-y-2">
                 <Label htmlFor="dateRange">Select Date Range *</Label>
                 <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -125,16 +131,16 @@ export function ProjectStep1({
                             )}
                         </Button>
                     </PopoverTrigger>
-                    <PopoverContent 
-                        className="w-auto p-0" 
+                    <PopoverContent
+                        className="w-auto p-0"
                         align="start"
                         sideOffset={4}
                     >
                         <div className="flex flex-col">
                             <div className="flex justify-between items-center p-2 border-b">
                                 <span className="text-sm font-medium">
-                                    {formData.startDate && !formData.endDate 
-                                        ? 'Select end date' 
+                                    {formData.startDate && !formData.endDate
+                                        ? 'Select end date'
                                         : 'Select date range'
                                     }
                                 </span>
@@ -153,16 +159,16 @@ export function ProjectStep1({
                             </div>
                             <Calendar
                                 mode="range"
-                                classNames={{ 
+                                classNames={{
                                     day_today: "",
                                 }}
                                 defaultMonth={formData.startDate ? new Date(formData.startDate) : new Date()}
                                 selected={
-                                    formData.startDate 
-                                        ? { 
-                                            from: new Date(formData.startDate), 
-                                            to: formData.endDate ? new Date(formData.endDate) : undefined 
-                                          }
+                                    formData.startDate
+                                        ? {
+                                            from: new Date(formData.startDate),
+                                            to: formData.endDate ? new Date(formData.endDate) : undefined
+                                        }
                                         : undefined
                                 }
                                 onSelect={handleDateSelect}
@@ -222,23 +228,21 @@ export function ProjectStep1({
                 </div>
             </div>
 
-            {/* Client Information Section */}
-            <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        id="includeClient"
+            {/* Client Information Section - Updated to match Edit Project style */}
+            <div className="space-y-4 pt-4 border-t border-border">
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="includeClientInfo"
                         checked={includeClient}
-                        onChange={(e) => setIncludeClient(e.target.checked)}
-                        className="rounded border-gray-300"
+                        onCheckedChange={(checked) => setIncludeClient(!!checked)}
                     />
-                    <Label htmlFor="includeClient" className="text-base font-medium">
+                    <Label htmlFor="includeClientInfo" className="text-sm font-medium cursor-pointer">
                         Include Client Information
                     </Label>
                 </div>
 
                 {includeClient && (
-                    <div className="grid grid-cols-1 gap-4 p-4 bg-muted/20 rounded-lg border">
+                    <div className="grid grid-cols-1 gap-4 pl-6 border-l-2 border-border">
                         <div className="space-y-2">
                             <Label htmlFor="clientName">Client Name *</Label>
                             <Input
@@ -246,7 +250,7 @@ export function ProjectStep1({
                                 value={formData.client.name}
                                 onChange={(e) => updateClientField('name', e.target.value)}
                                 placeholder="Enter client name"
-                                className={errors.clientName ? 'border-red-500' : ''}
+                                className={`bg-background ${errors.clientName ? 'border-red-500' : 'border-border'}`}
                                 maxLength={100}
                             />
                             {errors.clientName && (
@@ -254,38 +258,45 @@ export function ProjectStep1({
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="clientEmail">Client Email *</Label>
-                                <Input
-                                    id="clientEmail"
-                                    type="email"
-                                    value={formData.client.email}
-                                    onChange={(e) => updateClientField('email', e.target.value)}
-                                    placeholder="client@example.com"
-                                    className={errors.clientEmail ? 'border-red-500' : ''}
-                                    maxLength={100}
+                        <div className="space-y-2">
+                            <Label htmlFor="clientEmail">Client Email *</Label>
+                            <Input
+                                id="clientEmail"
+                                type="email"
+                                value={formData.client.email}
+                                onChange={(e) => updateClientField('email', e.target.value)}
+                                placeholder="client@example.com"
+                                className={`bg-background ${errors.clientEmail ? 'border-red-500' : 'border-border'}`}
+                                maxLength={100}
+                            />
+                            {errors.clientEmail && (
+                                <p className="text-red-500 text-sm">{errors.clientEmail}</p>
+                            )}
+                        </div>
 
-                                />
-                                {errors.clientEmail && (
-                                    <p className="text-red-500 text-sm">{errors.clientEmail}</p>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="clientMobile">Client Mobile *</Label>
-                                <Input
-                                    id="clientMobile"
-                                    value={formData.client.mobile}
-                                    onChange={(e) => {
-                                        const onlyDigits = e.target.value.replace(/\D/g, '');
-                                        updateClientField('mobile', onlyDigits);
-                                    }}
-                                    placeholder=""
-                                    className={errors.clientMobile ? 'border-red-500' : ''}
-                                    maxLength={15}
-                                />
-
+                        {/* Client Mobile with PhoneInput */}
+                        <div className="space-y-2">
+                            <Label htmlFor="clientMobile">Phone Number *</Label>
+                            <PhoneInput
+                                defaultCountry="gb"
+                                value={formData.client.mobile || ""}
+                                onChange={handlePhoneChange}
+                                className={`rounded-md gap-2 ${errors.clientMobile ? 'border-red-500' : ''}`}
+                                inputClassName="!flex !h-10 !w-full border !border-input !bg-background px-3 py-2 text-sm !text-foreground
+                                    !placeholder:text-muted-foreground 
+                                    !rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                                    focus-visible:ring-offset-accent disabled:cursor-not-allowed disabled:opacity-50"
+                                countrySelectorStyleProps={{
+                                    buttonClassName: "!h-10 border !border-input !bg-background hover:bg-accent !rounded-md px-3 !relative",
+                                    dropdownStyleProps: {
+                                        className: "!text-foreground !bg-background !border!border-white !shadow-lg !absolute !bottom-full !top-auto !mb-[4px] !rounded-md scrollbar-hide !border",
+                                        listItemSelectedClassName: "!bg-accent",
+                                        listItemCountryNameStyle: { color: "gray" },
+                                    },
+                                }}
+                                placeholder="Enter phone number"
+                            />
+                            <div className="h-5">
                                 {errors.clientMobile && (
                                     <p className="text-red-500 text-sm">{errors.clientMobile}</p>
                                 )}

@@ -8,7 +8,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { addMemberToProject } from "@/api/project";
 import { AvailableMember, AvailableMembersData, getAvailableMembers } from "@/api/member";
-import { useRoles } from "@/context/RolesContext"; // Import roles context
+import { useRole } from "@/hooks/useRole"; // Import roles hook
 import { RoleDropdown } from "./dropdowns/RoleDropdown";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
@@ -51,8 +51,8 @@ export function AddMemberToProjectDialog({
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
   const companyId = JSON.parse(localStorage.getItem('user-details') || '{}').id;
   
-  // Get roles from context to map role names to IDs
-  const { roles } = useRoles();
+  // Get roles from hook to map role names to IDs
+  const { roles } = useRole();
 
   // Fetch available members when dialog opens
   useEffect(() => {
@@ -225,7 +225,7 @@ export function AddMemberToProjectDialog({
                   >
                     <div className="flex items-center gap-3 py-1">
                       <Avatar className="w-8 h-8">
-                        <AvatarImage src={`${S3_URL}/${member.profilePhoto}`} alt={member.name} />
+                        <AvatarImage src={`${S3_URL}/${member.profilePhoto}`} alt={member.name} className="object-cover" />
                         <AvatarFallback className="bg-studio-gold text-studio-dark text-xs">
                           {member.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>

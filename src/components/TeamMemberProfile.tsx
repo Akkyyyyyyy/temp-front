@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,20 +10,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Project, toggleMemberStatus, updateMember } from "@/api/member";
 import { toast } from "sonner";
 import { TeamMember } from "./TeamMembers";
-import countries from "world-countries";
 import * as yup from 'yup';
 import { format } from "date-fns";
 import { removeMemberPhoto, updateMemberProfile, uploadMemberPhoto } from "@/api/member";
 import { removeMemberFromProject } from "@/api/project";
 import { Switch } from "./ui/switch";
-import { useRoles } from "@/context/RolesContext";
+import { useRole } from "@/hooks/useRole";
 import { RoleDropdown } from "./dropdowns/RoleDropdown";
 import { Label } from "./ui/label";
+import { PhoneInput } from "react-international-phone";
+import "react-international-phone/style.css";
+
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
-const S3_URL = import.meta.env.VITE_S3_BASE_URL
-
-
-
+const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
 interface TeamMemberProfileProps {
   isOpen: boolean;
@@ -35,9 +34,6 @@ interface TeamMemberProfileProps {
   onAddProject: (memberId: string, project: Omit<Project, 'id'>) => void;
   onDeleteProject: (memberId: string, projectId: string) => void;
   refreshMembers: () => void;
-}
-interface Country {
-  code: string;
 }
 
 // Yup validation schemas
@@ -62,8 +58,11 @@ const profileSchema = yup.object({
     .string()
     .test('is-valid-phone', 'Invalid phone number format', value => {
       if (!value) return true; // skip if empty or undefined
-      return /^\+?[\d\s-()]+$/.test(value);
-    }),
+      // Must contain at least 7 digits, optional +, and valid separators
+      return /^\+?[\d\s\-()]{7,}$/.test(value) && (value.replace(/\D/g, '').length >= 7);
+    })
+    .required('Phone number is required')
+  ,
   location: yup
     .string()
     .nullable()
@@ -135,13 +134,14 @@ export function TeamMemberProfile({
     const stored = localStorage.getItem('memberDetails');
     return stored ? JSON.parse(stored) : null;
   });
-  const { roles } = useRoles();
+  const { roles } = useRole();
 
   const formatHour12 = (hour) => {
     const h = hour % 12 === 0 ? 12 : hour % 12;
     const suffix = hour < 12 || hour === 24 ? 'AM' : 'PM';
     return `${h} ${suffix}`;
   };
+
 
   const [profileData, setProfileData] = useState({
     name: member?.name || '',
@@ -156,84 +156,10 @@ export function TeamMemberProfile({
     roleId: member?.roleId || '',
   });
   const [togglingStatus, setTogglingStatus] = useState(false);
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [isLoadingCountries, setIsLoadingCountries] = useState(false);
 
-  // Add this useEffect to fetch countries
-  useEffect(() => {
-    fetchCountries();
-  }, []);
 
-  // Copy the fetchCountries function from your dialog
-  const fetchCountries = async () => {
-    setIsLoadingCountries(true);
-    try {
-      const response = await fetch('https://restcountries.com/v3.1/all?fields=name,idd');
-      const data = await response.json();
 
-      const countryCodeSet = new Set<string>();
 
-      data.forEach((country: any) => {
-        if (country.idd?.root && country.idd?.suffixes) {
-          country.idd.suffixes.forEach((suffix: string) => {
-            const callingCode = `${country.idd.root}${suffix}`;
-            if (callingCode.length <= 5 && callingCode !== '+') {
-              countryCodeSet.add(callingCode);
-            }
-          });
-        } else if (country.idd?.root) {
-          const callingCode = country.idd.root;
-          if (callingCode.length <= 5 && callingCode !== '+') {
-            countryCodeSet.add(callingCode);
-          }
-        }
-      });
-
-      const uniqueCodes = Array.from(countryCodeSet);
-      const sortedCountries = uniqueCodes
-        .map(code => ({ code }))
-        .sort((a, b) => {
-          if (a.code === "+1") return -1;
-          if (b.code === "+1") return 1;
-          if (a.code === "+44") return -1;
-          if (b.code === "+44") return 1;
-          const numA = parseInt(a.code.replace('+', '')) || 0;
-          const numB = parseInt(b.code.replace('+', '')) || 0;
-          return numA - numB;
-        });
-
-      setCountries(sortedCountries);
-    } catch (error) {
-      console.error("Failed to fetch countries:", error);
-      setCountries(getCommonCountryCodes());
-    } finally {
-      setIsLoadingCountries(false);
-    }
-  };
-
-  // Copy the fallback function
-  const getCommonCountryCodes = (): Country[] => {
-    const commonCodes = [
-      "+1", "+44", "+91", "+61", "+49", "+33", "+81", "+86",
-      "+55", "+7", "+34", "+39", "+82", "+52", "+27"
-    ];
-
-    const uniqueCodes = [...new Set(commonCodes)]
-      .map(code => ({ code }))
-      .sort((a, b) => {
-        if (a.code === "+1") return -1;
-        if (b.code === "+1") return 1;
-        if (a.code === "+44") return -1;
-        if (b.code === "+44") return 1;
-        const numA = parseInt(a.code.replace('+', '')) || 0;
-        const numB = parseInt(b.code.replace('+', '')) || 0;
-        return numA - numB;
-      });
-
-    return uniqueCodes;
-  };
-
-  // Add this handler function
   const handleToggleStatus = async () => {
     setTogglingStatus(true);
     try {
@@ -271,9 +197,6 @@ export function TeamMemberProfile({
       photo: member?.profilePhoto || ''
     });
   }, [member]);
-
-
-
 
   const [newProject, setNewProject] = useState({
     name: '',
@@ -491,7 +414,6 @@ export function TeamMemberProfile({
           roleId: result.member.role.id || '',
         };
 
-
         if (memberDetails) {
           localStorage.setItem('memberDetails', JSON.stringify(result.member));
           setMemberDetails(result.member);
@@ -626,114 +548,11 @@ export function TeamMemberProfile({
     }
   };
 
-
   // Helper function to get full image URL from S3 key
   const getImageUrl = (s3Key: string) => {
     if (!s3Key) return '';
     return `${import.meta.env.NEXT_PUBLIC_S3_BASE_URL}/${s3Key}`;
   };
-
-  // Edit Project Form Component
-  // const EditProjectForm = ({ project, onSave, onCancel }: {
-  //   project: Project;
-  //   onSave: (updates: Partial<Project>) => void;
-  //   onCancel: () => void;
-  // }) => {
-  //   const [editableProject, setEditableProject] = useState(project);
-
-  //   const handleSave = async () => {
-  //     const isValid = await validateProject(editableProject);
-  //     if (isValid) {
-  //       onSave(editableProject);
-  //     }
-  //   };
-
-  //   return (
-  //     <div className="space-y-4">
-  //       <div className="grid grid-cols-2 gap-4">
-  //         <div>
-  //           <label className="text-sm font-medium">Project Name</label>
-  //           <Input
-  //             value={editableProject.name}
-  //             onChange={(e) => setEditableProject(prev => ({ ...prev, name: e.target.value }))}
-  //             className={projectErrors.name ? 'border-red-500' : ''}
-  //           />
-  //           {projectErrors.name && <p className="text-red-500 text-xs mt-1">{projectErrors.name}</p>}
-  //         </div>
-  //         <div>
-  //           <label className="text-sm font-medium">Color</label>
-  //           <select
-  //             value={editableProject.color}
-  //             onChange={(e) => setEditableProject(prev => ({ ...prev, color: e.target.value }))}
-  //             className={`w-full p-2 border rounded ${projectErrors.color ? 'border-red-500' : ''}`}
-  //           >
-  //             <option value="bg-blue-500">Blue</option>
-  //             <option value="bg-green-500">Green</option>
-  //             <option value="bg-red-500">Red</option>
-  //             <option value="bg-purple-500">Purple</option>
-  //             <option value="bg-orange-500">Orange</option>
-  //             <option value="bg-yellow-500">Yellow</option>
-  //             <option value="bg-indigo-500">Indigo</option>
-  //             <option value="bg-pink-500">Pink</option>
-  //           </select>
-  //           {projectErrors.color && <p className="text-red-500 text-xs mt-1">{projectErrors.color}</p>}
-  //         </div>
-  //         <div>
-  //           <label className="text-sm font-medium">Start Date (August)</label>
-  //           <Input
-  //             type="number"
-  //             min="1"
-  //             max="31"
-  //             value={editableProject.startDate}
-  //             onChange={(e) => setEditableProject(prev => ({ ...prev, startDate: parseInt(e.target.value) || 1 }))}
-  //             className={projectErrors.startDate ? 'border-red-500' : ''}
-  //           />
-  //           {projectErrors.startDate && <p className="text-red-500 text-xs mt-1">{projectErrors.startDate}</p>}
-  //         </div>
-  //         <div>
-  //           <label className="text-sm font-medium">End Date (August)</label>
-  //           <Input
-  //             type="number"
-  //             min="1"
-  //             max="31"
-  //             value={editableProject.endDate}
-  //             onChange={(e) => setEditableProject(prev => ({ ...prev, endDate: parseInt(e.target.value) || 1 }))}
-  //             className={projectErrors.endDate ? 'border-red-500' : ''}
-  //           />
-  //           {projectErrors.endDate && <p className="text-red-500 text-xs mt-1">{projectErrors.endDate}</p>}
-  //         </div>
-  //         <div>
-  //           <label className="text-sm font-medium">Start Hour</label>
-  //           <Input
-  //             type="number"
-  //             min="0"
-  //             max="23"
-  //             value={editableProject.startHour || 9}
-  //             onChange={(e) => setEditableProject(prev => ({ ...prev, startHour: parseInt(e.target.value) || 9 }))}
-  //             className={projectErrors.startHour ? 'border-red-500' : ''}
-  //           />
-  //           {projectErrors.startHour && <p className="text-red-500 text-xs mt-1">{projectErrors.startHour}</p>}
-  //         </div>
-  //         <div>
-  //           <label className="text-sm font-medium">End Hour</label>
-  //           <Input
-  //             type="number"
-  //             min="0"
-  //             max="23"
-  //             value={editableProject.endHour || 17}
-  //             onChange={(e) => setEditableProject(prev => ({ ...prev, endHour: parseInt(e.target.value) || 17 }))}
-  //             className={projectErrors.endHour ? 'border-red-500' : ''}
-  //           />
-  //           {projectErrors.endHour && <p className="text-red-500 text-xs mt-1">{projectErrors.endHour}</p>}
-  //         </div>
-  //       </div>
-  //       <div className="flex gap-2">
-  //         <Button onClick={handleSave}>Save</Button>
-  //         <Button variant="outline" onClick={onCancel}>Cancel</Button>
-  //       </div>
-  //     </div>
-  //   );
-  // };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -747,8 +566,6 @@ export function TeamMemberProfile({
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-3">
               <div className="relative group">
-
-
                 {editingProfile && (
                   <>
                     <label
@@ -785,7 +602,6 @@ export function TeamMemberProfile({
                   </>
                 )}
               </div>
-
             </DialogTitle>
           </div>
         </DialogHeader>
@@ -806,35 +622,29 @@ export function TeamMemberProfile({
                 </div>
               </div>
 
-              {/* Action buttons with toggle switch */}
-              <div className="flex items-center gap-2">
-                {/* Toggle Status Switch */}
-                <div className="flex items-center gap-2 mr-2">
-                  <Switch
-                    checked={member.active} // This controls the switch position
-                    onCheckedChange={handleToggleStatus} // This fires when user toggles
-                    disabled={togglingStatus}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${member.active
-                      ? 'bg-green-500 hover:bg-green-600'
-                      : 'bg-red-500 hover:bg-red-600'
-                      } ${togglingStatus ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${member.active ? 'translate-x-6' : 'translate-x-1'
-                        } ${togglingStatus ? 'animate-pulse' : ''}`}
-                    />
-                  </Switch>
-                </div>
+              <div className="flex items-center gap-1">
+                {/* Toggle Status Button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleToggleStatus}
+                  disabled={togglingStatus}
+                  className={`h-8 w-8 ${member.active
+                    ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20'
+                    : 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20'
+                    } ${togglingStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {member.active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </Button>
 
                 {/* Delete Button */}
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => setShowDeleteDialog(true)}
-                  className="h-8 w-8 text-red-500 hover:bg-red-100 hover:text-red-700"
+                  className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20"
                 >
                   <Trash2 className="h-4 w-4" />
-                  <span className="sr-only">Delete member</span>
                 </Button>
               </div>
             </CardHeader>
@@ -896,7 +706,7 @@ export function TeamMemberProfile({
                     >
                       {uploadingPhoto ? (
                         <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent" />
+                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
                           Uploading...
                         </>
                       ) : (
@@ -983,9 +793,7 @@ export function TeamMemberProfile({
                       </div>
 
                       {/* Email Field */}
-
                       <div className="space-y-2">
-
                         <label className="text-sm font-medium flex items-center gap-2">
                           <Mail className="w-4 h-4 text-muted-foreground" />
                           Email *
@@ -1002,67 +810,32 @@ export function TeamMemberProfile({
                           Email cannot be changed
                         </p>
                       </div>
+
+                      {/* Combined Phone Number Field with Country Code */}
                       {/* Combined Phone Number Field with Country Code */}
                       <div className="space-y-2">
                         <label className="text-sm font-medium flex items-center gap-2">
                           <Phone className="w-4 h-4 text-muted-foreground" />
-                          Phone Number
+                          Phone Number *
                         </label>
-                        <div className="flex gap-2">
-                          {/* Country Code Select */}
-                          <div className="relative w-32 flex-shrink-0">
-                            <select
-                              value={profileData.countryCode || "+44"}
-                              onChange={(e) => setProfileData({ ...profileData, countryCode: e.target.value })}
-                              className="appearance-none flex h-10 w-full rounded-md border border-input bg-background px-3 pr-8 py-2 text-sm ring-offset-background
-                 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-                 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                              disabled={isLoadingCountries}
-                            >
-                              <option value="">Select</option>
-                              {countries.map((country) => (
-                                <option key={country.code} value={country.code}>
-                                  {country.code}
-                                </option>
-                              ))}
-                            </select>
 
-                            {/* Custom dropdown arrow */}
-                            <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
-                              <svg
-                                className="h-4 w-4 text-muted-foreground"
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 12a.75.75 0 0 1-.53-.22l-4-4a.75.75 0 1 1 1.06-1.06L10 10.19l3.47-3.47a.75.75 0 0 1 1.06 1.06l-4 4A.75.75 0 0 1 10 12z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            </div>
-                          </div>
+                        <PhoneInput
+                          defaultCountry="gb"
+                          value={profileData.phone || ""}
+                          onChange={(phone) => setProfileData(prev => ({ ...prev, phone }))}
+                          className="rounded-md  gap-2"
+                          inputClassName="!flex !h-10 !w-full border !border-input !bg-background px-3 py-2 text-sm !text-foreground
+      !placeholder:text-muted-foreground 
+      !rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+      focus-visible:ring-offset-accent disabled:cursor-not-allowed disabled:opacity-50"
+                          countrySelectorStyleProps={{
+                            buttonClassName: "!h-10 border !border-input !bg-background hover:bg-accent !rounded-md px-3",
+                            dropdownStyleProps: { className: "!text-foreground !bg-background !hover:bg-background !rounded-md scrollbar-hide !border", listItemSelectedClassName: "!bg-accent", listItemCountryNameStyle: { color: "gray" } },
+                          }}
+                          placeholder="Enter phone number"
+                        />
 
-                          {/* Phone Number Input */}
-                          <div className="flex-1">
-                            <Input
-                              value={profileData.phone}
-                              onChange={(e) => {
-                                const onlyDigits = e.target.value.replace(/\D/g, '');
-                                setProfileData(prev => ({ ...prev, phone: onlyDigits }));
-                              }}
-                              className={`w-full transition-colors ${profileErrors.phone ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}
-                              maxLength={15}
-                              placeholder="Enter phone number"
-                            />
-                          </div>
-                        </div>
 
-                        {/* Loading and Error Messages */}
-                        {isLoadingCountries && (
-                          <p className="text-xs text-muted-foreground">Loading countries...</p>
-                        )}
                         {profileErrors.phone && (
                           <p className="text-red-500 text-xs flex items-center gap-1 mt-1">
                             <AlertCircle className="w-3 h-3" />
@@ -1164,85 +937,95 @@ export function TeamMemberProfile({
                             <Plus className="w-4 h-4" />
                           </Button>
                         </div>
-
                       </div>
                     </div>
                   </div>
                 </form>
               ) : (
-              /* View Mode - Enhanced Display */
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 gap-4">
-      {[
-        { 
-          icon: Mail, 
-          label: "Email", 
-          value: member.email, 
-          color: "blue" 
-        },
-        { 
-          icon: Phone, 
-          label: "Phone", 
-          value: member.phone ? `${member.countryCode || '+44'} ${member.phone}` : null, 
-          color: "green" 
-        },
-        { 
-          icon: MapPin, 
-          label: "Location", 
-          value: member.location, 
-          color: "red" 
-        }
-      ].map((item, index) => (
-        item.value && (
-          <div key={index} className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors group">
-            <div className={`flex items-center justify-center w-10 h-10 rounded-full bg-${item.color}-100 group-hover:bg-${item.color}-200 transition-colors`}>
-              <item.icon className={`w-5 h-5 text-${item.color}-600`} />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
-              <p className="font-semibold text-foreground break-all">{item.value}</p>
-            </div>
-          </div>
-        )
-      ))}
-    </div>
-  </div>
+                /* View Mode - Enhanced Display */
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-4">
+                      {[
+                        {
+                          icon: Mail,
+                          label: "Email",
+                          value: member.email,
+                          color: "#3b82f6", // blue
+                          lightColor: "#dbeafe" // blue-100 equivalent
+                        },
+                        {
+                          icon: Phone,
+                          label: "Phone",
+                          value: member.phone,
+                          color: "#10b981", // green
+                          lightColor: "#d1fae5" // green-100 equivalent
+                        },
+                        {
+                          icon: MapPin,
+                          label: "Location",
+                          value: member.location,
+                          color: "#ef4444", // red
+                          lightColor: "#fee2e2" // red-100 equivalent
+                        }
+                      ].map((item, index) => (
+                        item.value && (
+                          <div key={index} className="flex items-center gap-4 p-4 rounded-lg border bg-card hover:bg-muted/30 transition-colors group">
+                            <div
+                              className="flex items-center justify-center w-10 h-10 rounded-full transition-colors group-hover:bg-opacity-80"
+                              style={{
+                                backgroundColor: item.lightColor,
+                              }}
+                            >
+                              <item.icon
+                                className="w-5 h-5"
+                                style={{ color: item.color }}
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-muted-foreground">{item.label}</p>
+                              <p className="font-semibold text-foreground break-all">{item.value}</p>
+                            </div>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
 
-  <div className="space-y-6">
-    {member.bio && (
-      <div className="p-5 rounded-xl border bg-card shadow-sm">
-        <h4 className="font-semibold mb-3 flex items-center gap-2 text-lg">
-          <FileText className="w-5 h-5 text-primary" />
-          About Me
-        </h4>
-        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
-          {member.bio}
-        </p>
-      </div>
-    )}
+                  <div className="space-y-6">
+                    {member.bio && (
+                      <div className="p-5 rounded-xl border bg-card shadow-sm">
+                        <h4 className="font-semibold mb-3 flex items-center gap-2 text-lg">
+                          <FileText className="w-5 h-5 text-primary" />
+                          About Me
+                        </h4>
+                        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
+                          {member.bio}
+                        </p>
+                      </div>
+                    )}
 
-    {member.skills && member.skills.length > 0 && (
-      <div className="p-5 rounded-xl border bg-card shadow-sm">
-        <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
-          <Award className="w-5 h-5 text-primary" />
-          Skills & Expertise
-        </h4>
-        <div className="flex flex-wrap gap-2">
-          {member.skills.map((skill, index) => (
-            <Badge
-              key={index}
-              variant="secondary"
-              className="px-3 py-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors"
-            >
-              {skill}
-            </Badge>
-          ))}
-        </div>
-      </div>
-    )}
-  </div>
-</div>
+                    {member.skills && member.skills.length > 0 && (
+                      <div className="p-5 rounded-xl border bg-card shadow-sm">
+                        <h4 className="font-semibold mb-4 flex items-center gap-2 text-lg">
+                          <Award className="w-5 h-5 text-primary" />
+                          Skills & Expertise
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {member.skills.map((skill, index) => (
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="px-3 py-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/20 transition-colors"
+                            >
+                              {skill}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
               {/* Action Button in Header */}
               <div className="flex items-center justify-end gap-2">
@@ -1352,7 +1135,7 @@ export function TeamMemberProfile({
                             <div className="space-y-1 text-sm text-muted-foreground">
                               <div className="flex items-center gap-2">
                                 <Calendar className="w-3 h-3" />
-                                {format(new Date(project.startDate), 'MMM d, yyyy')} - {format(new Date(project.endDate), 'MMM d, yyyy')}
+                                {format(new Date(project.startDate), 'd MMM yyyy')} - {format(new Date(project.endDate), 'd MMM yyyy')}
                               </div>
                               {project.startHour !== undefined && project.endHour !== undefined && (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1360,7 +1143,6 @@ export function TeamMemberProfile({
                                   {formatHour12(project.startHour)} - {formatHour12(project.endHour)}
                                 </div>
                               )}
-
                             </div>
                           </div>
                           <div className="flex gap-2">
@@ -1417,7 +1199,6 @@ export function TeamMemberProfile({
           {/* Delete Confirmation Dialog */}
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <DialogContent className="sm:max-w-md bg-[#101319]  text-white">
-
               <div className="py-2 space-y-3">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />

@@ -15,7 +15,6 @@ import { AddMemberToProjectDialog } from "./AddMemberToProjectDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { toast } from "sonner";
 import { EditProjectDialog } from "./modals/EditProjectDialog";
-import { ToggleSwitch } from "./ui/ToggleSwitch";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -41,6 +40,72 @@ interface ProjectDetailsProps {
     onAddSection: () => void;
 }
 
+// Single source of truth for additional tabs configuration
+const ADDITIONAL_TABS = {
+    documents: {
+        label: "Documents",
+        description: "Upload and manage project documents",
+        content: (
+            <div className="text-center py-8 text-muted-foreground">
+                <p>Documents content will be displayed here</p>
+                <p className="text-sm">Upload and manage project documents</p>
+            </div>
+        )
+    },
+    moodboard: {
+        label: "Moodboard",
+        description: "Visual inspiration and style references",
+        content: (
+            <div className="text-center py-8 text-muted-foreground">
+                <p>Moodboard content will be displayed here</p>
+                <p className="text-sm">Visual inspiration and style references</p>
+            </div>
+        )
+    },
+    checklist: {
+        label: "Checklist",
+        description: "Project tasks and completion tracking",
+        content: (
+            <div className="text-center py-8 text-muted-foreground">
+                <p>Checklist content will be displayed here</p>
+                <p className="text-sm">Project tasks and completion tracking</p>
+            </div>
+        )
+    },
+    roles: {
+        label: "Roles",
+        description: "Team member responsibilities and roles",
+        content: (
+            <div className="text-center py-8 text-muted-foreground">
+                <p>Roles content will be displayed here</p>
+                <p className="text-sm">Team member responsibilities and roles</p>
+            </div>
+        )
+    },
+    equipments: {
+        label: "Equipment",
+        description: "Required equipment and inventory",
+        content: (
+            <div className="text-center py-8 text-muted-foreground">
+                <p>Equipment content will be displayed here</p>
+                <p className="text-sm">Required equipment and inventory</p>
+            </div>
+        )
+    },
+    reminders: {
+        label: "Reminders",
+        description: "Important dates and notifications",
+        content: (
+            <div className="text-center py-8 text-muted-foreground">
+                <p>Reminders content will be displayed here</p>
+                <p className="text-sm">Important dates and notifications</p>
+            </div>
+        )
+    }
+} as const;
+
+type AdditionalTabKey = keyof typeof ADDITIONAL_TABS;
+
 export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMember, onAddSection }: ProjectDetailsProps) {
     const [activeProjectTab, setActiveProjectTab] = useState("creative-brief");
     const [editingSection, setEditingSection] = useState<number | null>(null);
@@ -54,6 +119,10 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     const [logisticsSections, setLogisticsSections] = useState<LogisticsSection[]>([]);
     const [tabWidths, setTabWidths] = useState({});
     const tabRefs = useRef({});
+    const additionalTabRefs = useRef({});
+
+    // New state for additional tabs - set "documents" as default
+    const [activeAdditionalTab, setActiveAdditionalTab] = useState<AdditionalTabKey>("documents");
 
     useEffect(() => {
         const widths = {};
@@ -71,15 +140,30 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
         const activeIndex = ['creative-brief', 'logistics'].indexOf(activeProjectTab);
         let translateX = 0;
 
-        // Calculate translateX based on previous tabs' widths
         for (let i = 0; i < activeIndex; i++) {
             const tabKey = ['creative-brief', 'logistics'][i];
-            translateX += (tabWidths[tabKey] || 0) + 8; // 8px for gap
+            translateX += (tabWidths[tabKey] || 0) + 8;
         }
 
         return {
             width: `${tabWidths[activeProjectTab]}px`,
             transform: `translateX(${translateX}px)`
+        };
+    };
+
+    // Get tab indicator style for additional tabs
+    const getAdditionalTabStyle = () => {
+        const activeEl = additionalTabRefs.current[activeAdditionalTab];
+        if (!activeEl) return { width: 0, left: 0 };
+
+        const rect = activeEl.getBoundingClientRect();
+        const containerRect = activeEl.parentElement?.getBoundingClientRect();
+        
+        const left = (rect.left - (containerRect?.left || 0)) - 32;
+
+        return {
+            width: rect.width,
+            left,
         };
     };
 
@@ -276,8 +360,8 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
         const newId = Math.max(0, ...(sectionType === 'brief' ? briefSections : logisticsSections).map(s => s.id)) + 1;
         const newSection = {
             id: newId,
-            title: contentType === 'text' ? "Add Title" : "Add Title",
-            content: contentType === 'text' ? "Add Info" : ["Add Info"],
+            title: '',
+            content: contentType === 'text' ? "" : [""],
             type: contentType
         };
 
@@ -312,6 +396,11 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             setLogisticsSections([...originalLogisticsSections]);
             setEditingLogisticsSection(null);
         }
+    };
+
+    // Render additional tab content using the configuration
+    const renderAdditionalTabContent = () => {
+        return ADDITIONAL_TABS[activeAdditionalTab].content;
     };
 
     // Find project details
@@ -370,20 +459,23 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         type="text"
                         value={section.title}
                         onChange={(e) => onUpdate({ ...section, title: e.target.value })}
-                        className="w-full text-sm font-medium bg-background border border-border rounded px-2 py-1"
+                        className="w-full text-md font-medium bg-background border border-border rounded px-2 py-1"
                         autoFocus
+                        placeholder="Enter Title"
                     />
                     {section.type === "text" ? (
                         <input
                             type="text"
                             value={section.content as string}
                             onChange={(e) => onUpdate({ ...section, content: e.target.value })}
-                            className="w-full text-foreground bg-background border border-border rounded px-2 py-1"
+                            className="w-full text-sm text-foreground bg-background border border-border rounded px-2 py-1"
                         />
                     ) : (
                         <div className="space-y-2">
                             {(section.content as string[]).map((item, index) => (
+
                                 <div key={index} className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60"></div>
                                     <input
                                         type="text"
                                         value={item}
@@ -511,16 +603,12 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             <div className="flex items-center justify-between mb-6 gap-2">
                 <div className="flex flex-col justify-center">
                     <div className="flex items-center gap-2">
-                        <div
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: projectDetails.color }}
-                        />
                         <h3 className="text-xl font-semibold text-foreground p-0 m-0">
                             {projectDetails.name}
                         </h3>
                     </div>
-                    <p className="text-muted-foreground ml-4">
-                        {format(new Date(projectDetails.startDate), "MMM d, yyyy")} - {format(new Date(projectDetails.endDate), "MMM d, yyyy")}
+                    <p className="text-muted-foreground">
+                        {format(new Date(projectDetails.startDate), "d MMM yyyy")} - {format(new Date(projectDetails.endDate), "d MMM yyyy")}
                     </p>
                 </div>
 
@@ -543,31 +631,29 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                     >
                         <Trash2 className="w-4 h-4" />
                     </Button>
-                    <div className="inline-flex items-center gap-2 bg-muted rounded-full p-1 border border-border shadow-sm relative">
+                    <div className="inline-flex items-center bg-muted rounded-full p-1 border border-border shadow-sm relative">
                         <div
                             className="absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out h-[calc(100%-8px)]"
                             style={getActiveTabStyle()}
                         />
                         {(['creative-brief', 'logistics']).map((tab) => (
-                            <Button
+                            <button
                                 key={tab}
                                 ref={el => tabRefs.current[tab] = el}
                                 onClick={() => setActiveProjectTab(tab)}
-                                size="sm"
-                                variant="tab"
                                 className={`
-            relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
-            z-10
-            ${activeProjectTab === tab
+                                    relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
+                                    z-10 min-w-[80px] justify-center font-semibold h-8
+                                    ${activeProjectTab === tab
                                         ? 'text-primary-foreground bg-studio-gold'
-                                        : 'text-muted-foreground'
+                                        : 'bg-transparent text-muted-foreground hover:text-foreground'
                                     }
-        `}
+                                `}
                             >
                                 {tab.split('-').map(word =>
                                     word.charAt(0).toUpperCase() + word.slice(1)
                                 ).join(' ')}
-                            </Button>
+                            </button>
                         ))}
                     </div>
                 </div>
@@ -575,7 +661,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
             {/* Tab Content */}
             {activeProjectTab === "creative-brief" && (
-                <div className="bg-background/50 rounded-lg p-6 border border-border/20 mb-6">
+                <div className="bg-background/50 rounded-lg mb-6">
                     <h4 className="font-semibold text-foreground mb-4">Add Brief</h4>
                     <div className="space-y-4">
                         {briefSections.map((section) => (
@@ -612,7 +698,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     className="flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    Add Additional Specification
+                                    Add List Section
                                 </button>
                             </div>
                         )}
@@ -621,7 +707,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             )}
 
             {activeProjectTab === "logistics" && (
-                <div className="bg-background/50 rounded-lg p-6 border border-border/20 mb-6">
+                <div className="bg-background/50 rounded-lg mb-6">
                     <h4 className="font-semibold text-foreground mb-4">Add Logistics</h4>
                     <div className="space-y-4">
                         {logisticsSections.map((section) => (
@@ -665,6 +751,41 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                     </div>
                 </div>
             )}
+
+            {/* Additional Tabs Section */}
+            <div className="bg-background/50 rounded-lg mb-6">
+                <div className="relative mb-4">
+                    {/* Scrollable tabs container */}
+                    <div className="relative border-b border-border/20 overflow-x-auto scrollbar-hide">
+                        <div className="flex space-x-8 pb-1 relative w-max min-w-full">
+                            {Object.keys(ADDITIONAL_TABS).map((tabKey) => (
+                                <button
+                                    key={tabKey}
+                                    ref={(el) => (additionalTabRefs.current[tabKey] = el)}
+                                    onClick={() => setActiveAdditionalTab(tabKey as AdditionalTabKey)}
+                                    className={`pb-3 px-1 text-sm font-medium transition-all duration-300 relative whitespace-nowrap flex-shrink-0 ${
+                                        activeAdditionalTab === tabKey
+                                            ? 'text-primary'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                                >
+                                    {ADDITIONAL_TABS[tabKey as AdditionalTabKey].label}
+                                </button>
+                            ))}
+
+                            {/* Underline indicator
+                            <div
+                                className="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-in-out"
+                                style={getAdditionalTabStyle()}
+                            /> */}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="min-h-[200px]">
+                    {renderAdditionalTabContent()}
+                </div>
+            </div>
 
             {/* Team and Schedule */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -732,7 +853,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                 {/* Schedule Section */}
                 <div>
                     <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-medium text-foreground">Project Schedule</h4>
+                        <h4 className="font-medium text-foreground">Project Details</h4>
                     </div>
 
                     {/* Display Section */}

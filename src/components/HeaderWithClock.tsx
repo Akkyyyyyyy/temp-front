@@ -7,7 +7,7 @@ import { apiFetch } from '@/api/apiClient';
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
 interface HeaderWithClockProps {
-  timeView: 'week' | 'month';
+  timeView: any;
   onDateClick: () => void;
 }
 

@@ -129,7 +129,10 @@ interface AddMemberRequest {
   roleId?: string;
   companyId: string;
   phone?:string;
-  countryCode?:string;
+  countryCode?: string;
+  location?: string;
+  bio?: string;
+  skills?: string[];
 }
 
 interface AddMemberResponse {
@@ -167,7 +170,7 @@ export interface ToggleMemberStatusResponse {
 export async function addMember(request: AddMemberRequest): Promise<AddMemberResponse> {
   try {
     const token = localStorage.getItem("auth-token");
-
+    
     const response = await apiFetch(`${baseUrl}/member/add`, {
       method: "POST",
       headers: {
@@ -200,7 +203,7 @@ export async function addMember(request: AddMemberRequest): Promise<AddMemberRes
 export async function getMembersByCompanyId(
   companyId: string,
   params: {
-    viewType: 'month' | 'week';
+    viewType: 'day' | 'month' | 'week';
     month?: number;
     year?: number;
     week?: number;
@@ -212,13 +215,17 @@ export async function getMembersByCompanyId(
 
     const requestBody: GetMembersByCompanyRequest = {
       companyId,
-      viewType: params.viewType,
+      viewType: params.viewType === 'day' ? 'month' : params.viewType,
       ...(params.viewType === 'month' && {
         month: params.month,
         year: params.year
       }),
       ...(params.viewType === 'week' && {
         week: params.week,
+        year: params.year
+      }),
+      ...(params.viewType === 'day' && {
+        month: params.month,
         year: params.year
       }),
       ...(params.memberId && { memberId: params.memberId }) // Add memberId if provided
@@ -377,7 +384,7 @@ export async function updateMemberProfile(
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || "Failed to update member profile");
     }
@@ -386,9 +393,9 @@ export async function updateMemberProfile(
   } catch (error: any) {
     console.error('Error updating profile:', error);
     toast.error(error.message || "An error occurred while updating the member profile");
-    return { 
-      success: false, 
-      message: error.message || "An error occurred while updating the member profile" 
+    return {
+      success: false,
+      message: error.message || "An error occurred while updating the member profile"
     };
   }
 }
@@ -413,7 +420,7 @@ export async function uploadMemberPhoto(
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || "Failed to upload photo");
     }
@@ -422,9 +429,9 @@ export async function uploadMemberPhoto(
   } catch (error: any) {
     console.error('Error uploading photo:', error);
     toast.error(error.message || "Failed to upload profile picture");
-    return { 
-      success: false, 
-      message: error.message || "Failed to upload profile picture" 
+    return {
+      success: false,
+      message: error.message || "Failed to upload profile picture"
     };
   }
 }
@@ -444,7 +451,7 @@ export async function removeMemberPhoto(
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || "Failed to remove photo");
     }
@@ -453,9 +460,9 @@ export async function removeMemberPhoto(
   } catch (error: any) {
     console.error('Error removing photo:', error);
     toast.error(error.message || "Failed to remove profile picture");
-    return { 
-      success: false, 
-      message: error.message || "Failed to remove profile picture" 
+    return {
+      success: false,
+      message: error.message || "Failed to remove profile picture"
     };
   }
 }
@@ -522,7 +529,7 @@ export async function toggleMemberStatus(
 
     const statusMessage = data.newStatus ? "activated" : "deactivated";
     // toast.success(`Member ${statusMessage} successfully`);
-    
+
     return {
       success: true,
       message: data.message,

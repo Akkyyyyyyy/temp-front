@@ -20,6 +20,7 @@ interface RingColorDialogProps {
   member: TeamMember | null;
   onColorChange: (memberId: string, color: string) => Promise<void>;
   isUpdating?: boolean;
+  refreshMembers: () => void;
 }
 
 // Color presets in hex format
@@ -43,12 +44,13 @@ export function RingColorDialog({
   onClose, 
   member, 
   onColorChange, 
-  isUpdating = false 
+  isUpdating = false,
+  refreshMembers
 }: RingColorDialogProps) {
   const [selectedColor, setSelectedColor] = useState("#6B7280");
   const [isSaving, setIsSaving] = useState(false);
   const colorInputRef = useRef<HTMLInputElement>(null);
-
+  
   // Reset selected color when member changes
   useEffect(() => {
     if (member?.ringColor) {
@@ -64,6 +66,7 @@ export function RingColorDialog({
     setIsSaving(true);
     try {
       await onColorChange(member.id, selectedColor);
+      refreshMembers();
       onClose();
     } catch (error) {
       console.error('Failed to save ring color:', error);
@@ -112,21 +115,22 @@ export function RingColorDialog({
         <div className="px-6 py-6 space-y-6">
           {/* Member Info & Preview */}
           <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/20 border">
-            <Avatar 
-              className="w-16 h-16 ring-4 transition-all duration-200"
-              style={{ 
-                borderColor: selectedColor,
-                boxShadow: `0 0 0 3px ${selectedColor}`
-              }}
-            >
-              <AvatarImage 
-                src={member.profilePhoto ? `${S3_URL}/${member.profilePhoto}` : undefined} 
-                alt={member.name} 
-              />
-              <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-base">
-                {member.name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+              <Avatar 
+                className="w-16 h-16 ring-4 transition-all duration-200"
+                style={{ 
+                  borderColor: selectedColor,
+                  boxShadow: `0 0 0 3px ${selectedColor}`
+                }}
+              >
+                <AvatarImage 
+                  src={member.profilePhoto ? `${S3_URL}/${member.profilePhoto}` : undefined} 
+                  alt={member.name} 
+                  className="object-cover"
+                />
+                <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-base">
+                  {member.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-foreground truncate">{member.name}</h3>
               <p className="text-sm text-muted-foreground truncate">{member.role}</p>
@@ -152,13 +156,13 @@ export function RingColorDialog({
                     style={{ zIndex: 10 }}
                   />
                   
-                  {/* Color preview that sits behind the input */}
+                  {/* Gradient preview that shows it's a color picker */}
                   <div
                     className={`
                       w-12 h-12 rounded-md border-2 transition-all duration-200
                       ${selectedColor ? 'border-border' : 'border-dashed border-muted-foreground/30'}
+                      bg-[conic-gradient(from_0deg,red,yellow,lime,aqua,blue,magenta,red)]
                     `}
-                    style={{ backgroundColor: selectedColor }}
                   />
                 </div>
                 
@@ -174,7 +178,6 @@ export function RingColorDialog({
                 </div>
               </div>
             </div>
-
             {/* Quick Color Presets */}
             <div className="space-y-3">
               <label className="text-sm font-medium text-foreground">Quick Colors</label>

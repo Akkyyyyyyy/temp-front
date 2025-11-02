@@ -21,13 +21,13 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
 import { ScrollArea } from "../ui/scroll-area";
 import { Input } from "../ui/input";
 import { Checkbox } from "../ui/checkbox";
+import { PhoneInput } from "react-international-phone";
 
 interface EditProjectFormData {
     name: string;
@@ -67,11 +67,11 @@ interface EditProjectDialogProps {
     onProjectUpdated: () => void;
 }
 
-export function EditProjectDialog({ 
-    open, 
-    onOpenChange, 
-    project, 
-    onProjectUpdated 
+export function EditProjectDialog({
+    open,
+    onOpenChange,
+    project,
+    onProjectUpdated
 }: EditProjectDialogProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -99,7 +99,9 @@ export function EditProjectDialog({
                 endDate: project.endDate,
                 startHour: project.startHour || 9,
                 endHour: project.endHour || 17,
-                client: project.client ? { ...project.client } : undefined
+                client: project.client ? {
+                    ...project.client
+                } : undefined
             });
         }
     }, [project]);
@@ -111,11 +113,6 @@ export function EditProjectDialog({
     const isValidEmail = (email: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
-    };
-
-    const isValidPhoneNumber = (phone: string): boolean => {
-        const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-        return phoneRegex.test(phone.replace(/[\s\-\(\)]/g, ''));
     };
 
     // Validate form
@@ -160,13 +157,25 @@ export function EditProjectDialog({
                 errors.clientEmail = "Please enter a valid email address";
             }
 
-            if (editFormData.client.mobile && !isValidPhoneNumber(editFormData.client.mobile)) {
+            // Phone validation - react-international-phone handles basic validation
+            if (editFormData.client.mobile && editFormData.client.mobile.replace(/\D/g, '').length < 7) {
                 errors.clientMobile = "Please enter a valid phone number";
             }
         }
 
         setEditErrors(errors);
         return Object.keys(errors).length === 0;
+    };
+
+    // Handle phone number change
+    const handlePhoneChange = (phone: string) => {
+        setEditFormData(prev => ({
+            ...prev,
+            client: prev.client ? {
+                ...prev.client,
+                mobile: phone
+            } : undefined
+        }));
     };
 
     // Handle form submission
@@ -205,7 +214,7 @@ export function EditProjectDialog({
                 // Remove client information if checkbox is unchecked
                 updateData.client = null;
             }
-
+            
             const response = await editProject(updateData);
 
             if (response.success) {
@@ -236,11 +245,58 @@ export function EditProjectDialog({
                 endDate: project.endDate,
                 startHour: project.startHour || 9,
                 endHour: project.endHour || 17,
-                client: project.client ? { ...project.client } : undefined
+                client: project.client ? {
+                    ...project.client
+                } : undefined
             });
             setEditErrors({});
         }
         onOpenChange(newOpen);
+    };
+
+    // Fixed calendar date selection handler
+    const handleDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
+        if (!range?.from) {
+            // If no from date, clear selection
+            setEditFormData(prev => ({
+                ...prev,
+                startDate: '',
+                endDate: ''
+            }));
+            return;
+        }
+
+        if (range.from && range.to) {
+            // Complete range selected
+            setEditFormData(prev => ({
+                ...prev,
+                startDate: format(range.from!, "yyyy-MM-dd"),
+                endDate: format(range.to!, "yyyy-MM-dd")
+            }));
+
+            // Clear errors and close calendar
+            if (editErrors.startDate || editErrors.endDate) {
+                setEditErrors({ ...editErrors, startDate: '', endDate: '' });
+            }
+            setIsCalendarOpen(false);
+        } else if (range.from && !range.to) {
+            // Only start date selected, keep calendar open for end date selection
+            setEditFormData(prev => ({
+                ...prev,
+                startDate: format(range.from, "yyyy-MM-dd"),
+                endDate: ''
+            }));
+        }
+    };
+
+    const handleClearDates = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent triggering popover close
+        setEditFormData(prev => ({
+            ...prev,
+            startDate: '',
+            endDate: ''
+        }));
+        // Don't close the calendar - let user pick new dates immediately
     };
 
     return (
@@ -314,7 +370,7 @@ export function EditProjectDialog({
                             />
                         </div>
 
-                        {/* Date Range Section */}
+                        {/* Date Range Section - Fixed Calendar */}
                         <div className="space-y-2">
                             <Label htmlFor="dateRange">Select Date Range *</Label>
                             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -354,18 +410,7 @@ export function EditProjectDialog({
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => {
-                                                        setEditFormData(prev => ({
-                                                            ...prev,
-                                                            startDate: '',
-                                                            endDate: ''
-                                                        }));
-                                                        setEditErrors(prev => ({
-                                                            ...prev,
-                                                            startDate: '',
-                                                            endDate: ''
-                                                        }));
-                                                    }}
+                                                    onClick={handleClearDates}
                                                     className="h-6 px-2 text-xs"
                                                 >
                                                     <X className="h-3 w-3 mr-1" />
@@ -387,31 +432,7 @@ export function EditProjectDialog({
                                                     }
                                                     : undefined
                                             }
-                                            onSelect={(range, singleDate) => {
-                                                if (!range || (range?.from && !range?.to)) {
-                                                    const date = range?.from || singleDate;
-                                                    if (date) {
-                                                        setEditFormData(prev => ({
-                                                            ...prev,
-                                                            startDate: format(date, "yyyy-MM-dd"),
-                                                            endDate: format(date, "yyyy-MM-dd")
-                                                        }));
-                                                        return;
-                                                    }
-                                                    return;
-                                                }
-                                                setEditFormData(prev => ({
-                                                    ...prev,
-                                                    startDate: format(range.from, "yyyy-MM-dd"),
-                                                    endDate: range.to ? format(range.to, "yyyy-MM-dd") : ''
-                                                }));
-                                                if (editErrors.startDate || editErrors.endDate) {
-                                                    setEditErrors({ ...editErrors, startDate: '', endDate: '' });
-                                                }
-                                                if (range.to) {
-                                                    setIsCalendarOpen(false);
-                                                }
-                                            }}
+                                            onSelect={handleDateSelect}
                                             initialFocus
                                             numberOfMonths={1}
                                         />
@@ -520,47 +541,52 @@ export function EditProjectDialog({
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="clientEmail">Email</Label>
-                                            <Input
-                                                id="clientEmail"
-                                                type="email"
-                                                value={editFormData.client.email}
-                                                onChange={(e) => setEditFormData(prev => ({
-                                                    ...prev,
-                                                    client: {
-                                                        ...prev.client!,
-                                                        email: e.target.value
-                                                    }
-                                                }))}
-                                                placeholder="client@example.com"
-                                                className={`bg-background ${editErrors.clientEmail ? 'border-red-500' : 'border-border'}`}
-                                            />
-                                            {editErrors.clientEmail && (
-                                                <p className="text-red-500 text-sm">{editErrors.clientEmail}</p>
-                                            )}
-                                        </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="clientEmail">Email</Label>
+                                        <Input
+                                            id="clientEmail"
+                                            type="email"
+                                            value={editFormData.client.email}
+                                            onChange={(e) => setEditFormData(prev => ({
+                                                ...prev,
+                                                client: {
+                                                    ...prev.client!,
+                                                    email: e.target.value
+                                                }
+                                            }))}
+                                            placeholder="client@example.com"
+                                            className={`bg-background ${editErrors.clientEmail ? 'border-red-500' : 'border-border'}`}
+                                        />
+                                        {editErrors.clientEmail && (
+                                            <p className="text-red-500 text-sm">{editErrors.clientEmail}</p>
+                                        )}
+                                    </div>
 
-                                        <div className="space-y-2">
-                                            <Label htmlFor="clientMobile">Mobile</Label>
-                                            <Input
-                                                id="clientMobile"
-                                                value={editFormData.client.mobile}
-                                                onChange={(e) => setEditFormData(prev => ({
-                                                    ...prev,
-                                                    client: {
-                                                        ...prev.client!,
-                                                        mobile: e.target.value
-                                                    }
-                                                }))}
-                                                placeholder="+1 (555) 000-0000"
-                                                className={`bg-background ${editErrors.clientMobile ? 'border-red-500' : 'border-border'}`}
-                                            />
-                                            {editErrors.clientMobile && (
-                                                <p className="text-red-500 text-sm">{editErrors.clientMobile}</p>
-                                            )}
-                                        </div>
+                                    {/* Client Mobile with react-international-phone */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="clientMobile">Mobile</Label>
+                                        <PhoneInput
+                                            defaultCountry="gb"
+                                            value={editFormData.client.mobile || ""}
+                                            onChange={handlePhoneChange}
+                                            className={`rounded-md gap-2 ${editErrors.clientMobile ? 'border-red-500' : ''}`}
+                                            inputClassName="!flex !h-10 !w-full border !border-input !bg-background px-3 py-2 text-sm !text-foreground
+                                                !placeholder:text-muted-foreground 
+                                                !rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                                                focus-visible:ring-offset-accent disabled:cursor-not-allowed disabled:opacity-50"
+                                            countrySelectorStyleProps={{
+                                                buttonClassName: "!h-10 border !border-input !bg-background hover:bg-accent !rounded-md px-3 !relative",
+                                                dropdownStyleProps: {
+                                                    className: "!text-foreground !bg-background !border!border-white !shadow-lg !absolute !bottom-full !top-auto !mb-[4px] !rounded-md scrollbar-hide !border",
+                                                    listItemSelectedClassName: "!bg-accent",
+                                                    listItemCountryNameStyle: { color: "gray" },
+                                                },
+                                            }}
+                                            placeholder="Enter phone number"
+                                        />
+                                        {editErrors.clientMobile && (
+                                            <p className="text-red-500 text-sm mt-1">{editErrors.clientMobile}</p>
+                                        )}
                                     </div>
                                 </div>
                             )}

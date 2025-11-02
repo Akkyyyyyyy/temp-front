@@ -3,13 +3,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, X, AlertCircle, Plus } from 'lucide-react';
+import { Users, UserPlus, X, AlertCircle, Plus, Save } from 'lucide-react';
 import { colorOptions, MAX_TEAM_MEMBERS_PER_PROJECT } from '@/constant/constant';
 import { ProjectFormData } from './AddProjectDialog';
 
 import { AvailableMember } from '@/api/member';
 import { useEffect, useRef, useState } from 'react';
-import { useRoles } from '@/context/RolesContext'; // Import roles context
+import { useRole } from '@/hooks/useRole'; // Import roles hook
 import { RoleDropdown } from './dropdowns/RoleDropdown';
 
 export interface TeamAssignment {
@@ -69,7 +69,7 @@ export function ProjectStep2({
   onDialogCloseTrigger
 }: ProjectStep2Props) {
   const colorInputRef = useRef<HTMLInputElement>(null);
-  const { roles } = useRoles(); // Get roles from context
+  const { roles } = useRole(); // Get roles from hook
 
   const handleDialogCloseLocally = () => {
     checkMemberAvailability();
@@ -318,12 +318,12 @@ export function ProjectStep2({
               disabled={!currentMember.memberName || !currentMember.responsibility || hasConflicts(currentMember.memberId)}
               className="text-xs w-full"
             >
-              <UserPlus className="w-3 h-3 mr-1" />
+              <Save className="w-3 h-3 " />
               {hasConflicts(currentMember.memberId)
                 ? "Member Unavailable"
                 : teamAssignments.length > 0
-                  ? "Add Another Member"
-                  : "Add Member"
+                  ? "Save"
+                  : "Save"
               }
             </Button>
           </div>

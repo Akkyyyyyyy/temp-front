@@ -37,7 +37,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Plus, Trash2, Edit, Building } from "lucide-react";
-import { useRoles } from "@/context/RolesContext";
+import { useRole } from "@/hooks/useRole";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
@@ -64,10 +64,8 @@ export function RoleDropdown({
     addRole, 
     deleteRole, 
     updateRole, 
-    error,
-    currentCompanyId,
-    loadRoles 
-  } = useRoles();
+    refresh 
+  } = useRole();
   const { user, isCompany } = useAuth();
   const [isAddingRole, setIsAddingRole] = useState(false);
   const [isDeletingRole, setIsDeletingRole] = useState<string | null>(null);
@@ -76,22 +74,24 @@ export function RoleDropdown({
   const [newRoleDescription, setNewRoleDescription] = useState("");
   const [updateRoleName, setUpdateRoleName] = useState("");
   const [updateRoleDescription, setUpdateRoleDescription] = useState("");
+  const [pendingRoleId, setPendingRoleId] = useState<string | null>(null);
+
+  // Watch for pending role to appear in roles array, then call onChange
+  useEffect(() => {
+    if (pendingRoleId && roles.find(r => r.id === pendingRoleId)) {
+      onChange(pendingRoleId);
+      setPendingRoleId(null);
+    }
+  }, [pendingRoleId, roles, onChange]);
 
   // Determine which company to use
-  const targetCompanyId = externalCompanyId || currentCompanyId || user.data?.id || user.data?.company?.id;
+  const targetCompanyId = externalCompanyId || user.data?.id || user.data?.company?.id;
   
   // Find the selected role by ID
   const selectedRole = roles.find(role => role.id === selected);
   
 
   const canManageRoles = isCompany && targetCompanyId;
-
-  // Load roles when company changes
-  useEffect(() => {
-    if (targetCompanyId) {
-      loadRoles(targetCompanyId);
-    }
-  }, [targetCompanyId, loadRoles]);
 
   const handleAddRole = async () => {
     if (!newRoleName.trim()) {
@@ -108,11 +108,12 @@ export function RoleDropdown({
       const newRole = await addRole({
         name: newRoleName.trim(),
         description: newRoleDescription.trim() || undefined,
-        companyId: targetCompanyId,
       });
       
-      toast.success("Role created successfully");
-      onChange(newRole.id); // Use ID instead of name for selection
+      if (newRole) {
+        // Set pending role ID - useEffect will call onChange when role appears
+        setPendingRoleId(newRole.id);
+      }
       
       // Reset form
       setNewRoleName("");
@@ -125,12 +126,13 @@ export function RoleDropdown({
 
   const handleDeleteRole = async (roleId: string) => {
     try {
-      await deleteRole(roleId, targetCompanyId);
-      toast.success("Role deleted successfully");
+      const success = await deleteRole(roleId);
       
-      // If the deleted role was selected, clear selection
-      if (selected === roleId) {
-        onChange("");
+      if (success) {
+        // If the deleted role was selected, clear selection
+        if (selected === roleId) {
+          onChange("");
+        }
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete role");
@@ -151,13 +153,14 @@ export function RoleDropdown({
     }
 
     try {
-      await updateRole(roleId, {
+      const updatedRole = await updateRole(roleId, {
         name: updateRoleName.trim(),
         description: updateRoleDescription.trim() || undefined,
-        companyId: targetCompanyId,
       });
       
-      toast.success("Role updated successfully");
+      if (updatedRole) {
+        toast.success("Role updated successfully");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update role");
     } finally {
@@ -215,6 +218,7 @@ export function RoleDropdown({
       )}
       
       <Select
+        key={roles.length} // Force re-render when roles change
         value={selected}
         onValueChange={onChange}
         disabled={disabled || !targetCompanyId}
@@ -334,7 +338,7 @@ export function RoleDropdown({
                 <DialogTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-muted-foreground hover:text-foreground"
+                    className="w-full justify-start text-muted-foreground hover:text-background"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -447,10 +451,6 @@ export function RoleDropdown({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {error && (
-        <p className="text-sm text-red-500">{error}</p>
-      )}
 
     </div>
   );

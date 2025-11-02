@@ -35,6 +35,7 @@ export interface ProjectFormData {
     name: string;
     mobile: string;
     email: string;
+    cc: string;
   };
 }
 
@@ -61,7 +62,8 @@ export function AddProjectDialog({
     client: {
       name: '',
       mobile: '',
-      email: ''
+      email: '',
+      cc: ''
     }
   });
 
@@ -103,6 +105,16 @@ export function AddProjectDialog({
       newErrors.endDate = 'End date is required';
     }
 
+    if (formData.endDate) {
+      const endDate = new Date(formData.endDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time to compare dates only
+
+      if (endDate < today) {
+        newErrors.endDate = 'End date must be today or later.';
+      }
+    }
+
     if (formData.startHour >= formData.endHour) {
       newErrors.endHour = 'End time must be after start time';
     }
@@ -124,9 +136,8 @@ export function AddProjectDialog({
         newErrors.clientEmail = 'Please enter a valid email address';
       }
 
-      const mobileRegex = /^[+]?[\d\s\-()]+$/;
-      if (formData.client.mobile && !mobileRegex.test(formData.client.mobile)) {
-        newErrors.clientMobile = 'Please enter a valid mobile number';
+      if (formData.client.mobile && formData.client.mobile.replace(/\D/g, '').length < 7) {
+        newErrors.clientMobile = 'Please enter a valid phone number';
       }
     }
 
@@ -179,7 +190,7 @@ export function AddProjectDialog({
         setAvailabilityChecked(true);
       }
     } catch (error) {
-      console.error('Error checking member availability:', error);      
+      console.error('Error checking member availability:', error);
     } finally {
       setIsLoadingAvailableMembers(false);
     }
@@ -302,7 +313,8 @@ export function AddProjectDialog({
     client: {
       name: '',
       mobile: '',
-      email: ''
+      email: '',
+      cc: ''
     }
   });
 
@@ -445,9 +457,9 @@ export function AddProjectDialog({
                 <Button type="button" variant="outline" onClick={handleCancel}>
                   Cancel
                 </Button>
-                <Button 
-                  type="button" 
-                  onClick={handleNextStep} 
+                <Button
+                  type="button"
+                  onClick={handleNextStep}
                   disabled={!isStep1Complete || isLoadingNextStep}
                 >
                   {isLoadingNextStep ? (
@@ -465,9 +477,9 @@ export function AddProjectDialog({
               </>
             ) : (
               <>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={handlePreviousStep}
                   disabled={isSubmitting}
                 >
@@ -475,16 +487,16 @@ export function AddProjectDialog({
                   Back
                 </Button>
                 <div className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={handleCancel}
                     disabled={isSubmitting}
                   >
                     Cancel
                   </Button>
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={!isStep2Complete || isSubmitting}
                   >
                     {isSubmitting ? (

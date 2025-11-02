@@ -68,6 +68,7 @@ export interface EditProjectRequest {
     name: string;
     email: string;
     mobile: string;
+    cc: string;
   } | null;
   isScheduleUpdate?: boolean;
 }
@@ -122,7 +123,8 @@ export async function createProject(booking: Omit<EditableBooking, 'id'>) {
         client: {
           name: booking.client.name,
           mobile: booking.client.mobile,
-          email: booking.client.email
+          email: booking.client.email,
+          cc:booking.client.cc
         }
       })
     };
@@ -360,7 +362,7 @@ export async function editProject(
 ): Promise<EditProjectResponse> {
   try {
     const token = localStorage.getItem('auth-token');
-
+    
     if (!request.projectId?.trim()) {
       toast.error("Project ID is required");
       return { success: false, message: "Project ID is required" };

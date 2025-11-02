@@ -13,7 +13,7 @@ export function useTeamMembers({
     selectedMonth: number | null;
     selectedYear: number | null;
     selectedWeek: number | null;
-    timeView: "week" | "month";
+    timeView: any;
 }) {
     const { user, isCompany, isMember } = useAuth();
     const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -41,7 +41,7 @@ export function useTeamMembers({
                     week: selectedWeek,
                     month: selectedMonth,
                     year: selectedYear,
-                    memberId: memberId, // Pass member ID to get specific member data
+                    memberId: memberId,
                 });
 
                 let members: Member[] = [];

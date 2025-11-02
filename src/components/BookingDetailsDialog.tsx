@@ -27,7 +27,7 @@ export function BookingDetailsDialog({
   formatHour
 }: BookingDetailsDialogProps) {
   if (!booking) return null;
-  
+
   const duration = booking.endHour - booking.startHour;
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -40,16 +40,16 @@ export function BookingDetailsDialog({
           <div className="space-y-6 py-4">
             {/* Project Header */}
             <div className={`rounded-lg p-4 text-white`}
-            style={{ backgroundColor: booking.color }}>
+              style={{ backgroundColor: booking.color }}>
               <h3 className="text-lg font-semibold mb-3">{booking.projectName}</h3>
               <div className="flex items-center gap-3">
                 <Avatar className="w-12 h-12 ring-2 ring-white/30"
-                style={{
-                            borderColor: booking.memberRingColor || 'hsl(var(--muted))',
-                            boxShadow: `0 0 0 2px ${booking.memberRingColor || 'hsl(var(--muted))'}`
-                          }}>
+                  style={{
+                    borderColor: booking.memberRingColor || 'hsl(var(--muted))',
+                    boxShadow: `0 0 0 2px ${booking.memberRingColor || 'hsl(var(--muted))'}`
+                  }}>
 
-                  <AvatarImage src={`${S3_URL}/${booking.memberPhoto}`} alt={booking.memberName} />
+                  <AvatarImage src={`${S3_URL}/${booking.memberPhoto}`} alt={booking.memberName} className="object-cover" />
 
                   <AvatarFallback className="bg-white/20 text-white font-semibold">
                     {booking.memberName.slice(0, 2).toUpperCase()}
