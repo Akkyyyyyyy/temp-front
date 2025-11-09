@@ -77,7 +77,7 @@ export function AddProjectDialog({
     roleId: ''
   });
 
-  const { user, isCompany } = useAuth();
+  const { user } = useAuth();
   const [availableMembers, setAvailableMembers] = useState<AvailableMember[]>([]);
   const [isLoadingAvailableMembers, setIsLoadingAvailableMembers] = useState(false);
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
@@ -85,9 +85,6 @@ export function AddProjectDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingNextStep, setIsLoadingNextStep] = useState(false);
 
-  const companyDetails = isCompany && user?.data
-    ? user.data
-    : JSON.parse(localStorage.getItem('user-details') || '{}');
 
   // Validation functions
   const validateStep1 = () => {
@@ -178,7 +175,7 @@ export function AddProjectDialog({
     setIsLoadingAvailableMembers(true);
     try {
       const result = await getAvailableMembers({
-        companyId: companyDetails.id,
+        companyId: user.data.company.id,
         startDate: formData.startDate,
         endDate: formData.endDate,
         startHour: formData.startHour,
@@ -369,7 +366,7 @@ export function AddProjectDialog({
         teamAssignments: teamAssignments,
         client: includeClient ? formData.client : undefined,
         newRole: undefined
-      });
+      },user.data.company.id);
 
       if (res?.success) {
         refreshMembers();

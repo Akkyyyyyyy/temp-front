@@ -13,7 +13,6 @@ interface HeaderWithClockProps {
 
 export function HeaderWithClock({ timeView, onDateClick }: HeaderWithClockProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const companyDetails = JSON.parse(localStorage.getItem('user-details') || '{}') || {};
   const { user } = useAuth();
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -273,7 +272,7 @@ export function HeaderWithClock({ timeView, onDateClick }: HeaderWithClockProps)
   return (
     <div className="hidden lg:flex justify-between items-center mb-4">
       <div className="lg:block">
-        <h1 className="text-2xl font-semibold text-foreground mb-1">The VIP Studio</h1>
+        <h1 className="text-2xl font-semibold text-foreground mb-1">{user.data.company.name}</h1>
         
       </div>
 
@@ -297,7 +296,6 @@ export function HeaderWithClock({ timeView, onDateClick }: HeaderWithClockProps)
           </p>
         </div>
 
-        {user?.type == "member" && (
           <GoogleCalendarSync
             onConnect={handleConnect}
             onSync={handleSync}
@@ -305,7 +303,6 @@ export function HeaderWithClock({ timeView, onDateClick }: HeaderWithClockProps)
             isAuthorized={isAuthorized}
             isSyncing={isSyncing}
           />
-        )}
       </div>
     </div>
   );

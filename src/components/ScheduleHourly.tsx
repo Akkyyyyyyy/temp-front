@@ -76,7 +76,6 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     // Auto-scroll to project details when selectedProject changes
     useEffect(() => {
       if (selectedProject && projectDetailsRef.current) {
-        // Small timeout to ensure the DOM is updated
         setTimeout(() => {
           scrollToProjectDetails();
         }, 50);
@@ -94,12 +93,14 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     };
 
     const scrollToProjectDetails = () => {
-      if (projectDetailsRef.current) {
-        projectDetailsRef.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
-        });
-      }
+      setTimeout(() => {
+        if (projectDetailsRef.current) {
+          projectDetailsRef.current.scrollIntoView({
+            behavior: 'smooth', // smooth scroll animation
+            block: 'start',
+          });
+        }
+      }, 300); // wait 1 second before starting the animation
     };
 
     // Expose the scroll functions via the forwardRef
@@ -298,6 +299,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                 onClose={() => setSelectedProject(null)}
                 setSelectedMember={setSelectedMember}
                 onAddSection={onAddSection}
+                onReady={scrollToProjectDetails}
               />
             </div>
           )}

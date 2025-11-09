@@ -111,7 +111,7 @@ type ValidationErrors = {
 
 export function EditPackageDrawer({ open, onOpenChange, package: initialPackage, onSave }: EditPackageDrawerProps) {
   const { user } = useAuth();
-  const userCountry = user?.data?.country;
+  const userCountry = user?.data?.company.country;
   const currencyConfig = getCurrencyConfig(userCountry);
   const CurrencyIcon = currencyConfig.icon;
 

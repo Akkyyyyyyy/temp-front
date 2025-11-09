@@ -13,13 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Building2, User2, Eye, EyeOff } from "lucide-react";
+import { User2, Eye, EyeOff, AlertCircle, Building2 } from "lucide-react";
 import { toast } from "sonner";
-import { loginUser } from "@/api/company";
+import { loginMember } from "@/api/company";
 
 import { useNavigate } from "react-router-dom";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
 import { useAuth } from "@/context/AuthContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const schema = yup.object({
   email: yup.string().email("Invalid email format").matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format").required("Email is required"),
@@ -35,8 +36,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forceResetRequired, setForceResetRequired] = useState(false);
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const { login } = useAuth();
 
   const {
     register,
@@ -44,12 +46,11 @@ const Login = () => {
     formState: { errors },
     reset,
     setValue,
-    watch,
   } = useForm<FormData>({
     resolver: yupResolver(schema),
   });
 
-  // Load remembered email and user type from localStorage on component mount
+  // Load remembered email on component mount
   useEffect(() => {
     const rememberedEmail = localStorage.getItem("rememberedEmail");
     const rememberedUserType = localStorage.getItem("user-type") as "company" | "member" | null;
@@ -74,13 +75,23 @@ const Login = () => {
   const onSubmit = async (formData: FormData) => {
     try {
       setLoading(true);
+      setForceResetRequired(false);
 
-      const response = await loginUser(userType, {
+      // Use member login with rememberMe
+      const response = await loginMember({
         email: formData.email,
         password: formData.password,
+        rememberMe: formData.rememberMe,
+        userType:userType
       });
 
       if (!response.success) {
+        // Handle force password reset for members
+        if (response.forceReset) {
+          setForceResetRequired(true);
+          toast.error("Password reset required");
+          return;
+        }
         toast.error(response.message || "Login failed");
         return;
       }
@@ -88,13 +99,18 @@ const Login = () => {
       // Handle remember me functionality
       if (formData.rememberMe) {
         localStorage.setItem("rememberedEmail", formData.email);
-        localStorage.setItem("user-type", userType);
       } else {
         localStorage.removeItem("rememberedEmail");
-        localStorage.removeItem("user-type");
       }
 
-      login(userType, response.data);
+      // For member login, use the unified user data structure
+      if (response.data) {
+        login(response.data.user.userType, {
+          token: response.data.token,
+          member: response.data.user // Use the unified user object from backend
+        });
+      }
+
       navigate("/");
     } catch (error: any) {
       toast.error(error.message || "Something went wrong");
@@ -128,6 +144,12 @@ const Login = () => {
 
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+
+  const handleForceReset = () => {
+    // Navigate to force reset password page or show reset modal
+    setShowForgotPassword(true);
+    setForceResetRequired(false);
   };
 
   return (
@@ -180,6 +202,22 @@ const Login = () => {
           </CardHeader>
 
           <CardContent className="space-y-5 pt-2">
+            {/* Force Reset Alert */}
+            {forceResetRequired && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Password reset required.{" "}
+                  <button 
+                    onClick={handleForceReset}
+                    className="underline font-medium hover:no-underline"
+                  >
+                    Reset your password
+                  </button>
+                </AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit(onSubmit)} className="">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">Email</Label>
@@ -290,7 +328,7 @@ const Login = () => {
       <ForgotPasswordModal
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
-        userType={userType}
+        userType={"member"}
       />
     </>
   );

@@ -12,7 +12,7 @@ interface AuthUser {
 }
 
 interface AuthContextProps {
-    user: AuthUser | null;
+    user: any | null;
     login: (userType: UserType, data: any) => void;
     logout: () => void;
     isCompany: boolean;
@@ -25,7 +25,7 @@ interface AuthContextProps {
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [user, setUser] = useState<AuthUser | null>(null);
+    const [user, setUser] = useState<any | null>(null);
     const [roles, setRoles] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const navigate = useNavigate();
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         try {
             setLoadingRoles(true);
-            const companyId = user.data?.id || user.data?.company?.id;
+            const companyId = user.data.company.id;
             
             if (!companyId) {
                 setRoles([]);
@@ -92,12 +92,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const login = (type: UserType, data: any) => {
         localStorage.setItem("auth-token", data.token);
         localStorage.setItem("user-type", type);
-        localStorage.setItem("user-details", JSON.stringify(data[type === "company" ? "companyDetails" : "member"]));
+        localStorage.setItem("user-details", JSON.stringify(data.member));
 
         setUser({
             type,
             token: data.token,
-            data: data[type === "company" ? "companyDetails" : "member"],
+            data: data.member,
         });
     };
 

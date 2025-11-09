@@ -10,6 +10,7 @@ import { addMemberToProject } from "@/api/project";
 import { AvailableMember, AvailableMembersData, getAvailableMembers } from "@/api/member";
 import { useRole } from "@/hooks/useRole"; // Import roles hook
 import { RoleDropdown } from "./dropdowns/RoleDropdown";
+import { useAuth } from "@/context/AuthContext";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -49,7 +50,8 @@ export function AddMemberToProjectDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [availableMembersData, setAvailableMembersData] = useState<AvailableMembersData | null>(null);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
-  const companyId = JSON.parse(localStorage.getItem('user-details') || '{}').id;
+  const { user } = useAuth();
+  const companyId = user.data.company.id;
   
   // Get roles from hook to map role names to IDs
   const { roles } = useRole();

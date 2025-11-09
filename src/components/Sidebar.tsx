@@ -50,7 +50,7 @@ export function Sidebar({
 
   // Function to get currency icon based on country
   const getCurrencyIcon = () => {
-    const country = user?.data?.country?.toLowerCase();
+    const country = user?.data?.company.country?.toLowerCase();
     
     switch (country) {
       case 'us':
@@ -92,17 +92,9 @@ export function Sidebar({
       { icon: UserRoundCheck, label: "Bookings", active: false, action: "showTeamAvailability" },
       { icon: Plus, label: "Add Booking", active: false, action: "addBooking" },
       { icon: CurrencyIcon, label: "Revenue", active: false, action: "showFinancialManagement" },
+      { icon: BriefcaseBusiness, label: "Packages", active: false, action: "showPackages" },
     ];
 
-    // Conditionally add packages for members
-    if (user?.type === "member") {
-      baseItems.push({ 
-        icon: BriefcaseBusiness, 
-        label: "Packages", 
-        active: false, 
-        action: "showPackages" 
-      });
-    }
 
     // Add the remaining items
     baseItems.push(
@@ -174,7 +166,7 @@ export function Sidebar({
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-studio-gold to-studio-gold-light flex items-center justify-center">
                   <Camera className="w-4 h-4 text-studio-dark" />
                 </div>
-                <span className="ml-2 text-white font-semibold">The VIP Studio</span>
+                <span className="ml-2 text-white font-semibold">{user.data.company.name}</span>
               </div>
 
               {/* Navigation Items */}
@@ -214,14 +206,7 @@ export function Sidebar({
         
         {/* Logo */}
         <div className="flex gap-5">
-          <div className="flex flex-col">
-            <h1 className="text-sm font-semibold text-foreground mb-1">The VIP Studio</h1>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs font-medium ${user?.type === 'member' ? 'text-blue-600' : 'text-purple-600'}`}>
-                {user?.type === 'member' ? 'Member' : 'Admin'}
-              </span>
-            </div>
-          </div>
+            <h1 className="text-md font-semibold text-foreground flex items-center">{user.data.company.name}</h1>
         </div>
       </div>
       

@@ -9,12 +9,22 @@ import {
     updateProjectSections,
     getProjectSections,
     IProjectSection,
-    removeMemberFromProject
+    removeMemberFromProject,
+    getProjectById
 } from "@/api/project";
 import { AddMemberToProjectDialog } from "./AddMemberToProjectDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { toast } from "sonner";
 import { EditProjectDialog } from "./modals/EditProjectDialog";
+import {
+    DocumentsTab,
+    MoodboardTab,
+    ChecklistTab,
+    RolesTab,
+    EquipmentTab,
+    RemindersTab
+} from './additional-tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -38,6 +48,7 @@ interface ProjectDetailsProps {
     onClose: () => void;
     setSelectedMember: (member: TeamMember) => void;
     onAddSection: () => void;
+    onReady: () => void;
 }
 
 // Single source of truth for additional tabs configuration
@@ -45,68 +56,43 @@ const ADDITIONAL_TABS = {
     documents: {
         label: "Documents",
         description: "Upload and manage project documents",
-        content: (
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Documents content will be displayed here</p>
-                <p className="text-sm">Upload and manage project documents</p>
-            </div>
-        )
+        component: DocumentsTab
     },
     moodboard: {
         label: "Moodboard",
         description: "Visual inspiration and style references",
-        content: (
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Moodboard content will be displayed here</p>
-                <p className="text-sm">Visual inspiration and style references</p>
-            </div>
-        )
+        component: MoodboardTab
     },
     checklist: {
         label: "Checklist",
         description: "Project tasks and completion tracking",
-        content: (
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Checklist content will be displayed here</p>
-                <p className="text-sm">Project tasks and completion tracking</p>
-            </div>
-        )
+        component: ChecklistTab
     },
     roles: {
         label: "Roles",
         description: "Team member responsibilities and roles",
-        content: (
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Roles content will be displayed here</p>
-                <p className="text-sm">Team member responsibilities and roles</p>
-            </div>
-        )
+        component: RolesTab
     },
     equipments: {
         label: "Equipment",
         description: "Required equipment and inventory",
-        content: (
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Equipment content will be displayed here</p>
-                <p className="text-sm">Required equipment and inventory</p>
-            </div>
-        )
+        component: EquipmentTab
     },
     reminders: {
         label: "Reminders",
         description: "Important dates and notifications",
-        content: (
-            <div className="text-center py-8 text-muted-foreground">
-                <p>Reminders content will be displayed here</p>
-                <p className="text-sm">Important dates and notifications</p>
-            </div>
-        )
+        component: RemindersTab
     }
 } as const;
 
 type AdditionalTabKey = keyof typeof ADDITIONAL_TABS;
 
-export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMember, onAddSection }: ProjectDetailsProps) {
+// Props interface for additional tab components
+interface AdditionalTabProps {
+    projectId: string;
+}
+
+export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMember, onAddSection, onReady }: ProjectDetailsProps) {
     const [activeProjectTab, setActiveProjectTab] = useState("creative-brief");
     const [editingSection, setEditingSection] = useState<number | null>(null);
     const [editingLogisticsSection, setEditingLogisticsSection] = useState<number | null>(null);
@@ -119,10 +105,35 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     const [logisticsSections, setLogisticsSections] = useState<LogisticsSection[]>([]);
     const [tabWidths, setTabWidths] = useState({});
     const tabRefs = useRef({});
+    const [projectDetails, setProjectDetails] = useState(null);
+    const [isLoadingProject, setIsLoadingProject] = useState(true);
+    const [activeAdditionalTab, setActiveAdditionalTab] = useState('documents');
     const additionalTabRefs = useRef({});
 
-    // New state for additional tabs - set "documents" as default
-    const [activeAdditionalTab, setActiveAdditionalTab] = useState<AdditionalTabKey>("documents");
+    const loadProjectDetails = async () => {
+        if (!projectId) return;
+
+        setIsLoadingProject(true);
+        try {
+            const result = await getProjectById(projectId);
+            if (result.success && result.project) {
+                setProjectDetails(result.project);
+            }
+        } catch (error) {
+            console.error('Error loading project details:', error);
+        } finally {
+            setIsLoadingProject(false);
+        }
+    };
+    useEffect(() => {
+        loadProjectDetails();
+    }, [projectId]);
+
+    useEffect(() => {
+        if (projectDetails) {
+            onReady?.();
+        }
+    }, [projectDetails]);
 
     useEffect(() => {
         const widths = {};
@@ -151,33 +162,12 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
         };
     };
 
-    // Get tab indicator style for additional tabs
-    const getAdditionalTabStyle = () => {
-        const activeEl = additionalTabRefs.current[activeAdditionalTab];
-        if (!activeEl) return { width: 0, left: 0 };
-
-        const rect = activeEl.getBoundingClientRect();
-        const containerRect = activeEl.parentElement?.getBoundingClientRect();
-        
-        const left = (rect.left - (containerRect?.left || 0)) - 32;
-
-        return {
-            width: rect.width,
-            left,
-        };
-    };
-
     // Store original sections for cancel operation
     const [originalBriefSections, setOriginalBriefSections] = useState<BriefSection[]>([]);
     const [originalLogisticsSections, setOriginalLogisticsSections] = useState<LogisticsSection[]>([]);
-
-    // Ref for auto-focusing on title input
     const titleInputRef = useRef<HTMLInputElement>(null);
-
-    // Check if any section is being edited
     const isAnySectionEditing = editingSection !== null || editingLogisticsSection !== null;
 
-    // Auto-focus on title input when editing starts
     useEffect(() => {
         if (editingSection !== null || editingLogisticsSection !== null) {
             setTimeout(() => {
@@ -186,7 +176,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
         }
     }, [editingSection, editingLogisticsSection]);
 
-    // Load sections from backend
     useEffect(() => {
         const loadSections = async () => {
             setIsLoading(true);
@@ -240,29 +229,19 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     const handleProjectDeleted = () => {
         onClose();
         onAddSection();
+        loadProjectDetails();
     };
 
-    // Get assigned workers
-    const assignedWorker = teamMembers
-        .filter(member =>
-            member.projects.some(project => project.id === projectId)
-        )
-        .map(member => {
-            const project = member.projects.find(project => project.id === projectId);
-            return {
-                ...member,
-                projectRole: project?.newRole || 'No role assigned'
-            };
-        });
-
-    // Prepare data for AddMemberDialog
-    const assignedMembers = assignedWorker.map(worker => ({
-        id: worker.id,
-        name: worker.name,
-        email: worker.email,
-        profilePhoto: worker.profilePhoto,
-        role: worker.projectRole
-    }));
+    // Get assigned members directly from projectDetails
+    const assignedMembers = projectDetails?.assignments?.map((assignment: any) => ({
+        id: assignment.member.id,
+        name: assignment.member.name,
+        email: assignment.member.email,
+        profilePhoto: assignment.member.profilePhoto,
+        ringColor: assignment.member.ringColor,
+        role: assignment.role?.name || 'No role assigned',
+        projectRole: assignment.role?.name || 'No role assigned'
+    })) || [];
 
     // Handle remove member from project
     const handleRemoveMember = async (memberId: string) => {
@@ -275,7 +254,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
             if (response.success) {
                 onAddSection();
-                toast.success("Member removed from project");
+                loadProjectDetails();
             } else {
                 toast.error(response.message || "Failed to remove member");
             }
@@ -290,11 +269,13 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     // Handle member added callback
     const handleMemberAdded = () => {
         onAddSection();
+        loadProjectDetails();
     };
 
     // Handle project updated callback
     const handleProjectUpdated = () => {
         onAddSection();
+        loadProjectDetails();
     };
 
     // Save sections to backend
@@ -400,29 +381,24 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
     // Render additional tab content using the configuration
     const renderAdditionalTabContent = () => {
-        return ADDITIONAL_TABS[activeAdditionalTab].content;
+        const TabComponent = ADDITIONAL_TABS[activeAdditionalTab].component;
+        return <TabComponent projectId={projectId} />;
     };
-
-    // Find project details
-    const projectDetails = teamMembers
-        .flatMap(member => member.projects)
-        .find(project => project.id === projectId);
+    if (isLoadingProject) {
+        return (
+            <div className="mt-6 p-6 bg-background rounded-lg border border-border/20 min-h-[429px]">
+                <div className="text-center text-muted-foreground">
+                    Loading project details...
+                </div>
+            </div>
+        );
+    }
 
     if (!projectDetails) {
         return (
             <div className="mt-6 p-6 bg-background rounded-lg border border-border/20">
                 <div className="text-center text-muted-foreground">
                     Project not found
-                </div>
-            </div>
-        );
-    }
-
-    if (isLoading) {
-        return (
-            <div className="mt-6 p-6 bg-background rounded-lg border border-border/20">
-                <div className="text-center text-muted-foreground">
-                    Loading project details...
                 </div>
             </div>
         );
@@ -606,6 +582,10 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         <h3 className="text-xl font-semibold text-foreground p-0 m-0">
                             {projectDetails.name}
                         </h3>
+                        <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: projectDetails.color }}
+                        />
                     </div>
                     <p className="text-muted-foreground">
                         {format(new Date(projectDetails.startDate), "d MMM yyyy")} - {format(new Date(projectDetails.endDate), "d MMM yyyy")}
@@ -639,7 +619,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         {(['creative-brief', 'logistics']).map((tab) => (
                             <button
                                 key={tab}
-                                ref={el => tabRefs.current[tab] = el}
                                 onClick={() => setActiveProjectTab(tab)}
                                 className={`
                                     relative capitalize px-4 py-1.5 text-sm rounded-full transition-all duration-300
@@ -692,14 +671,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     <Plus className="w-4 h-4" />
                                     Add Text Section
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleAddSection('brief', 'list')}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add List Section
-                                </button>
                             </div>
                         )}
                     </div>
@@ -744,7 +715,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     className="flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    Add List Section
+                                    Add Additional Specification
                                 </button>
                             </div>
                         )}
@@ -755,29 +726,43 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             {/* Additional Tabs Section */}
             <div className="bg-background/50 rounded-lg mb-6">
                 <div className="relative mb-4">
-                    {/* Scrollable tabs container */}
-                    <div className="relative border-b border-border/20 overflow-x-auto scrollbar-hide">
-                        <div className="flex space-x-8 pb-1 relative w-max min-w-full">
-                            {Object.keys(ADDITIONAL_TABS).map((tabKey) => (
-                                <button
-                                    key={tabKey}
-                                    ref={(el) => (additionalTabRefs.current[tabKey] = el)}
-                                    onClick={() => setActiveAdditionalTab(tabKey as AdditionalTabKey)}
-                                    className={`pb-3 px-1 text-sm font-medium transition-all duration-300 relative whitespace-nowrap flex-shrink-0 ${
-                                        activeAdditionalTab === tabKey
-                                            ? 'text-primary'
-                                            : 'text-muted-foreground hover:text-foreground'
-                                    }`}
-                                >
-                                    {ADDITIONAL_TABS[tabKey as AdditionalTabKey].label}
-                                </button>
-                            ))}
+                    {/* Mobile Dropdown */}
+                    <div className="block md:hidden">
+                        <Select
+                            value={activeAdditionalTab}
+                            onValueChange={(value) => setActiveAdditionalTab(value as AdditionalTabKey)}
+                        >
+                            <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Select a tab" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.keys(ADDITIONAL_TABS).map((tabKey) => (
+                                    <SelectItem key={tabKey} value={tabKey}>
+                                        {ADDITIONAL_TABS[tabKey as AdditionalTabKey].label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-                            {/* Underline indicator
-                            <div
-                                className="absolute bottom-0 h-0.5 bg-primary transition-all duration-300 ease-in-out"
-                                style={getAdditionalTabStyle()}
-                            /> */}
+                    {/* Desktop Tabs */}
+                    <div className="hidden md:block">
+                        <div className="relative border-b border-border/20 overflow-x-auto scrollbar-hide">
+                            <div className="flex space-x-8 pb-1 relative w-max min-w-full">
+                                {Object.keys(ADDITIONAL_TABS).map((tabKey) => (
+                                    <button
+                                        key={tabKey}
+                                        ref={(el) => (additionalTabRefs.current[tabKey] = el)}
+                                        onClick={() => setActiveAdditionalTab(tabKey as AdditionalTabKey)}
+                                        className={`pb-3 px-1 text-sm font-medium transition-all duration-300 relative whitespace-nowrap flex-shrink-0 ${activeAdditionalTab === tabKey
+                                                ? 'text-primary'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                    >
+                                        {ADDITIONAL_TABS[tabKey as AdditionalTabKey].label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -804,7 +789,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         </Button>
                     </div>
                     <div className="space-y-3">
-                        {assignedWorker.map(worker => (
+                        {assignedMembers.map((worker: any) => (
                             <div
                                 key={worker.id}
                                 className="flex items-center justify-between gap-3 p-3 bg-background rounded-lg border border-border/20 group"
@@ -822,7 +807,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     >
                                         <AvatarImage src={`${S3_URL}/${worker.profilePhoto}`} alt={worker.name} />
                                         <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold">
-                                            {worker.name.slice(0, 2).toUpperCase()}
+                                            {worker.name?.slice(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
@@ -842,7 +827,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                 </Button>
                             </div>
                         ))}
-                        {assignedWorker.length === 0 && (
+                        {assignedMembers.length === 0 && (
                             <div className="text-center p-4 text-muted-foreground border border-dashed border-border rounded-lg">
                                 No team members assigned yet
                             </div>

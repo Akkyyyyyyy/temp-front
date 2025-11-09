@@ -398,28 +398,13 @@ export function GanttChart() {
       setIsProjectClick(false); // Reset after scrolling
     }
   }, [selectedProject, isProjectClick]);
-  useEffect(() => {
-    // Preload countries when app starts
-    preloadCountries();
-  }, []);
-
-  // Day calendar scrolling effect
   // useEffect(() => {
-  //   if (hasMounted.current && scheduleHourlyRef.current && isDayClick) {
-  //     scheduleHourlyRef.current.scrollToDayCalendar();
-  //     setIsDayClick(false); // Reset after scrolling
-  //   } else {
-  //     hasMounted.current = true;
-  //   }
-  // }, [isDayClick]);
+  //   // Preload countries when app starts
+  //   preloadCountries();
+  // }, []);
 
-  const { user, isCompany, isMember } = useAuth();
-  const companyDetails = isCompany && user?.data
-    ? user.data
-    : JSON.parse(localStorage.getItem('user-details') || '{}');
-  const memberDetails = isMember && user?.data
-    ? user.data
-    : JSON.parse(localStorage.getItem('user-details') || '{}');
+
+  const { user } = useAuth();
 
 
   const baseUrl = import.meta.env.VITE_BACKEND_URL;
@@ -434,7 +419,7 @@ export function GanttChart() {
       }
     };
     fetchMembers();
-  }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate, companyDetails?.id, memberDetails?.company?.id]);
+  }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate]);
 
 
   const handleJumpToToday = () => {
@@ -477,7 +462,7 @@ export function GanttChart() {
         name: memberData.name,
         email: memberData.email,
         roleId: memberData.roleId, // Use roleId instead of role
-        companyId: companyDetails.id,
+        companyId: user.data.company.id,
         countryCode: memberData.countryCode,
         phone: memberData.phone,
         location: memberData.location,
@@ -516,6 +501,7 @@ export function GanttChart() {
         location: memberData.location,
         bio: memberData.bio,
         skills: memberData.skills || [],
+        isAdmin: false
       };
 
       setTeamMembers((prev) => [newMember, ...prev]);
@@ -673,7 +659,7 @@ export function GanttChart() {
       />
 
       {/* Main Content */}
-      <div className="mt-12 lg:mt-0 flex-1 p-6 overflow-x-hidden">
+      <div className="mt-12 lg:mt-0 flex-1 px-6 py-3 overflow-x-hidden">
         {/* Header */}
         <HeaderWithClock
           timeView={timeView}
@@ -743,7 +729,9 @@ export function GanttChart() {
         <TeamAvailabilityTable
           isOpen={showTeamAvailability}
           onClose={() => setShowTeamAvailability(false)}
-          teamMembers={teamMembers}
+          // teamMembers={teamMembers}
+          setSelectedProject={setSelectedProject}
+          setIsProjectClick={setIsProjectClick}
         />
 
         <TeamMemberProfile

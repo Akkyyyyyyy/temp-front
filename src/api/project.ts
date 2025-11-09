@@ -99,9 +99,56 @@ export interface IAddMemberToProjectResponse {
   message: string;
 }
 
-export async function createProject(booking: Omit<EditableBooking, 'id'>) {
+// Add these interfaces to your existing types
+export interface IGetProjectByIdRequest {
+  projectId: string;
+}
+
+export interface IGetProjectByIdResponse {
+  success: boolean;
+  message?: string;
+  project?: {
+    id: string;
+    name: string;
+    color: string;
+    startDate: string;
+    endDate: string;
+    startHour: number;
+    endHour: number;
+    location: string;
+    description: string;
+    client?: {
+      name?: string;
+      email?: string;
+      mobile?: string;
+      cc?: string;
+    } | null;
+    brief: IProjectSection[];
+    logistics: IProjectSection[];
+    company: {
+      id: string;
+      name: string;
+    };
+    assignments: {
+      id: string;
+      member: {
+        id: string;
+        name: string;
+        email: string;
+      };
+      role: {
+        id: string;
+        name: string;
+      };
+      googleEventId?: string;
+    }[];
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
+export async function createProject(booking: Omit<EditableBooking, 'id'>, companyId: string) {
   try {
-    const companyDetails = JSON.parse(localStorage.getItem('user-details') || '{}');
 
     // Prepare payload for backend API
     const apiPayload = {
@@ -113,7 +160,7 @@ export async function createProject(booking: Omit<EditableBooking, 'id'>) {
       endHour: booking.endHour,
       location: booking.location,
       description: booking.description,
-      companyId: companyDetails.id,
+      companyId: companyId,
       assignments: booking.teamAssignments.map(assignment => ({
         memberId: assignment.id,
         roleId: assignment.roleId
@@ -148,6 +195,43 @@ export async function createProject(booking: Omit<EditableBooking, 'id'>) {
     return { success: false, message: error.message || "Network error" };
   }
 }
+
+export async function getProjectById(
+  projectId: string
+): Promise<IGetProjectByIdResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    if (!projectId?.trim()) {
+      return { 
+        success: false, 
+        message: "Project ID is required" 
+      };
+    }
+
+    const response = await apiFetch(`${baseUrl}/project/${projectId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const result: IGetProjectByIdResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to fetch project");
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error("Error fetching project:", error);
+    return {
+      success: false,
+      message: error.message || "Network error while fetching project"
+    };
+  }
+}
+
 
 export async function checkProjectName(
   projectName: string

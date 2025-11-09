@@ -7,7 +7,7 @@ export function useRole() {
 
     const getCompanyId = useCallback(() => {
         if (!user) return null;
-        return user.data?.id || user.data?.company?.id;
+        return user.data?.company?.id;
     }, [user]);
 
     const addRole = useCallback(async (roleData: Omit<CreateRoleRequest, 'companyId'>) => {

@@ -94,7 +94,7 @@ export function PackageCard({
   isPreview = false,
 }: PackageCardProps) {
   const { user } = useAuth();
-  const userCountry = user?.data?.country;
+  const userCountry = user?.data?.company.country;
   const currencyConfig = getCurrencyConfig(userCountry);
   const CurrencyIcon = currencyConfig.icon;
 

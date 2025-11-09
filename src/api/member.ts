@@ -17,6 +17,7 @@ export interface Member {
   ringColor?: string;
   projects?: Project[];
   active:boolean;
+  isAdmin:boolean;
   roleId:string;
 }
 
@@ -166,6 +167,31 @@ export interface ToggleMemberStatusResponse {
   newStatus: boolean;
 }
 
+export interface GetMembersWithProjectsRequest {
+  companyId: string;
+  memberId?: string;
+}
+
+export interface GetMembersWithProjectsResponse {
+  success: boolean;
+  message: string;
+  members: MemberWithProjects[];
+  totalCount: number;
+  summary: {
+    totalProjects: number;
+    currentProjects: number;
+    upcomingProjects: number;
+    asOfDate: string;
+  };
+}
+
+export interface MemberWithProjects extends Member {
+  projects: ProjectWithStatus[];
+}
+
+export interface ProjectWithStatus extends Project {
+  status: 'current' | 'upcoming';
+}
 
 export async function addMember(request: AddMemberRequest): Promise<AddMemberResponse> {
   try {
@@ -201,15 +227,13 @@ export async function addMember(request: AddMemberRequest): Promise<AddMemberRes
 
 // Get members by company ID with month/week view support
 export async function getMembersByCompanyId(
-  companyId: string,
-  params: {
+companyId: string, params: {
     viewType: 'day' | 'month' | 'week';
     month?: number;
     year?: number;
     week?: number;
     memberId?: string;
-  }
-): Promise<ApiResponse<GetMembersByCompanyResponse>> {
+}): Promise<ApiResponse<GetMembersByCompanyResponse>> {
   try {
     const token = localStorage.getItem('auth-token');
 
@@ -544,5 +568,39 @@ export async function toggleMemberStatus(
       message: error.message || "Failed to toggle member status",
       newStatus: false
     };
+  }
+}
+
+
+export async function getMembersWithFutureProjects(
+  companyId: string,
+  memberId?: string
+): Promise<ApiResponse<GetMembersWithProjectsResponse>> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    const requestBody: GetMembersWithProjectsRequest = {
+      companyId,
+      ...(memberId && { memberId })
+    };
+
+    const response = await apiFetch(`${baseUrl}/member/getAllFutureProjects`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data: data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
   }
 }

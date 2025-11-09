@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { differenceInDays, format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, startOfMonth, endOfMonth } from "date-fns";
 import { Skeleton } from "./ui/skeleton";
-import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban } from "lucide-react";
+import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop } from "lucide-react";
 import { Input } from "./ui/input";
 import { TimeView } from "./GanttChart";
 import { monthNames } from "@/constant/constant";
@@ -14,10 +14,12 @@ import { RingColorDialog } from "./modals/RingColorDialog";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { TimeViewToggle } from "./TimeViewToggle";
 import { DayCalendar } from "./DayCalendar";
+import { useAuth } from "@/context/AuthContext";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
 export interface TeamMember {
+  isAdmin: boolean;
   role: any;
   profilePhoto?: any;
   id: string;
@@ -121,6 +123,7 @@ export function TeamMembers({
   const [colorDialogOpen, setColorDialogOpen] = useState(false);
   const [selectedMemberForColor, setSelectedMemberForColor] = useState<TeamMember | null>(null);
   const [isUpdatingColor, setIsUpdatingColor] = useState(false);
+  const { user } = useAuth();
 
   // Handle opening the color dialog
   const handleOpenColorDialog = (member: TeamMember, e: React.MouseEvent) => {
@@ -388,7 +391,7 @@ export function TeamMembers({
     setIsDayClick(true);
     setSelectedDay(clickedDate);
     setSelectedProject(null);
-    setTimeView('day');
+    // setTimeView('day');
    
   };
 
@@ -492,19 +495,24 @@ export function TeamMembers({
             </div>
           ))}
         </div>
-      ) : sortedTeamMembers.length ? sortedTeamMembers.map(member => {
+      ) : sortedTeamMembers.length ? sortedTeamMembers.map((member, index) => {
         const projectRows = getProjectRows(member.projects || []);
         const timelineHeight = getTimelineHeight(member);
         const isInactive = !member.active;
+        const isLoggedInUser = member.id === user.data.id;  // First member is the logged-in user
+
+        const isAdmin = member.isAdmin === true; // Check if member is admin
 
         return (
           <div
             key={member.id}
             className={`${timelineHeight} ${isInactive ? 'opacity-50 grayscale' : ''}`}
           >
-            <div className={`flex gap-2 cursor-pointer p-2 rounded-md transition-colors max-h-16 ${isInactive
-              ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
-              : 'hover:bg-muted/50 hover:text-studio-gold'
+            <div className={`flex gap-2 cursor-pointer p-2 rounded-sm transition-colors max-h-16 ${isInactive
+                ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
+                : isLoggedInUser
+                  ? ''
+                  : 'hover:bg-muted/50 hover:text-studio-gold'
               }`}>
               <div className="relative">
                 <Tooltip>
@@ -527,24 +535,35 @@ export function TeamMembers({
                           src={`${S3_URL}/${member.profilePhoto}`}
                           alt={member.name}
                           className={isInactive ? 'grayscale object-cover' : 'object-cover'}
-                          
                         />
                         <AvatarFallback className={`text-sm font-semibold ${isInactive
-                          ? 'bg-muted-foreground/20 text-muted-foreground'
-                          : 'bg-studio-gold text-studio-dark'
+                            ? 'bg-muted-foreground/20 text-muted-foreground'
+                            : 'bg-studio-gold text-studio-dark'
                           }`}>
                           {member.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       {isInactive && (
-                        <div className="absolute -top-1 -right-1 bg-muted-foreground/70 text-white rounded-full p-0.5">
+                        <div className="absolute -bottom-1 -right-1 bg-muted-foreground/70 text-white rounded-full p-0.5">
                           <Ban className="w-3 h-3" />
+                        </div>
+                      )}
+                      {isAdmin && !isInactive && (
+                        <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                          <Laptop className="w-3 h-3" />
                         </div>
                       )}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{isInactive ? 'Inactive member - Click to set ring color' : 'Click to set ring color'}</p>
+                    <p>
+                      {isInactive
+                        ? 'Inactive member - Click to set ring color'
+                        : isAdmin
+                          ? 'Admin - Click to set ring color'
+                          : 'Click to set ring color'
+                      }
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -558,6 +577,11 @@ export function TeamMembers({
                   {isInactive && (
                     <span className="ml-2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       Inactive
+                    </span>
+                  )}
+                  {isLoggedInUser && !isInactive && (
+                    <span className="ml-2 text-xs text-primary-foreground bg-primary px-1.5 py-0.5 rounded-md">
+                      You
                     </span>
                   )}
                 </h3>

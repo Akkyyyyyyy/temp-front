@@ -66,7 +66,7 @@ export function RoleDropdown({
     updateRole, 
     refresh 
   } = useRole();
-  const { user, isCompany } = useAuth();
+  const { user } = useAuth();
   const [isAddingRole, setIsAddingRole] = useState(false);
   const [isDeletingRole, setIsDeletingRole] = useState<string | null>(null);
   const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null);
@@ -85,13 +85,13 @@ export function RoleDropdown({
   }, [pendingRoleId, roles, onChange]);
 
   // Determine which company to use
-  const targetCompanyId = externalCompanyId || user.data?.id || user.data?.company?.id;
+  const targetCompanyId = user.data?.company?.id;
   
   // Find the selected role by ID
   const selectedRole = roles.find(role => role.id === selected);
   
 
-  const canManageRoles = isCompany && targetCompanyId;
+  const canManageRoles = targetCompanyId;
 
   const handleAddRole = async () => {
     if (!newRoleName.trim()) {
@@ -210,12 +210,6 @@ export function RoleDropdown({
 
   return (
     <div className="space-y-2">
-      {showCompanyInfo && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Building className="h-4 w-4" />
-          <span>Managing roles for selected company</span>
-        </div>
-      )}
       
       <Select
         key={roles.length} // Force re-render when roles change

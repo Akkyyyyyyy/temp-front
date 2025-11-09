@@ -74,9 +74,8 @@ const Register = () => {
 
     useEffect(() => {
         const token = localStorage.getItem("auth-token");
-        const companyDetails = localStorage.getItem("companyDetails");
 
-        if (token && companyDetails) {
+        if (token) {
             navigate("/");
         } else {
             setIsChecking(false)

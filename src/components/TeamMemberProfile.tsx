@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff, MoreHorizontal, MoreVertical } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,8 @@ import { RoleDropdown } from "./dropdowns/RoleDropdown";
 import { Label } from "./ui/label";
 import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
+import { ImageCropModal } from "./modals/ImageCropModal";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
@@ -42,9 +44,9 @@ const profileSchema = yup.object({
     .string()
     .trim()
     .required('Name is required')
-    .test('min-if-not-empty', 'Name must be at least 3 characters', value => {
+    .test('min-if-not-empty', 'Name must be at least 2 characters', value => {
       if (!value) return true;
-      return value.length >= 3;
+      return value.length >= 2;
     })
     .max(50, 'Name must be at most 50 characters'),
   role: yup
@@ -130,10 +132,8 @@ export function TeamMemberProfile({
     projectId: null,
     projectName: ''
   });
-  const [memberDetails, setMemberDetails] = useState(() => {
-    const stored = localStorage.getItem('memberDetails');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const { roles } = useRole();
 
   const formatHour12 = (hour) => {
@@ -153,12 +153,9 @@ export function TeamMemberProfile({
     bio: member?.bio || '',
     skills: member?.skills || [],
     photo: member?.profilePhoto || '',
-    roleId: member?.roleId || '',
+    roleId: member?.roleId || null,
   });
   const [togglingStatus, setTogglingStatus] = useState(false);
-
-
-
 
   const handleToggleStatus = async () => {
     setTogglingStatus(true);
@@ -193,7 +190,7 @@ export function TeamMemberProfile({
       location: member?.location || '',
       bio: member?.bio || '',
       skills: member?.skills || [],
-      roleId: member?.roleId || '',
+      roleId: member?.roleId || null,
       photo: member?.profilePhoto || ''
     });
   }, [member]);
@@ -228,49 +225,45 @@ export function TeamMemberProfile({
       return;
     }
 
-    try {
-      setUploadingPhoto(true);
+    // Create object URL and show crop modal
+    const imageUrl = URL.createObjectURL(file);
+    setImageToCrop(imageUrl);
+    setShowCropModal(true);
 
-      const result = await uploadMemberPhoto(member.id, file);
-
-      if (result.success) {
-        // Update local state with new photo URL/path
-        const updatedProfileData = {
-          ...profileData,
-          photo: result.profilePhotoPath
-        };
-
-        setProfileData(updatedProfileData);
-
-        // Update member in parent component
-        onUpdateMember(member.id, {
-          ...updatedProfileData,
-          profilePhoto: result.profilePhotoPath
-        });
-
-        // Update localStorage if memberDetails exists
-        if (memberDetails) {
-          const updatedMemberDetails = {
-            ...memberDetails,
-            profilePhoto: result.profilePhotoPath
-          };
-          localStorage.setItem('memberDetails', JSON.stringify(updatedMemberDetails));
-          setMemberDetails(updatedMemberDetails);
-        }
-
-        toast.success('Profile picture updated successfully!');
-      } else {
-        throw new Error(result.message || 'Failed to upload photo');
-      }
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      // Error is already handled in the API function
-    } finally {
-      setUploadingPhoto(false);
-      // Reset file input
-      event.target.value = '';
-    }
+    // Reset file input
+    event.target.value = '';
   };
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+  try {
+    setUploadingPhoto(true);
+    
+    // Create a file from the blob
+    const file = new File([croppedImageBlob], 'profile-photo.jpg', { type: 'image/jpeg' });
+
+    // Upload using your existing function
+    const result = await uploadMemberPhoto(member.id, file);
+
+    if (result.success) {
+      const updatedProfileData = {
+        ...profileData,
+        photo: result.profilePhotoPath
+      };
+
+      setProfileData(updatedProfileData);
+      onUpdateMember(member.id, {
+        ...updatedProfileData,
+        profilePhoto: result.profilePhotoPath
+      });
+
+      toast.success('Profile picture updated successfully!');
+    }
+  } catch (error) {
+    console.error('Error uploading cropped image:', error);
+    toast.error('Failed to upload image');
+  } finally {
+    setUploadingPhoto(false);
+  }
+};
 
   // Remove profile picture using dedicated remove API
   const handleRemovePhoto = async () => {
@@ -293,15 +286,6 @@ export function TeamMemberProfile({
           photo: '',
           profilePhoto: ''
         });
-
-        if (memberDetails) {
-          const updatedMemberDetails = {
-            ...memberDetails,
-            profilePhoto: ''
-          };
-          localStorage.setItem('user-details', JSON.stringify(updatedMemberDetails));
-          setMemberDetails(updatedMemberDetails);
-        }
 
         toast.success('Profile picture removed successfully!');
       } else {
@@ -390,11 +374,11 @@ export function TeamMemberProfile({
         bio: profileData.bio,
         skills: JSON.stringify(profileData.skills), // Convert to string for form-data
         profilePhoto: profileData.photo,
-        roleId: profileData.roleId,
-      };
+        roleId: profileData.roleId || null,
+      };      
 
       const result = await updateMemberProfile(member.id, updateData);
-
+      
       if (result.success) {
         onUpdateMember(member.id, {
           ...profileData,
@@ -403,7 +387,7 @@ export function TeamMemberProfile({
 
         const updatedMember = {
           name: result.member.name,
-          role: result.member.role.name,
+          role: result.member?.role?.name || 'No Role Assigned',
           email: result.member.email || '',
           phone: result.member.phone || '',
           countryCode: result.member.countryCode || '',
@@ -411,13 +395,8 @@ export function TeamMemberProfile({
           bio: result.member.bio || '',
           skills: result.member.skills || [],
           photo: result.member.profilePhoto || profileData.photo,
-          roleId: result.member.role.id || '',
+          roleId: result.member?.role?.id || null,
         };
-
-        if (memberDetails) {
-          localStorage.setItem('memberDetails', JSON.stringify(result.member));
-          setMemberDetails(result.member);
-        }
 
         setProfileData(updatedMember);
         setEditingProfile(false);
@@ -432,7 +411,8 @@ export function TeamMemberProfile({
       setSaving(false);
     }
   };
-
+  
+  
   const handleSaveProject = async (projectId: string, updates: Partial<Project>) => {
     const projectToValidate = { ...member?.projects.find(project => project.id === projectId), ...updates };
     const isValid = await validateProject(projectToValidate);
@@ -623,29 +603,45 @@ export function TeamMemberProfile({
               </div>
 
               <div className="flex items-center gap-1">
-                {/* Toggle Status Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleToggleStatus}
-                  disabled={togglingStatus}
-                  className={`h-8 w-8 ${member.active
-                    ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20'
-                    : 'bg-gray-500/10 text-gray-500 hover:bg-gray-500/20'
-                    } ${togglingStatus ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {member.active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                </Button>
-
-                {/* Delete Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="h-8 w-8 bg-red-500/10 text-red-600 hover:bg-red-500/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {/* Three-dot menu button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem
+                      onClick={handleToggleStatus}
+                      disabled={togglingStatus}
+                      className={`flex items-center gap-2 ${member.active ? 'text-green-600' : 'text-gray-600'}`}
+                    >
+                      {member.active ? (
+                        <>
+                          <EyeOff className="h-4 w-4" />
+                          Deactivate Member
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-4 w-4" />
+                          Activate Member
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Member
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
 
@@ -1046,7 +1042,7 @@ export function TeamMemberProfile({
                         bio: member.bio || '',
                         skills: member.skills || [],
                         photo: member.profilePhoto || '',
-                        roleId: member?.roleId || '',
+                        roleId: member?.roleId || null,
                       });
                     }}
                     className="flex items-center gap-1 border-muted-foreground/30 hover:bg-muted"
@@ -1074,7 +1070,7 @@ export function TeamMemberProfile({
                         bio: member.bio || '',
                         skills: member.skills || [],
                         photo: member.profilePhoto || '',
-                        roleId: member?.roleId || '',
+                        roleId: member?.roleId || null,
                       });
                       setProfileErrors({});
                     }
@@ -1116,14 +1112,7 @@ export function TeamMemberProfile({
                   {member?.projects?.map((project) => (
                     <div key={project.id} className="border rounded-lg p-4">
                       {editingProject === project.id ? (
-                        <EditProjectForm
-                          project={project}
-                          onSave={(updates) => handleSaveProject(project.id, updates)}
-                          onCancel={() => {
-                            setEditingProject(null);
-                            setProjectErrors({});
-                          }}
-                        />
+                        <></>
                       ) : (
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
@@ -1335,106 +1324,20 @@ export function TeamMemberProfile({
             </Card>
           )}
         </div>
+          <ImageCropModal
+      isOpen={showCropModal}
+      onClose={() => {
+        setShowCropModal(false);
+        if (imageToCrop) {
+          URL.revokeObjectURL(imageToCrop);
+          setImageToCrop(null);
+        }
+      }}
+      image={imageToCrop}
+      onCropComplete={handleCropComplete}
+      aspect={1} // Square aspect ratio for profile pictures
+    />
       </DialogContent>
     </Dialog>
-  );
-}
-// Component for editing individual projects
-interface EditProjectFormProps {
-  project: Project;
-  onSave: (updates: Partial<Project>) => void;
-  onCancel: () => void;
-}
-
-function EditProjectForm({ project, onSave, onCancel }: EditProjectFormProps) {
-  const [formData, setFormData] = useState({
-    name: project.name,
-    startDate: project.startDate,
-    endDate: project.endDate,
-    color: project.color,
-    startHour: project.startHour || 9,
-    endHour: project.endHour || 17
-  });
-
-  const handleSave = () => {
-    onSave(formData);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="text-sm font-medium">Project Name</label>
-          <Input
-            value={formData.name}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Color</label>
-          <select
-            value={formData.color}
-            onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-            className="w-full p-2 border rounded"
-          >
-            <option value="bg-blue-500">Blue</option>
-            <option value="bg-green-500">Green</option>
-            <option value="bg-red-500">Red</option>
-            <option value="bg-purple-500">Purple</option>
-            <option value="bg-orange-500">Orange</option>
-            <option value="bg-yellow-500">Yellow</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-sm font-medium">Start Date (August)</label>
-          <Input
-            type="number"
-            min="1"
-            max="31"
-            value={formData.startDate}
-            onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">End Date (August)</label>
-          <Input
-            type="number"
-            min="1"
-            max="31"
-            value={formData.endDate}
-            onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Start Hour</label>
-          <Input
-            type="number"
-            min="0"
-            max="23"
-            value={formData.startHour}
-            onChange={(e) => setFormData(prev => ({ ...prev, startHour: parseInt(e.target.value) }))}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium">End Hour</label>
-          <Input
-            type="number"
-            min="0"
-            max="23"
-            value={formData.endHour}
-            onChange={(e) => setFormData(prev => ({ ...prev, endHour: parseInt(e.target.value) }))}
-          />
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button onClick={handleSave}>
-          <Save className="w-4 h-4 mr-2" />
-          Save
-        </Button>
-        <Button variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </div>
   );
 }

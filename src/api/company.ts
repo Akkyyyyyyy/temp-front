@@ -19,12 +19,8 @@ interface RegisterMemberPayload {
 export interface LoginPayload {
   email: string;
   password: string;
-}
-
-interface LoginResponse {
-  token: string;
-  companyDetails?: any;
-  member?: any;
+  rememberMe?: boolean;
+  userType:any;
 }
 
 export interface ApiResponse<T> {
@@ -79,8 +75,38 @@ export async function loginCompany(payload: LoginPayload): Promise<ApiResponse<L
   }
 }
 
-// Member Auth Functions
-export async function loginMember(payload: LoginPayload): Promise<ApiResponse<LoginResponse>> {
+// Update your types file
+export interface LoginResponse {
+  success: boolean;
+  message: string;
+  token: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string | null;
+    isAdmin: boolean;
+    userType: "admin" | "member";
+    location: string | null;
+    company: {
+      id: string | null;
+      name: string | null;
+      email: string;
+      country: string | null;
+    };
+  };
+  forceReset?: boolean;
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  forceReset?: boolean;
+}
+
+// Update the loginMember function to handle forceReset
+export async function loginMember(payload: LoginPayload): Promise<any> {
   try {
     const response = await apiFetch(`${baseUrl}/member/login`, {
       method: "POST",
@@ -93,6 +119,15 @@ export async function loginMember(payload: LoginPayload): Promise<ApiResponse<Lo
     const data = await response.json();
 
     if (!response.ok) {
+      // Handle force reset case
+      if (response.status === 403 && data.forceReset) {
+        return { 
+          success: false, 
+          message: data.message, 
+          errors: data.errors,
+          forceReset: true 
+        };
+      }
       return { success: false, message: data.message, errors: data.errors };
     }
 
