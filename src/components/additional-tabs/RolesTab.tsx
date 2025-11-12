@@ -9,6 +9,7 @@ import {
     updateAssignmentInstructions,
     Assignment
 } from "@/api/additional-tabs";
+import { useAuth } from "@/context/AuthContext";
 
 interface RolesTabProps {
     projectId: string;
@@ -21,6 +22,7 @@ export function RolesTab({ projectId }: RolesTabProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [editingAssignmentId, setEditingAssignmentId] = useState<string | null>(null);
     const [editInstructions, setEditInstructions] = useState("");
+    const { user } = useAuth();
 
     // Fetch project assignments
     const fetchAssignments = async () => {
@@ -119,9 +121,9 @@ export function RolesTab({ projectId }: RolesTabProps) {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center py-6">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-sm text-muted-foreground">Loading team roles...</span>
+            <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                <span className="ml-3 text-muted-foreground">Loading team...</span>
             </div>
         );
     }
@@ -171,7 +173,7 @@ export function RolesTab({ projectId }: RolesTabProps) {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <h5 className="text-sm font-medium text-foreground">Instructions</h5>
-                                {editingAssignmentId !== assignment.id && assignment.instructions && (
+                                {editingAssignmentId !== assignment.id && assignment.instructions && user.data.isAdmin && (
                                     <div className="flex items-center gap-1">
                                         <Button
                                             variant="ghost"
@@ -236,12 +238,18 @@ export function RolesTab({ projectId }: RolesTabProps) {
                                             {assignment.instructions}
                                         </div>
                                     ) : (
-                                        <button
-                                            onClick={() => handleAddInstructions(assignment)}
-                                            className="w-full text-left text-sm text-muted-foreground italic bg-muted/20 hover:bg-muted/30 rounded-md p-2 transition-colors"
-                                        >
-                                            + Add instructions
-                                        </button>
+                                        user.data.isAdmin ? (
+                                            <button
+                                                onClick={() => handleAddInstructions(assignment)}
+                                                className="w-full text-left text-sm text-muted-foreground italic bg-muted/20 hover:bg-muted/30 rounded-md p-2 transition-colors"
+                                            >
+                                                + Add instructions
+                                            </button>
+                                        ) : (
+                                    <div className="text-sm text-muted-foreground bg-muted/30 rounded-md p-2 pr-10">
+                                        No instructions
+                                    </div>
+                                    )
                                     )}
                                 </div>
                             )}

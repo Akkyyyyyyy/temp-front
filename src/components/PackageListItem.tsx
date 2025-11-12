@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Pencil, Copy, Trash2 } from "lucide-react";
 import { PackageType } from "../components/PackagesDialog";
+import { useAuth } from "@/context/AuthContext";
 
 interface PackageListItemProps {
   package: PackageType;
@@ -12,6 +13,7 @@ interface PackageListItemProps {
 }
 
 export function PackageListItem({ package: pkg, onEdit, onDuplicate, onDelete }: PackageListItemProps) {
+  const { user } = useAuth();
   return (
     <Card className="p-4 hover:border-primary/50 transition-colors">
       <div className="flex items-center justify-between gap-4">
@@ -52,17 +54,21 @@ export function PackageListItem({ package: pkg, onEdit, onDuplicate, onDelete }:
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={onDuplicate}>
-            <Copy className="w-4 h-4" />
-          </Button>
-          <Button variant="outline" size="sm" onClick={onDelete} className="text-destructive hover:text-destructive">
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
+        {
+          user.data.isAdmin &&
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDuplicate}>
+              <Copy className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={onDelete} className="text-destructive hover:text-destructive">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        }
+
       </div>
     </Card>
   );

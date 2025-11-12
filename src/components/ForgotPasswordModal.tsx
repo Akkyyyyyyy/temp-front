@@ -44,11 +44,12 @@ interface ForgotPasswordModalProps {
     isOpen: boolean;
     onClose: () => void;
     userType: "company" | "member";
+    email?: string;
 }
 
 type ForgotPasswordStep = 'email' | 'otp' | 'newPassword';
 
-export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswordModalProps) => {
+export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: ForgotPasswordModalProps) => {
     const [step, setStep] = useState<ForgotPasswordStep>('email');
     const [loading, setLoading] = useState(false);
     const [resetEmail, setResetEmail] = useState("");
@@ -56,8 +57,9 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
     const [initialToken, setInitialToken] = useState("");
     const [resendTimer, setResendTimer] = useState(0);
     const [isResending, setIsResending] = useState(false);
-    const [showConfirmPassword,setShowConfirmPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
+    const [hasAutoSent, setHasAutoSent] = useState(false);
 
     const emailForm = useForm<EmailData>({
         resolver: yupResolver(emailSchema),
@@ -70,6 +72,16 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
     const newPasswordForm = useForm<NewPasswordData>({
         resolver: yupResolver(newPasswordSchema),
     });
+    // Auto-send OTP when email prop is provided and modal opens
+    useEffect(() => {
+        if (isOpen && email && email.trim() !== '' && !hasAutoSent) {
+            // Set the email in the form
+            emailForm.setValue('email', email);
+            // Trigger the OTP send automatically
+            handleSendOTP({ email });
+            setHasAutoSent(true);
+        }
+    }, [isOpen, email, hasAutoSent]);
 
     // Timer effect for resend OTP
     useEffect(() => {
@@ -85,6 +97,13 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
             if (interval) clearInterval(interval);
         };
     }, [resendTimer]);
+
+    // Reset auto-sent state when modal closes
+    useEffect(() => {
+        if (!isOpen) {
+            setHasAutoSent(false);
+        }
+    }, [isOpen]);
 
     const startResendTimer = () => {
         setResendTimer(30); // 30 seconds
@@ -196,6 +215,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
         setResetToken("");
         setInitialToken("");
         setResendTimer(0); // Clear timer on close
+        setHasAutoSent(false);
         emailForm.reset();
         otpForm.reset();
         newPasswordForm.reset();
@@ -275,6 +295,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                                     type="text"
                                     placeholder={userType === "company" ? "admin@company.com" : "member@company.com"}
                                     {...emailForm.register("email")}
+                                    disabled={loading && email && email.trim() !== ''} // Disable input during auto-send
                                 />
                                 {emailForm.formState.errors.email && (
                                     <p className="text-sm text-destructive">
@@ -287,7 +308,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                                 {loading ? (
                                     <>
                                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                                        Sending OTP...
+                                        {email && email.trim() !== '' ? 'Sending OTP...' : 'Sending OTP...'}
                                     </>
                                 ) : (
                                     'Send OTP'
@@ -351,11 +372,11 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType }: ForgotPasswor
                                 </div>
 
                                 {/* Development helper - show token if available */}
-                                {process.env.NODE_ENV === 'development' && initialToken && (
+                                {/* {process.env.NODE_ENV === 'development' && initialToken && (
                                     <p className="text-xs text-muted-foreground text-center mt-2">
                                         OTP available (check console)
                                     </p>
-                                )}
+                                )} */}
                             </div>
 
                             <Button type="submit" className="w-full" disabled={loading}>

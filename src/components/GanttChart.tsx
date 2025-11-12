@@ -659,7 +659,7 @@ export function GanttChart() {
       />
 
       {/* Main Content */}
-      <div className="mt-12 lg:mt-0 flex-1 px-6 py-3 overflow-x-hidden">
+      <div className="mt-12 lg:mt-0 flex-1 px-6 py-6 overflow-x-hidden">
         {/* Header */}
         <HeaderWithClock
           timeView={timeView}
@@ -731,7 +731,9 @@ export function GanttChart() {
           onClose={() => setShowTeamAvailability(false)}
           // teamMembers={teamMembers}
           setSelectedProject={setSelectedProject}
+          setSelectedMember={setSelectedMember}
           setIsProjectClick={setIsProjectClick}
+          team={teamMembers}
         />
 
         <TeamMemberProfile

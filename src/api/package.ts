@@ -11,7 +11,7 @@ export interface CreatePackagePayload {
   features?: Record<string, any> | null;
   addons?: Record<string, any> | null;
   status: "active" | "inactive";
-  memberId: string;
+  companyId: string;
 }
 
 export interface UpdatePackagePayload {
@@ -33,11 +33,9 @@ export interface Package {
   features: Record<string, any> | null;
   addons: Record<string, any> | null;
   status: "active" | "inactive";
-  member: {
+  Company: {
     id: string;
     name: string;
-    email: string;
-    role: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -158,9 +156,9 @@ export async function deletePackage(id: string): Promise<ApiResponse<{ package: 
   }
 }
 
-export async function getPackagesByMember(memberId: string): Promise<ApiResponse<{ packages: Package[] }>> {
+export async function getPackagesByCompany(companyId: string): Promise<ApiResponse<{ packages: Package[] }>> {
   try {
-    const response = await apiFetch(`${baseUrl}/package/member/${memberId}`, {
+    const response = await apiFetch(`${baseUrl}/package/company/${companyId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

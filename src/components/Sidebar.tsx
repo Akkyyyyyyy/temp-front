@@ -87,22 +87,28 @@ export function Sidebar({
   // Create sidebar items with unique action identifiers
   const getSidebarItems = (): SidebarItem[] => {
     const baseItems: SidebarItem[] = [
-      { icon: Home, label: "Dashboard", active: true, action: "dashboard" },
-      { icon: UserRoundPlus, label: "Add Team Members", active: false, action: "addTeamMember" },
-      { icon: UserRoundCheck, label: "Bookings", active: false, action: "showTeamAvailability" },
-      { icon: Plus, label: "Add Booking", active: false, action: "addBooking" },
-      { icon: CurrencyIcon, label: "Revenue", active: false, action: "showFinancialManagement" },
-      { icon: BriefcaseBusiness, label: "Packages", active: false, action: "showPackages" },
-    ];
+    { icon: Home, label: "Dashboard", active: true, action: "dashboard" },
+    { icon: UserRoundPlus, label: "Add Team Members", active: false, action: "addTeamMember" },
+    { icon: Plus, label: "Add Booking", active: false, action: "addBooking" },
+    { icon: UserRoundCheck, label: "Bookings", active: false, action: "showTeamAvailability" },
+    { icon: CurrencyIcon, label: "Revenue", active: false, action: "showFinancialManagement" },
+    { icon: BriefcaseBusiness, label: "Packages", active: false, action: "showPackages" },
+  ];
 
+  // Filter out admin-only items if user is not admin
+  const filteredItems = user.data.isAdmin
+    ? baseItems
+    : baseItems.filter(
+        (item) => item.label !== "Add Team Members" && item.label !== "Add Booking"
+      );
 
-    // Add the remaining items
-    baseItems.push(
-      { icon: Settings, label: "Settings", active: false, action: "settings" },
-      { icon: HelpCircle, label: "Help", active: false, action: "help" }
-    );
+  // Add remaining items
+  filteredItems.push(
+    { icon: Settings, label: "Settings", active: false, action: "settings" },
+    { icon: HelpCircle, label: "Help", active: false, action: "help" }
+  );
 
-    return baseItems;
+  return filteredItems;
   };
 
   const sidebarItems = getSidebarItems();
@@ -162,11 +168,11 @@ export function Sidebar({
           <SheetContent side="left" className="w-64 bg-studio-dark border-r border-border/20 p-0">
             <div className="flex flex-col h-full py-6">
               {/* Logo in Sheet */}
-              <div className="flex items-center justify-center mb-8">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-studio-gold to-studio-gold-light flex items-center justify-center">
-                  <Camera className="w-4 h-4 text-studio-dark" />
+              <div className="flex items-center justify-start mb-8 px-3 gap-2">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-studio-gold to-studio-gold-light flex items-center justify-center">
+                  <Camera className="w-5 h-5 text-studio-dark" />
                 </div>
-                <span className="ml-2 text-white font-semibold">{user.data.company.name}</span>
+                <span className="ml-2 text-white font-semibold text-xl">{user.data.company.name}</span>
               </div>
 
               {/* Navigation Items */}

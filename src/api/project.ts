@@ -161,9 +161,11 @@ export async function createProject(booking: Omit<EditableBooking, 'id'>, compan
       location: booking.location,
       description: booking.description,
       companyId: companyId,
+      reminders: booking.reminders,
       assignments: booking.teamAssignments.map(assignment => ({
         memberId: assignment.id,
-        roleId: assignment.roleId
+        roleId: assignment.roleId,
+        instructions: assignment.instructions
       })),
       // Add client data if provided
       ...(booking.client && {

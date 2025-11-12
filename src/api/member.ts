@@ -193,6 +193,17 @@ export interface ProjectWithStatus extends Project {
   status: 'current' | 'upcoming';
 }
 
+export interface ToggleAdminRequest {
+  memberId: string;
+}
+
+export interface ToggleAdminResponse {
+  success: boolean;
+  message: string;
+  member?: Member;
+  isAdmin: boolean;
+}
+
 export async function addMember(request: AddMemberRequest): Promise<AddMemberResponse> {
   try {
     const token = localStorage.getItem("auth-token");
@@ -602,5 +613,47 @@ export async function getMembersWithFutureProjects(
     return { success: true, data: data };
   } catch (error: any) {
     return { success: false, message: error.message || "Network error" };
+  }
+}
+
+// Add this function to your existing API functions
+export async function toggleMemberAdmin(
+  memberId: string
+): Promise<ToggleAdminResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    const response = await apiFetch(`${baseUrl}/member/toggle-admin`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ memberId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to toggle admin status");
+    }
+
+    const statusMessage = data.isAdmin ? "added" : "removed";
+    toast.success(`Admin privileges ${statusMessage} successfully`);
+
+    return {
+      success: true,
+      message: data.message,
+      member: data.member,
+      isAdmin: data.isAdmin
+    };
+  } catch (error: any) {
+    console.error("Error toggling admin status:", error);
+    toast.error(error.message || "Failed to toggle admin status");
+    return {
+      success: false,
+      message: error.message || "Failed to toggle admin status",
+      isAdmin: false
+    };
   }
 }

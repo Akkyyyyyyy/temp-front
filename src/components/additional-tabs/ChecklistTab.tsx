@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { getProjectChecklist, IChecklistItem, updateProjectChecklist } from "@/api/additional-tabs";
+import { useAuth } from "@/context/AuthContext";
 
 interface ChecklistTabProps {
   projectId: string;
@@ -21,6 +22,7 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
   const [editDescription, setEditDescription] = useState("");
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const { user } = useAuth();
 
   // Create a ref for each menu - we'll use a function to get refs
   const menuRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -28,11 +30,11 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
   // Fetch checklist data using your API function
   const fetchChecklist = async () => {
     if (!projectId) return;
-    
+
     setIsLoading(true);
     try {
       const result = await getProjectChecklist({ projectId });
-      
+
       if (result.success && result.checklist) {
         setChecklist(result.checklist);
       } else {
@@ -69,7 +71,7 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
     const handleClickOutside = (event: MouseEvent) => {
       // Check if click is outside ALL menu elements
       let clickedInsideAnyMenu = false;
-      
+
       menuRefs.current.forEach((ref, itemId) => {
         if (ref && ref.contains(event.target as Node)) {
           clickedInsideAnyMenu = true;
@@ -163,8 +165,8 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
     }
 
     const updatedChecklist = checklist.map(item =>
-      item.id === editingItemId ? { 
-        ...item, 
+      item.id === editingItemId ? {
+        ...item,
         title: editTitle.trim(),
         description: editDescription.trim() || undefined
       } : item
@@ -190,10 +192,10 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-6">
-        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading checklist...</span>
-      </div>
+      <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                <span className="ml-3 text-muted-foreground">Loading Checklist...</span>
+            </div>
     );
   }
 
@@ -238,15 +240,16 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
           </div>
         </div>
       ) : (
-        <Button 
-          onClick={handleStartAdd}
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-        >
-          <Plus className="w-3 h-3 mr-1" />
-          Add New Item
-        </Button>
+        user.data.isAdmin == true && (
+          <Button
+            onClick={handleStartAdd}
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add New Item
+          </Button>)
       )}
 
       {/* Checklist Items */}
@@ -260,9 +263,8 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
           checklist.map((item) => (
             <div
               key={item.id}
-              className={`p-2 rounded-md border border-border/20 transition-colors group hover:border-border/40 ${
-                item.completed ? 'bg-muted/30 opacity-75' : 'bg-background'
-              }`}
+              className={`p-2 rounded-md border border-border/20 transition-colors group hover:border-border/40 ${item.completed ? 'bg-muted/30 opacity-75' : 'bg-background'
+                }`}
             >
               {editingItemId === item.id ? (
                 // Edit mode
@@ -308,27 +310,27 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
                     onCheckedChange={() => handleToggleItem(item.id)}
                     className="h-4 w-4 mt-0.5 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
                   />
-                  
+
                   <div className="flex-1 min-w-0">
-                    <div 
-                      className={`text-sm cursor-pointer select-none ${
-                        item.completed ? 'text-muted-foreground' : 'text-foreground'
-                      }`}
+                    <div
+                      className={`text-sm cursor-pointer select-none ${item.completed ? 'text-muted-foreground' : 'text-foreground'
+                        }`}
                       onClick={() => handleToggleItem(item.id)}
                     >
                       {item.title}
                     </div>
                     {item.description && (
-                      <div className={`text-xs mt-1 ${
-                        item.completed ? 'text-muted-foreground/70' : 'text-muted-foreground'
-                      }`}>
+                      <div className={`text-xs mt-1 ${item.completed ? 'text-muted-foreground/70' : 'text-muted-foreground'
+                        }`}>
                         {item.description}
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Dropdown Menu - FIXED: Use individual ref for each menu */}
                   <div className="relative" ref={setMenuRef(item.id)}>
+                     {
+                        user.data.isAdmin == true && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -336,8 +338,8 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
                       className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
                     >
                       <MoreVertical className="w-3 h-3" />
-                    </Button>
-                    
+                    </Button>)}
+
                     {/* Menu Dropdown */}
                     {activeMenu === item.id && (
                       <div className="absolute right-0 top-6 z-10 bg-background border border-border/20 rounded-md shadow-sm py-1 min-w-[100px]">

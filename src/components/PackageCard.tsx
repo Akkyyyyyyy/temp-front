@@ -22,7 +22,7 @@ interface PackageCardProps {
 // Function to get currency symbol and formatting based on country
 const getCurrencyConfig = (country?: string) => {
   const countryCode = country?.toLowerCase();
-  
+
   switch (countryCode) {
     case 'us':
     case 'usa':
@@ -33,12 +33,12 @@ const getCurrencyConfig = (country?: string) => {
     case 'singapore':
     case 'hong kong':
       return { symbol: '$', code: 'USD', icon: DollarSign, format: 'en-US' };
-    
+
     case 'gb':
     case 'uk':
     case 'united kingdom':
       return { symbol: '£', code: 'GBP', icon: PoundSterling, format: 'en-GB' };
-    
+
     case 'eu':
     case 'germany':
     case 'france':
@@ -48,11 +48,11 @@ const getCurrencyConfig = (country?: string) => {
     case 'belgium':
     case 'ireland':
       return { symbol: '€', code: 'EUR', icon: Euro, format: 'de-DE' };
-    
+
     case 'in':
     case 'india':
       return { symbol: '₹', code: 'INR', icon: IndianRupee, format: 'en-IN' };
-    
+
     // Add more countries as needed
     default:
       return { symbol: '$', code: 'USD', icon: DollarSign, format: 'en-US' };
@@ -62,10 +62,10 @@ const getCurrencyConfig = (country?: string) => {
 // Function to format price with proper currency formatting - handles string input
 const formatPrice = (price: string | number, country?: string) => {
   const config = getCurrencyConfig(country);
-  
+
   // Convert string to number, handle empty strings and invalid values
-  const numericPrice = typeof price === 'string' 
-    ? parseFloat(price) || 0 
+  const numericPrice = typeof price === 'string'
+    ? parseFloat(price) || 0
     : price || 0;
 
   // For currencies like JPY that typically don't use decimal places
@@ -77,7 +77,7 @@ const formatPrice = (price: string | number, country?: string) => {
       maximumFractionDigits: 0,
     }).format(numericPrice);
   }
-  
+
   return new Intl.NumberFormat(config.format, {
     style: 'currency',
     currency: config.code,
@@ -86,11 +86,11 @@ const formatPrice = (price: string | number, country?: string) => {
   }).format(numericPrice);
 };
 
-export function PackageCard({ 
-  package: pkg, 
-  onEdit, 
-  onDuplicate, 
-  onDelete, 
+export function PackageCard({
+  package: pkg,
+  onEdit,
+  onDuplicate,
+  onDelete,
   isPreview = false,
 }: PackageCardProps) {
   const { user } = useAuth();
@@ -100,11 +100,10 @@ export function PackageCard({
 
   return (
     <Card
-      className={`relative ${
-        pkg.popular
+      className={`relative ${pkg.popular
           ? "border-primary shadow-lg ring-2 ring-primary/20"
           : "border-border"
-      }`}
+        }`}
     >
       {pkg.popular && !isPreview && (
         <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
@@ -121,14 +120,18 @@ export function PackageCard({
             </div>
             <p className="text-sm text-muted-foreground">{pkg.duration || "No duration set"}</p>
           </div>
-          
+
           {!isPreview && (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
+              {
+                user.data.isAdmin &&
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              }
+
               <DropdownMenuContent align="end" className="bg-popover">
                 <DropdownMenuItem onClick={onEdit}>
                   <Pencil className="w-4 h-4 mr-2" />
@@ -182,6 +185,7 @@ export function PackageCard({
       </CardContent>
 
       {!isPreview && (
+        user.data.isAdmin &&
         <CardFooter>
           <Button variant="outline" className="w-full" onClick={onEdit}>
             <Pencil className="w-4 h-4 mr-2" />

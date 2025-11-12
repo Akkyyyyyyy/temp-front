@@ -37,6 +37,10 @@ export interface ProjectFormData {
     email: string;
     cc: string;
   };
+  reminders: {
+    weekBefore: boolean,
+    dayBefore: boolean;
+  }
 }
 
 export function AddProjectDialog({
@@ -64,6 +68,10 @@ export function AddProjectDialog({
       mobile: '',
       email: '',
       cc: ''
+    },
+    reminders: {
+      weekBefore: true,
+      dayBefore: true
     }
   });
 
@@ -74,7 +82,8 @@ export function AddProjectDialog({
     memberName: '',
     memberPhoto: '',
     responsibility: '',
-    roleId: ''
+    roleId: '',
+    instructions:''
   });
 
   const { user } = useAuth();
@@ -239,7 +248,8 @@ export function AddProjectDialog({
           memberName: currentMember.memberName,
           responsibility: currentMember.responsibility,
           memberId: currentMember.memberId,
-          roleId:  currentMember.roleId
+          roleId: currentMember.roleId,
+          instructions: currentMember.instructions,
         }
       ]);
 
@@ -248,7 +258,8 @@ export function AddProjectDialog({
         memberName: '',
         memberPhoto: '',
         responsibility: '',
-        roleId: ''
+        roleId: '',
+        instructions:'',
       });
     }
   };
@@ -312,6 +323,10 @@ export function AddProjectDialog({
       mobile: '',
       email: '',
       cc: ''
+    },
+    reminders: {
+      weekBefore: true,
+      dayBefore: true
     }
   });
 
@@ -323,7 +338,8 @@ export function AddProjectDialog({
       memberName: '',
       memberPhoto: '',
       responsibility: '',
-      roleId: ''
+      roleId: '',
+      instructions:'',
     });
     setErrors({});
     setIncludeClient(false);
@@ -365,8 +381,8 @@ export function AddProjectDialog({
         description: formData.description,
         teamAssignments: teamAssignments,
         client: includeClient ? formData.client : undefined,
-        newRole: undefined
-      },user.data.company.id);
+        newRole: undefined,
+      }, user.data.company.id);
 
       if (res?.success) {
         refreshMembers();

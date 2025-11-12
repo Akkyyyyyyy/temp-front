@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { getProjectEquipments, updateProjectEquipments, IProjectSection } from "@/api/additional-tabs";
+import { useAuth } from "@/context/AuthContext";
 
 interface EquipmentTabProps {
   projectId: string;
@@ -20,6 +21,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
   const [editItems, setEditItems] = useState([{ id: "1", name: "" }]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const { user } = useAuth();
 
   // Create a ref for each menu - we'll use a function to get refs
   const menuRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -27,11 +29,11 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
   // Fetch equipments data using your API function
   const fetchEquipments = async () => {
     if (!projectId) return;
-    
+
     setIsLoading(true);
     try {
       const result = await getProjectEquipments({ projectId });
-      
+
       if (result.success && result.equipments) {
         setEquipments(result.equipments);
       } else {
@@ -68,7 +70,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
     const handleClickOutside = (event: MouseEvent) => {
       // Check if click is outside ALL menu elements
       let clickedInsideAnyMenu = false;
-      
+
       menuRefs.current.forEach((ref, itemId) => {
         if (ref && ref.contains(event.target as Node)) {
           clickedInsideAnyMenu = true;
@@ -175,11 +177,11 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
     setEditingItemId(item.id);
     setEditTitle(item.title);
     setEditItems(
-      Array.isArray(item.content) 
-        ? item.content.map((content, index) => ({ 
-            id: `edit_${index}_${Date.now()}`, 
-            name: content 
-          }))
+      Array.isArray(item.content)
+        ? item.content.map((content, index) => ({
+          id: `edit_${index}_${Date.now()}`,
+          name: content
+        }))
         : [{ id: "1", name: "" }]
     );
     setActiveMenu(null);
@@ -223,8 +225,8 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
     }
 
     const updatedEquipments = equipments.map(item =>
-      item.id === editingItemId ? { 
-        ...item, 
+      item.id === editingItemId ? {
+        ...item,
         title: editTitle.trim(),
         content: validItems.map(item => item.name.trim())
       } : item
@@ -250,10 +252,10 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-6">
-        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading equipments...</span>
-      </div>
+      <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                <span className="ml-3 text-muted-foreground">Loading Equipments...</span>
+            </div>
     );
   }
 
@@ -270,7 +272,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
               className="h-8 text-sm"
               autoFocus
             />
-            
+
             {/* Equipment Items */}
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground">Equipment items:</label>
@@ -294,7 +296,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
                   )}
                 </div>
               ))}
-              
+
               <Button
                 variant="outline"
                 size="sm"
@@ -328,15 +330,17 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
           </div>
         </div>
       ) : (
-        <Button 
-          onClick={handleStartAdd}
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-        >
-          <Plus className="w-3 h-3 mr-1" />
-          Add New Equipment
-        </Button>
+        user.data.isAdmin && (
+          <Button
+            onClick={handleStartAdd}
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add New Equipment
+          </Button>
+        )
       )}
 
       {/* Equipment Sections */}
@@ -362,7 +366,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
                     className="h-8 text-sm"
                     autoFocus
                   />
-                  
+
                   {/* Edit Equipment Items */}
                   <div className="space-y-2">
                     <label className="text-xs text-muted-foreground">Equipment items:</label>
@@ -386,7 +390,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
                         )}
                       </div>
                     ))}
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -436,18 +440,23 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
                       </ul>
                     )}
                   </div>
-                  
+
                   {/* Dropdown Menu - FIXED: Use individual ref for each menu */}
                   <div className="relative" ref={setMenuRef(item.id)}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleMenu(item.id)}
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    >
-                      <MoreVertical className="w-3 h-3" />
-                    </Button>
-                    
+                    {
+                      user.data.isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleMenu(item.id)}
+                          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                        >
+                          <MoreVertical className="w-3 h-3" />
+                        </Button>
+                      )
+                    }
+
+
                     {/* Menu Dropdown */}
                     {activeMenu === item.id && (
                       <div className="absolute right-0 top-6 z-10 bg-background border border-border/20 rounded-md shadow-sm py-1 min-w-[100px]">

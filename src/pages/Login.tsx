@@ -31,7 +31,7 @@ const schema = yup.object({
 type FormData = yup.InferType<typeof schema>;
 
 const Login = () => {
-  const [userType, setUserType] = useState<"company" | "member">("company");
+  const [userType, setUserType] = useState<"company" | "member">("member");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -46,9 +46,11 @@ const Login = () => {
     formState: { errors },
     reset,
     setValue,
+    watch
   } = useForm<FormData>({
     resolver: yupResolver(schema),
   });
+  const watchedEmail = watch("email");
 
   // Load remembered email on component mount
   useEffect(() => {
@@ -58,7 +60,7 @@ const Login = () => {
     // Set initial user type based on localStorage (default to "company" if none)
     const initialUserType = rememberedUserType && (rememberedUserType === "company" || rememberedUserType === "member") 
       ? rememberedUserType 
-      : "company";
+      : "member";
     
     setUserType(initialUserType);
 
@@ -89,7 +91,7 @@ const Login = () => {
         // Handle force password reset for members
         if (response.forceReset) {
           setForceResetRequired(true);
-          toast.error("Password reset required");
+          setShowForgotPassword(true);
           return;
         }
         toast.error(response.message || "Login failed");
@@ -202,22 +204,6 @@ const Login = () => {
           </CardHeader>
 
           <CardContent className="space-y-5 pt-2">
-            {/* Force Reset Alert */}
-            {forceResetRequired && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Password reset required.{" "}
-                  <button 
-                    onClick={handleForceReset}
-                    className="underline font-medium hover:no-underline"
-                  >
-                    Reset your password
-                  </button>
-                </AlertDescription>
-              </Alert>
-            )}
-
             <form onSubmit={handleSubmit(onSubmit)} className="">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">Email</Label>
@@ -329,6 +315,7 @@ const Login = () => {
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
         userType={"member"}
+        email={watchedEmail}
       />
     </>
   );

@@ -25,6 +25,7 @@ import {
     RemindersTab
 } from './additional-tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { useAuth } from "@/context/AuthContext";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -69,7 +70,7 @@ const ADDITIONAL_TABS = {
         component: ChecklistTab
     },
     roles: {
-        label: "Roles",
+        label: "Team",
         description: "Team member responsibilities and roles",
         component: RolesTab
     },
@@ -109,6 +110,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     const [isLoadingProject, setIsLoadingProject] = useState(true);
     const [activeAdditionalTab, setActiveAdditionalTab] = useState('documents');
     const additionalTabRefs = useRef({});
+    const { user } = useAuth();
 
     const loadProjectDetails = async () => {
         if (!projectId) return;
@@ -513,22 +515,25 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             <div>
                 <div className="flex items-center gap-5 group">
                     <label className="text-sm font-medium text-muted-foreground">{section.title}</label>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                            type="button"
-                            onClick={() => onEdit(section.id)}
-                            className="text-muted-foreground hover:text-foreground"
-                        >
-                            <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onDelete(section.id)}
-                            className="text-muted-foreground hover:text-destructive"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    </div>
+                    {
+                        user.data.isAdmin == true && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    type="button"
+                                    onClick={() => onEdit(section.id)}
+                                    className="text-muted-foreground hover:text-foreground"
+                                >
+                                    <Edit className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => onDelete(section.id)}
+                                    className="text-muted-foreground hover:text-destructive"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
                 </div>
                 {section.type === "text" ? (
                     <p className="text-foreground mt-1">{section.content as string}</p>
@@ -576,10 +581,10 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             />
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6 gap-2">
+            <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-2">
                 <div className="flex flex-col justify-center">
                     <div className="flex items-center gap-2">
-                        <h3 className="text-xl font-semibold text-foreground p-0 m-0">
+                        <h3 className="text-md md:text-xl font-semibold text-foreground p-0 m-0">
                             {projectDetails.name}
                         </h3>
                         <div
@@ -587,30 +592,37 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                             style={{ backgroundColor: projectDetails.color }}
                         />
                     </div>
-                    <p className="text-muted-foreground">
+                    <p className="text-muted-foreground text-sm md:text-md">
                         {format(new Date(projectDetails.startDate), "d MMM yyyy")} - {format(new Date(projectDetails.endDate), "d MMM yyyy")}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        onClick={() => setIsEditingProject(true)}
-                    >
-                        <Edit className="w-4 h-4" />
-                    </Button>
-                    {/* Delete Project Button */}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        onClick={() => setIsDeleteDialogOpen(true)}
-                        title="Delete Project"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                    </Button>
+                <div className="flex flex-col md:flex-row items-center gap-2">
+                    {
+                        user.data.isAdmin == true && (
+                            <div className="flex">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                    onClick={() => setIsEditingProject(true)}
+                                >
+                                    <Edit className="w-4 h-4" />
+                                </Button>
+                                {/* Delete Project Button */}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                    onClick={() => setIsDeleteDialogOpen(true)}
+                                    title="Delete Project"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
+                            </div>
+                        )
+                    }
+
                     <div className="inline-flex items-center bg-muted rounded-full p-1 border border-border shadow-sm relative">
                         <div
                             className="absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out h-[calc(100%-8px)]"
@@ -641,7 +653,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
             {/* Tab Content */}
             {activeProjectTab === "creative-brief" && (
                 <div className="bg-background/50 rounded-lg mb-6">
-                    <h4 className="font-semibold text-foreground mb-4">Add Brief</h4>
+                    {/* <h4 className="font-semibold text-foreground mb-4">Add Brief</h4> */}
                     <div className="space-y-4">
                         {briefSections.map((section) => (
                             <div key={section.id} className="group relative">
@@ -662,16 +674,18 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         ))}
 
                         {!isAnySectionEditing && (
-                            <div className="flex gap-2 pt-4 border-t border-border/20">
-                                <button
-                                    type="button"
-                                    onClick={() => handleAddSection('brief', 'text')}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Text Section
-                                </button>
-                            </div>
+                            user.data.isAdmin == true && (
+                                <div className="flex gap-2 pt-4 border-t border-border/20">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAddSection('brief', 'text')}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Add Text Section
+                                    </button>
+                                </div>
+                            )
                         )}
                     </div>
                 </div>
@@ -679,7 +693,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
             {activeProjectTab === "logistics" && (
                 <div className="bg-background/50 rounded-lg mb-6">
-                    <h4 className="font-semibold text-foreground mb-4">Add Logistics</h4>
+                    {/* <h4 className="font-semibold text-foreground mb-4">Add Logistics</h4> */}
                     <div className="space-y-4">
                         {logisticsSections.map((section) => (
                             <div key={section.id} className="group relative">
@@ -700,24 +714,26 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         ))}
 
                         {!isAnySectionEditing && (
-                            <div className="flex gap-2 pt-4 border-t border-border/20">
-                                <button
-                                    type="button"
-                                    onClick={() => handleAddSection('logistics', 'text')}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Text Section
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleAddSection('logistics', 'list')}
-                                    className="flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    Add Additional Specification
-                                </button>
-                            </div>
+                            user.data.isAdmin == true && (
+                                <div className="flex gap-2 pt-4 border-t border-border/20">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAddSection('logistics', 'text')}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Add Text Section
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleAddSection('logistics', 'list')}
+                                        className="flex items-center gap-2 px-3 py-2 text-sm bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        Add Additional Specification
+                                    </button>
+                                </div>
+                            )
                         )}
                     </div>
                 </div>
@@ -755,8 +771,8 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                         ref={(el) => (additionalTabRefs.current[tabKey] = el)}
                                         onClick={() => setActiveAdditionalTab(tabKey as AdditionalTabKey)}
                                         className={`pb-3 px-1 text-sm font-medium transition-all duration-300 relative whitespace-nowrap flex-shrink-0 ${activeAdditionalTab === tabKey
-                                                ? 'text-primary'
-                                                : 'text-muted-foreground hover:text-foreground'
+                                            ? 'text-primary'
+                                            : 'text-muted-foreground hover:text-foreground'
                                             }`}
                                     >
                                         {ADDITIONAL_TABS[tabKey as AdditionalTabKey].label}
@@ -778,15 +794,17 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                 <div>
                     <div className="flex items-center justify-between mb-3">
                         <h4 className="font-medium text-foreground">Assigned Team</h4>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-muted-foreground hover:bg-background hover:text-foreground transition-colors"
-                            onClick={() => setIsAddingMember(true)}
-                        >
-                            <UserPlus className="w-4 h-4" />
-                            Add Member
-                        </Button>
+                        {
+                            user.data.isAdmin == true && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-muted-foreground hover:bg-background hover:text-foreground transition-colors"
+                                    onClick={() => setIsAddingMember(true)}
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                    Add Member
+                                </Button>)}
                     </div>
                     <div className="space-y-3">
                         {assignedMembers.map((worker: any) => (
@@ -815,16 +833,19 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                         <p className="text-sm text-muted-foreground">{worker.projectRole}</p>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => handleRemoveMember(worker.id)}
-                                    disabled={isSaving}
-                                    className="flex items-center gap-2 transition-opacity text-muted-foreground p-1 hover:bg-background hover:text-red-500"
-                                    title="Remove from project"
-                                >
-                                    <UserMinus className="w-4 h-4" />
-                                    Remove
-                                </Button>
+                                {
+                                    user.data.isAdmin == true && (
+                                        <Button
+                                            variant="ghost"
+                                            onClick={() => handleRemoveMember(worker.id)}
+                                            disabled={isSaving}
+                                            className="flex items-center gap-2 transition-opacity text-muted-foreground p-1 hover:bg-background hover:text-red-500"
+                                            title="Remove from project"
+                                        >
+                                            <UserMinus className="w-4 h-4" />
+                                            Remove
+                                        </Button>
+                                )}
                             </div>
                         ))}
                         {assignedMembers.length === 0 && (

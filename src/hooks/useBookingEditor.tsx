@@ -18,6 +18,7 @@ export interface EditableBooking {
   location?: string;
   startDate?: string;
   endDate?: string;
+  reminders?: any;
   teamAssignments?: any[];
   client?: {
     cc: string;

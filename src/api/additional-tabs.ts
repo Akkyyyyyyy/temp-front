@@ -162,6 +162,31 @@ export interface DeleteProjectDocumentsResponse {
   success: boolean;
   message: string;
 }
+export interface IReminders {
+  weekBefore: boolean;
+  dayBefore: boolean;
+}
+
+export interface GetProjectRemindersRequest {
+  projectId: string;
+}
+
+export interface GetProjectRemindersResponse {
+  success: boolean;
+  message?: string;
+  reminders?: IReminders;
+}
+
+export interface UpdateProjectRemindersRequest {
+  projectId: string;
+  reminders: IReminders;
+}
+
+export interface UpdateProjectRemindersResponse {
+  success: boolean;
+  message: string;
+  reminders?: IReminders;
+}
 
 // Checklist API Functions
 export async function getProjectChecklist(
@@ -689,12 +714,10 @@ export function deleteDocumentFromArray(
 export function getDocumentDownloadUrl(document: ProjectDocument): string {
   const s3BaseUrl = import.meta.env.VITE_S3_BASE_URL;
   
-  // If filename is already a full URL, return it
   if (document.filename.startsWith('http')) {
     return document.filename;
   }
   
-  // If we have an S3 base URL and the filename is just a key, construct the full URL
   if (s3BaseUrl && !document.filename.startsWith('http')) {
     // Ensure the base URL ends with a slash and the filename doesn't start with one
     const baseUrl = s3BaseUrl.endsWith('/') ? s3BaseUrl : `${s3BaseUrl}/`;
@@ -706,13 +729,10 @@ export function getDocumentDownloadUrl(document: ProjectDocument): string {
   // Fallback - return the filename as is
   return document.filename;
 }
-
-// Helper function to get document display name
 export function getDocumentDisplayName(document: ProjectDocument): string {
   return document.title || document.filename.split('/').pop() || 'Untitled Document';
 }
 
-// Helper function to get file type from filename
 export function getFileType(filename: string): string {
   const extension = filename.split('.').pop()?.toLowerCase() || '';
   
@@ -729,6 +749,7 @@ export function getFileType(filename: string): string {
     'jpeg': 'Image',
     'png': 'Image',
     'gif': 'Image',
+    'webp': 'WEBP',
     'zip': 'Archive',
     'rar': 'Archive',
     'mp4': 'Video',
@@ -840,6 +861,103 @@ export async function deleteProjectDocuments(
     return {
       success: false,
       message: error.message || "Network error while deleting documents"
+    };
+  }
+}
+// Reminder API Functions
+export async function getProjectReminders(
+  request: GetProjectRemindersRequest
+): Promise<GetProjectRemindersResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    if (!request.projectId?.trim()) {
+      return { 
+        success: false, 
+        message: "Project ID is required" 
+      };
+    }
+
+    const response = await apiFetch(`${baseUrl}/project/${request.projectId}/reminders`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    const result: GetProjectRemindersResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to fetch project reminders");
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error("Error fetching project reminders:", error);
+    return {
+      success: false,
+      message: error.message || "Network error while fetching project reminders"
+    };
+  }
+}
+
+export async function updateProjectReminders(
+  request: UpdateProjectRemindersRequest
+): Promise<UpdateProjectRemindersResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    if (!request.projectId?.trim()) {
+      return { 
+        success: false, 
+        message: "Project ID is required" 
+      };
+    }
+
+    if (!request.reminders || typeof request.reminders !== 'object') {
+      return {
+        success: false,
+        message: "Reminders object is required"
+      };
+    }
+
+    // Validate reminders structure
+    if (typeof request.reminders.weekBefore !== 'boolean') {
+      return {
+        success: false,
+        message: "weekBefore must be a boolean"
+      };
+    }
+
+    if (typeof request.reminders.dayBefore !== 'boolean') {
+      return {
+        success: false,
+        message: "dayBefore must be a boolean"
+      };
+    }
+
+    const response = await apiFetch(`${baseUrl}/project/${request.projectId}/reminders`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ reminders: request.reminders })
+    });
+
+    const result: UpdateProjectRemindersResponse = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to update project reminders");
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error("Error updating project reminders:", error);
+    toast.error(error.message || "Network error while updating reminders");
+    return {
+      success: false,
+      message: error.message || "Network error while updating reminders"
     };
   }
 }

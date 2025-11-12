@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff, MoreHorizontal, MoreVertical } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff, MoreHorizontal, MoreVertical, UserMinus, UserPlus } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Project, toggleMemberStatus, updateMember } from "@/api/member";
+import { Project, toggleMemberAdmin, toggleMemberStatus, updateMember } from "@/api/member";
 import { toast } from "sonner";
 import { TeamMember } from "./TeamMembers";
 import * as yup from 'yup';
@@ -22,6 +22,7 @@ import { PhoneInput } from "react-international-phone";
 import "react-international-phone/style.css";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { ImageCropModal } from "./modals/ImageCropModal";
+import { useAuth } from "@/context/AuthContext";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
@@ -132,17 +133,18 @@ export function TeamMemberProfile({
     projectId: null,
     projectName: ''
   });
+
   const [showCropModal, setShowCropModal] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const { roles } = useRole();
+  const { user, updateUser } = useAuth();
+  const [togglingAdmin, setTogglingAdmin] = useState(false);
 
-  const formatHour12 = (hour) => {
+  const formatHour12 = (hour: any) => {
     const h = hour % 12 === 0 ? 12 : hour % 12;
     const suffix = hour < 12 || hour === 24 ? 'AM' : 'PM';
     return `${h} ${suffix}`;
   };
-
-
   const [profileData, setProfileData] = useState({
     name: member?.name || '',
     role: member?.role || '',
@@ -169,6 +171,11 @@ export function TeamMemberProfile({
 
         // Update the parent component's state
         onUpdateMember(member.id, { active: result.member.active });
+        if (user?.data?.id === member.id) {
+          updateUser({
+            isAdmin: result.member.isAdmin
+          });
+        }
 
         refreshMembers();
 
@@ -206,6 +213,31 @@ export function TeamMemberProfile({
 
   const [newSkill, setNewSkill] = useState('');
 
+  const handleToggleAdmin = async () => {
+    if (togglingAdmin) return;
+
+    setTogglingAdmin(true);
+    try {
+      const result = await toggleMemberAdmin(member.id);
+
+      if (result.success && result.member) {
+        const updatedMember = {
+          ...member,
+          isAdmin: result.member.isAdmin
+        };
+
+        // Update the parent component's state
+        onUpdateMember(member.id, { isAdmin: result.member.isAdmin });
+
+        refreshMembers();
+      }
+    } catch (error) {
+      console.error('Failed to toggle admin status:', error);
+    } finally {
+      setTogglingAdmin(false);
+    }
+  };
+
   // Handle photo upload using your existing upload-photo endpoint
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -234,36 +266,36 @@ export function TeamMemberProfile({
     event.target.value = '';
   };
   const handleCropComplete = async (croppedImageBlob: Blob) => {
-  try {
-    setUploadingPhoto(true);
-    
-    // Create a file from the blob
-    const file = new File([croppedImageBlob], 'profile-photo.jpg', { type: 'image/jpeg' });
+    try {
+      setUploadingPhoto(true);
 
-    // Upload using your existing function
-    const result = await uploadMemberPhoto(member.id, file);
+      // Create a file from the blob
+      const file = new File([croppedImageBlob], 'profile-photo.jpg', { type: 'image/jpeg' });
 
-    if (result.success) {
-      const updatedProfileData = {
-        ...profileData,
-        photo: result.profilePhotoPath
-      };
+      // Upload using your existing function
+      const result = await uploadMemberPhoto(member.id, file);
 
-      setProfileData(updatedProfileData);
-      onUpdateMember(member.id, {
-        ...updatedProfileData,
-        profilePhoto: result.profilePhotoPath
-      });
+      if (result.success) {
+        const updatedProfileData = {
+          ...profileData,
+          photo: result.profilePhotoPath
+        };
 
-      toast.success('Profile picture updated successfully!');
+        setProfileData(updatedProfileData);
+        onUpdateMember(member.id, {
+          ...updatedProfileData,
+          profilePhoto: result.profilePhotoPath
+        });
+
+        toast.success('Profile picture updated successfully!');
+      }
+    } catch (error) {
+      console.error('Error uploading cropped image:', error);
+      toast.error('Failed to upload image');
+    } finally {
+      setUploadingPhoto(false);
     }
-  } catch (error) {
-    console.error('Error uploading cropped image:', error);
-    toast.error('Failed to upload image');
-  } finally {
-    setUploadingPhoto(false);
-  }
-};
+  };
 
   // Remove profile picture using dedicated remove API
   const handleRemovePhoto = async () => {
@@ -375,10 +407,10 @@ export function TeamMemberProfile({
         skills: JSON.stringify(profileData.skills), // Convert to string for form-data
         profilePhoto: profileData.photo,
         roleId: profileData.roleId || null,
-      };      
+      };
 
       const result = await updateMemberProfile(member.id, updateData);
-      
+
       if (result.success) {
         onUpdateMember(member.id, {
           ...profileData,
@@ -411,8 +443,8 @@ export function TeamMemberProfile({
       setSaving(false);
     }
   };
-  
-  
+
+
   const handleSaveProject = async (projectId: string, updates: Partial<Project>) => {
     const projectToValidate = { ...member?.projects.find(project => project.id === projectId), ...updates };
     const isValid = await validateProject(projectToValidate);
@@ -541,10 +573,8 @@ export function TeamMemberProfile({
         setEditingProfile(false);
       }
     }}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-3">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col py-6">
+            {/* <DialogTitle className="flex items-center gap-3">
               <div className="relative group">
                 {editingProfile && (
                   <>
@@ -582,9 +612,8 @@ export function TeamMemberProfile({
                   </>
                 )}
               </div>
-            </DialogTitle>
-          </div>
-        </DialogHeader>
+            </DialogTitle> */}
+
 
         <div className="flex-1 overflow-auto space-y-6 scrollbar-hide">
           {/* Profile Information Card */}
@@ -603,45 +632,74 @@ export function TeamMemberProfile({
               </div>
 
               <div className="flex items-center gap-1">
-                {/* Three-dot menu button */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem
-                      onClick={handleToggleStatus}
-                      disabled={togglingStatus}
-                      className={`flex items-center gap-2 ${member.active ? 'text-green-600' : 'text-gray-600'}`}
-                    >
-                      {member.active ? (
-                        <>
-                          <EyeOff className="h-4 w-4" />
-                          Deactivate Member
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-4 w-4" />
-                          Activate Member
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="flex items-center gap-2 text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete Member
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {
+                  user.data.isAdmin &&
+                  <> {/* Three-dot menu button */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem
+                          onClick={handleToggleStatus}
+                          disabled={togglingStatus}
+                          className={`flex items-center gap-2 cursor-pointer ${member.active ? 'text-green-600' : 'text-gray-600'}`}
+                        >
+                          {member.active ? (
+                            <>
+                              <EyeOff className="h-4 w-4" />
+                              Deactivate Member
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-4 w-4" />
+                              Activate Member
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => setShowDeleteDialog(true)}
+                          className="flex items-center gap-2 text-red-600 focus:text-red-600 cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Delete Member
+                        </DropdownMenuItem>
+                        {
+                          user.data.email === user.data.company.email && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={handleToggleAdmin}
+                                disabled={togglingAdmin}
+                                className={`flex items-center gap-2 cursor-pointer ${member.isAdmin ? 'text-orange-600' : 'text-blue-600'}`}
+                              >
+                                {member.isAdmin ? (
+                                  <>
+                                    <UserMinus className="h-4 w-4" />
+                                    Revoke Admin
+                                  </>
+                                ) : (
+                                  <>
+                                    <UserPlus className="h-4 w-4" />
+                                    Make Admin
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </>
+                          )
+                        }
+
+                      </DropdownMenuContent>
+                    </DropdownMenu></>
+                }
+
               </div>
             </CardHeader>
 
@@ -664,28 +722,32 @@ export function TeamMemberProfile({
                         <User className="w-10 h-10" />
                       </AvatarFallback>
                     </Avatar>
-
-                    <label
-                      htmlFor="photo-upload-form"
-                      className="absolute inset-0 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-sm"
-                    >
-                      {uploadingPhoto ? (
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent" />
-                      ) : (
-                        <div className="text-center text-white">
-                          <Camera className="w-6 h-6 mx-auto mb-1" />
-                          <span className="text-xs font-medium">Change</span>
-                        </div>
+                    {
+                      (user.data.id == member.id) && (
+                        <>
+                          <label
+                            htmlFor="photo-upload-form"
+                            className="absolute inset-0 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-sm"
+                          >
+                            {uploadingPhoto ? (
+                              <div className="animate-spin rounded-full h-8 w-8 border-2 border-white border-t-transparent" />
+                            ) : (
+                              <div className="text-center text-white">
+                                <Camera className="w-6 h-6 mx-auto mb-1" />
+                                <span className="text-xs font-medium">Change</span>
+                              </div>
+                            )}
+                          </label>
+                          <input
+                            id="photo-upload-form"
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoUpload}
+                            className="hidden"
+                            disabled={uploadingPhoto}
+                          />
+                        </>
                       )}
-                    </label>
-                    <input
-                      id="photo-upload-form"
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoUpload}
-                      className="hidden"
-                      disabled={uploadingPhoto}
-                    />
                   </div>
                 </div>
 
@@ -694,38 +756,39 @@ export function TeamMemberProfile({
                   <Badge variant="secondary" className="mb-3 bg-primary/10 text-primary border-primary/20">
                     {member.role}
                   </Badge>
-
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center sm:justify-start mt-4">
-                    <label
-                      htmlFor="photo-upload-form"
-                      className="inline-flex items-center gap-2 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md cursor-pointer hover:bg-primary/90 transition-colors"
-                    >
-                      {uploadingPhoto ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Camera className="w-4 h-4" />
-                          Change Photo
-                        </>
-                      )}
-                    </label>
-                    {member.profilePhoto && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRemovePhoto}
-                        disabled={uploadingPhoto}
-                        className="flex items-center gap-2"
+                  {(user.data.id == member.id) && (
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center sm:justify-start mt-4">
+                      <label
+                        htmlFor="photo-upload-form"
+                        className="inline-flex items-center gap-2 text-sm bg-primary text-primary-foreground px-4 py-2 rounded-md cursor-pointer hover:bg-primary/90 transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
+                        {uploadingPhoto ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-4 h-4" />
+                            Change Photo
+                          </>
+                        )}
+                      </label>
+                      {member.profilePhoto && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRemovePhoto}
+                          disabled={uploadingPhoto}
+                          className="flex items-center gap-2"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1052,50 +1115,55 @@ export function TeamMemberProfile({
                     Cancel
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  disabled={saving || uploadingPhoto}
-                  onClick={() => {
-                    if (editingProfile) {
-                      handleSaveProfile();
-                    } else {
-                      setEditingProfile(true);
-                      setProfileData({
-                        name: member.name,
-                        role: member.role,
-                        email: member.email || '',
-                        phone: member.phone || '',
-                        countryCode: member.countryCode || '',
-                        location: member.location || '',
-                        bio: member.bio || '',
-                        skills: member.skills || [],
-                        photo: member.profilePhoto || '',
-                        roleId: member?.roleId || null,
-                      });
-                      setProfileErrors({});
-                    }
-                  }}
-                  className="flex items-center gap-1 bg-primary hover:bg-primary/90 shadow-sm min-w-[100px]"
-                >
-                  {editingProfile ? (
-                    saving ? (
-                      <>
-                        <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save
-                      </>
-                    )
-                  ) : (
-                    <>
-                      <Edit className="w-4 h-4" />
-                      Edit
-                    </>
-                  )}
-                </Button>
+                {
+                  (user.data.id == member.id) && (
+                    <Button
+                      size="sm"
+                      disabled={saving || uploadingPhoto}
+                      onClick={() => {
+                        if (editingProfile) {
+                          handleSaveProfile();
+                        } else {
+                          setEditingProfile(true);
+                          setProfileData({
+                            name: member.name,
+                            role: member.role,
+                            email: member.email || '',
+                            phone: member.phone || '',
+                            countryCode: member.countryCode || '',
+                            location: member.location || '',
+                            bio: member.bio || '',
+                            skills: member.skills || [],
+                            photo: member.profilePhoto || '',
+                            roleId: member?.roleId || null,
+                          });
+                          setProfileErrors({});
+                        }
+                      }}
+                      className="flex items-center gap-1 bg-primary hover:bg-primary/90 shadow-sm min-w-[100px]"
+                    >
+                      {editingProfile ? (
+                        saving ? (
+                          <>
+                            <div className="animate-spin rounded-full h-3 w-3 border-2 border-current border-t-transparent mr-1" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save
+                          </>
+                        )
+                      ) : (
+                        <>
+                          <Edit className="w-4 h-4" />
+                          Edit
+                        </>
+                      )}
+                    </Button>
+                  )
+                }
+
               </div>
             </CardContent>
           </Card>
@@ -1137,18 +1205,21 @@ export function TeamMemberProfile({
                           <div className="flex gap-2">
                             <Dialog open={removeDialog.open} onOpenChange={(open) => setRemoveDialog(prev => ({ ...prev, open }))}>
                               <DialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setRemoveDialog({
-                                    open: true,
-                                    memberId: member.id,
-                                    projectId: project.id,
-                                    projectName: project.name
-                                  })}
-                                >
-                                  <LogOut className="w-4 h-4" /> Remove from project
-                                </Button>
+                                {
+                                  user.data.isAdmin == true &&
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setRemoveDialog({
+                                      open: true,
+                                      memberId: member.id,
+                                      projectId: project.id,
+                                      projectName: project.name
+                                    })}
+                                  >
+                                    <LogOut className="w-4 h-4" /> Remove from project
+                                  </Button>
+                                }
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>
@@ -1324,19 +1395,19 @@ export function TeamMemberProfile({
             </Card>
           )}
         </div>
-          <ImageCropModal
-      isOpen={showCropModal}
-      onClose={() => {
-        setShowCropModal(false);
-        if (imageToCrop) {
-          URL.revokeObjectURL(imageToCrop);
-          setImageToCrop(null);
-        }
-      }}
-      image={imageToCrop}
-      onCropComplete={handleCropComplete}
-      aspect={1} // Square aspect ratio for profile pictures
-    />
+        <ImageCropModal
+          isOpen={showCropModal}
+          onClose={() => {
+            setShowCropModal(false);
+            if (imageToCrop) {
+              URL.revokeObjectURL(imageToCrop);
+              setImageToCrop(null);
+            }
+          }}
+          image={imageToCrop}
+          onCropComplete={handleCropComplete}
+          aspect={1} // Square aspect ratio for profile pictures
+        />
       </DialogContent>
     </Dialog>
   );

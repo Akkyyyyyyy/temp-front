@@ -26,6 +26,8 @@ import {
     deleteProjectDocument
 } from "@/api/additional-tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import { useAuth } from "@/context/AuthContext";
+import { toast } from "sonner";
 
 interface DocumentsTabProps {
     projectId: string;
@@ -38,6 +40,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [title, setTitle] = useState("");
+    const { user } = useAuth();
 
     const fetchDocuments = async () => {
         try {
@@ -55,10 +58,15 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            setTitle(file.name.replace(/\.[^/.]+$/, ""));
+        if (!file) return;
+        const maxSize = 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+            toast.error("File size must be less than 10MB");
+            event.target.value = "";
+            return;
         }
+        setSelectedFile(file);
+        setTitle(file.name.replace(/\.[^/.]+$/, ""));
     };
 
     const handleUpload = async () => {
@@ -110,7 +118,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
         const link = document.createElement('a');
         link.href = viewUrl;
         link.target = '_blank';
-        
+
 
         // Trigger the download
         document.body.appendChild(link);
@@ -119,24 +127,39 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
     };
 
 
-    const handleDownload = async(doc: ProjectDocument) => {
+    const handleDownload = async (doc: ProjectDocument) => {
         const downloadUrl = getDocumentDownloadUrl(doc);
-         const response = await fetch(downloadUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        // Create a temporary anchor element
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = doc.filename || 'document'; // Set the filename
-        link.target = '_blank';
+        const fileType = getFileType(doc.filename);
 
-        // Trigger the download
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Only create blob for images and files that need processing
+        if (fileType === 'Image' || fileType === 'Text') {
+            // For images, we might want to process them or ensure they download properly
+            const response = await fetch(downloadUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = doc.filename || 'document';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // Clean up the blob URL
+            URL.revokeObjectURL(blobUrl);
+        } else {
+            // For other files, use direct download
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = doc.filename || 'document';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     };
 
     const getFileIcon = (filename: string) => {
@@ -156,11 +179,9 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-12">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p className="text-muted-foreground">Loading documents...</p>
-                </div>
+            <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                <span className="ml-3 text-muted-foreground">Loading Documents...</span>
             </div>
         );
     }
@@ -169,7 +190,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
         <div>
             <div className="flex items-center justify-between mb-3">
                 {/* <span>Documents ({documents.length})</span> */}
-                {!selectedFile ? (
+                {!selectedFile && user.data.isAdmin == true ? (
                     <Button asChild size="sm" className="flex items-center gap-2" variant="outline">
                         <label>
                             <Upload className="h-4 w-4" />
@@ -298,19 +319,21 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                                                 >
                                                     <Download className="h-3.5 w-3.5" />
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDelete(document)}
-                                                    disabled={deletingId === document.filename}
-                                                    className="h-7 w-7 p-0 text-destructive"
-                                                >
-                                                    {deletingId === document.filename ? (
-                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                    ) : (
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    )}
-                                                </Button>
+                                                {
+                                                    user.data.isAdmin == true && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDelete(document)}
+                                                            disabled={deletingId === document.filename}
+                                                            className="h-7 w-7 p-0 text-destructive"
+                                                        >
+                                                            {deletingId === document.filename ? (
+                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            )}
+                                                        </Button>)}
                                             </div>
                                         </TableCell>
                                     </TableRow>

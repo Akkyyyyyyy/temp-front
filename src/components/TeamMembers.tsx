@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { differenceInDays, format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, startOfMonth, endOfMonth } from "date-fns";
 import { Skeleton } from "./ui/skeleton";
-import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop } from "lucide-react";
+import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog } from "lucide-react";
 import { Input } from "./ui/input";
 import { TimeView } from "./GanttChart";
 import { monthNames } from "@/constant/constant";
@@ -392,7 +392,7 @@ export function TeamMembers({
     setSelectedDay(clickedDate);
     setSelectedProject(null);
     // setTimeView('day');
-   
+
   };
 
   const isDaySelected = (day: Date) => {
@@ -509,17 +509,21 @@ export function TeamMembers({
             className={`${timelineHeight} ${isInactive ? 'opacity-50 grayscale' : ''}`}
           >
             <div className={`flex gap-2 cursor-pointer p-2 rounded-sm transition-colors max-h-16 ${isInactive
-                ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
-                : isLoggedInUser
-                  ? ''
-                  : 'hover:bg-muted/50 hover:text-studio-gold'
+              ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
+              : isLoggedInUser
+                ? ''
+                : 'hover:bg-muted/50 hover:text-studio-gold'
               }`}>
               <div className="relative">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div
                       className="cursor-pointer"
-                      onClick={(e) => handleOpenColorDialog(member, e)}
+                      onClick={(e) => {
+                        if (user?.data?.id === member.id) {
+                          handleOpenColorDialog(member, e);
+                        }
+                      }}
                     >
                       <Avatar
                         className={`w-9 h-9 ring-[2px] transition-all duration-200 ${isInactive ? 'ring-muted-foreground/30' : ''
@@ -537,8 +541,8 @@ export function TeamMembers({
                           className={isInactive ? 'grayscale object-cover' : 'object-cover'}
                         />
                         <AvatarFallback className={`text-sm font-semibold ${isInactive
-                            ? 'bg-muted-foreground/20 text-muted-foreground'
-                            : 'bg-studio-gold text-studio-dark'
+                          ? 'bg-muted-foreground/20 text-muted-foreground'
+                          : 'bg-studio-gold text-studio-dark'
                           }`}>
                           {member.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
@@ -550,7 +554,7 @@ export function TeamMembers({
                       )}
                       {isAdmin && !isInactive && (
                         <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
-                          <Laptop className="w-3 h-3" />
+                          <MonitorCog className="w-3 h-3" />
                         </div>
                       )}
                     </div>
@@ -790,30 +794,35 @@ export function TeamMembers({
                                         >
                                           <div className="space-y-2">
                                             <div className="flex items-center gap-2 font-semibold text-lg">
-                                              <Info className="w-5 h-5 text-blue-400" />
+                                              <Info className="w-5 h-5" 
+                                              style={{
+                                              color: isInactive
+                                                ? `${project.color}80` // Add transparency for inactive members
+                                                : project.color
+                                            }}/>
                                               <span>{project.name}</span>
                                             </div>
 
                                             {/* Project Description */}
-                                            {project.description && (
+                                            {/* {project.description && (
                                               <div className="text-xs text-gray-300">
                                                 {project.description}
                                               </div>
-                                            )}
+                                            )} */}
 
                                             <div className="flex items-center gap-3 text-xs text-gray-300">
                                               <Calendar className="w-4 h-4" />
                                               <span>
-                                                {format(new Date(project.startDate), "MMM d, yyyy")} – {format(new Date(project.endDate), "MMM d, yyyy")}
+                                                {format(new Date(project.startDate), "dd MMM, yyyy")} – {format(new Date(project.endDate), "dd MMM, yyyy")}
                                               </span>
                                             </div>
 
-                                            <div className="flex items-center gap-3 text-xs text-gray-300">
+                                            {/* <div className="flex items-center gap-3 text-xs text-gray-300">
                                               <Clock className="w-4 h-4" />
                                               <span>
                                                 Duration: {differenceInDays(new Date(project.endDate), new Date(project.startDate)) + 1} days
                                               </span>
-                                            </div>
+                                            </div> */}
 
                                             {/* Working Hours */}
                                             {(project.startHour !== undefined || project.endHour !== undefined) && (

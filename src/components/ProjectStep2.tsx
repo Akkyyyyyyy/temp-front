@@ -3,28 +3,30 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Users, UserPlus, X, AlertCircle, Plus, Save } from 'lucide-react';
+import { Users, UserPlus, X, AlertCircle, Plus, Save, MessageSquare } from 'lucide-react';
 import { colorOptions, MAX_TEAM_MEMBERS_PER_PROJECT } from '@/constant/constant';
 import { ProjectFormData } from './AddProjectDialog';
-
+import { Switch } from '@/components/ui/switch'; // Add switch import
 import { AvailableMember } from '@/api/member';
 import { useEffect, useRef, useState } from 'react';
-import { useRole } from '@/hooks/useRole'; // Import roles hook
+import { useRole } from '@/hooks/useRole';
 import { RoleDropdown } from './dropdowns/RoleDropdown';
 
 export interface TeamAssignment {
   id: string;
   memberName: string;
-  responsibility: string; // This should store role ID
+  responsibility: string;
   memberId: string;
   roleId: string;
+  instructions: string; // Add instructions to team assignment
 }
 export interface CurrentMember {
   memberId: string;
   memberName: string;
   memberPhoto: string;
-  responsibility: string; // This should store role ID
+  responsibility: string;
   roleId: string;
+  instructions: string; // Add instructions to current member
 }
 interface ProjectStep2Props {
   formData: ProjectFormData;
@@ -38,6 +40,7 @@ interface ProjectStep2Props {
     memberName: string;
     memberPhoto: string;
     responsibility: string;
+    instructions: string;
   };
   updateCurrentMember: (field: keyof CurrentMember, value: string) => void;
   addTeamMember: () => void;
@@ -69,7 +72,8 @@ export function ProjectStep2({
   onDialogCloseTrigger
 }: ProjectStep2Props) {
   const colorInputRef = useRef<HTMLInputElement>(null);
-  const { roles } = useRole(); // Get roles from hook
+  const { roles } = useRole();
+  const [expandedMember, setExpandedMember] = useState<string | null>(null); // Track which member is expanded for instructions
 
   const handleDialogCloseLocally = () => {
     checkMemberAvailability();
@@ -89,15 +93,12 @@ export function ProjectStep2({
   // Get role name from role ID for display
   const getRoleName = (roleId: string): string => {
     const role = roles.find(r => r.id === roleId);
-    return role?.name || roleId; // Fallback to ID if role not found
+    return role?.name || roleId;
   };
 
   const handleResponsibilityChange = (roleId: string) => {
-    // Find the role object to get both ID and name
     const selectedRole = roles.find(role => role.id === roleId);
-
     if (selectedRole) {
-      // Update both responsibility (name) and roleId (ID)
       updateCurrentMember('responsibility', selectedRole.name);
       updateCurrentMember('roleId', selectedRole.id);
     }
@@ -106,24 +107,30 @@ export function ProjectStep2({
   const handleMemberChange = (memberId: string) => {
     const selectedMember = filteredAvailableMembers.find(member => member.id === memberId);
     if (selectedMember) {
-      // Update both ID and name to keep them in sync
       updateCurrentMember('memberId', selectedMember.id);
       updateCurrentMember('memberName', selectedMember.name);
 
-      // Find the role by name to get the role ID
       const memberRole = roles.find(role => role.name === selectedMember.role);
       if (memberRole) {
-        updateCurrentMember('responsibility', memberRole.name); // Store role name for display
-        updateCurrentMember('roleId', memberRole.id); // Store role ID for backend
+        updateCurrentMember('responsibility', memberRole.name);
+        updateCurrentMember('roleId', memberRole.id);
       } else {
-        // Fallback: if role not found, use the member's role as name and try to find ID
         updateCurrentMember('responsibility', selectedMember.role);
-
-        // Try to find a role ID that matches the role name, or use the name as fallback
         const fallbackRole = roles.find(role => role.name.toLowerCase() === selectedMember.role.toLowerCase());
         updateCurrentMember('roleId', fallbackRole?.id || selectedMember.role);
       }
     }
+  };
+
+  // Handle reminder toggle
+  const handleReminderToggle = (reminderType: 'weekBefore' | 'dayBefore', checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      reminders: {
+        ...prev.reminders,
+        [reminderType]: checked
+      }
+    }));
   };
 
   return (
@@ -134,13 +141,9 @@ export function ProjectStep2({
           {/* Color Picker */}
           <div className="space-y-3">
             <Label className="text-sm font-medium">Color</Label>
-
-            {/* Custom Color Picker */}
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-                {/* Container for positioning */}
                 <div className="relative">
-                  {/* Hidden but positioned color input */}
                   <input
                     ref={colorInputRef}
                     type="color"
@@ -149,8 +152,6 @@ export function ProjectStep2({
                     className="absolute inset-0 w-12 h-12 opacity-0 cursor-pointer"
                     style={{ zIndex: 10 }}
                   />
-
-                  {/* Color preview that sits behind the input */}
                   <span
                     className={`
                       block w-12 h-12 rounded-md border-2 cursor-pointer transition-all duration-200
@@ -159,7 +160,6 @@ export function ProjectStep2({
                     style={{ backgroundColor: formData.color }}
                   />
                 </div>
-
                 <div className="flex-1 space-y-2">
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-mono text-muted-foreground">
@@ -172,29 +172,6 @@ export function ProjectStep2({
                 </div>
               </div>
             </div>
-
-            {/* Quick Color Presets */}
-            {/* <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground">Quick Colors</label>
-              <div className="grid grid-cols-6 gap-2">
-                {COLOR_PRESETS.map((color) => (
-                  <span
-                    key={color.value}
-                    onClick={() => handleColorChange(color.value)}
-                    className={`
-                      block w-6 h-6 rounded-md cursor-pointer transition-all duration-200
-                      hover:scale-110 active:scale-95
-                      ${formData.color === color.value 
-                        ? 'ring-2 ring-offset-1 ring-primary scale-110' 
-                        : 'hover:ring-1 hover:ring-offset-1 hover:ring-border'
-                      }
-                    `}
-                    style={{ backgroundColor: color.value }}
-                    title={color.label}
-                  />
-                ))}
-              </div>
-            </div> */}
           </div>
 
           <div className="space-y-2">
@@ -231,6 +208,44 @@ export function ProjectStep2({
               <p className="text-red-500 text-sm">{errors.description}</p>
             )}
           </div>
+
+          {/* Reminders Section */}
+          <div className="space-y-4 pt-4 border-t">
+            <Label className="text-sm font-medium">Reminders</Label>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="weekBefore" className="text-sm font-normal">
+                    Week Before
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Send reminder 1 week before the project
+                  </p>
+                </div>
+                <Switch
+                  id="weekBefore"
+                  checked={formData.reminders.weekBefore}
+                  onCheckedChange={(checked) => handleReminderToggle('weekBefore', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="dayBefore" className="text-sm font-normal">
+                    Day Before
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Send reminder 1 day before the project
+                  </p>
+                </div>
+                <Switch
+                  id="dayBefore"
+                  checked={formData.reminders.dayBefore}
+                  onCheckedChange={(checked) => handleReminderToggle('dayBefore', checked)}
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Column - Team Members */}
@@ -258,7 +273,7 @@ export function ProjectStep2({
                 <Label className="text-xs">Team Member</Label>
                 <Select
                   value={currentMember.memberId}
-                  onValueChange={handleMemberChange} // Use the new handler
+                  onValueChange={handleMemberChange}
                   disabled={isLoadingAvailableMembers}
                 >
                   <SelectTrigger className="bg-background border-border truncate">
@@ -310,6 +325,18 @@ export function ProjectStep2({
               </div>
             </div>
 
+            {/* Instructions Input */}
+            <div className="space-y-2">
+              <Label className="text-xs">Instructions (Optional)</Label>
+              <Textarea
+                value={currentMember.instructions}
+                onChange={(e) => updateCurrentMember('instructions', e.target.value)}
+                placeholder="Add specific instructions for this team member..."
+                rows={2}
+                className="text-sm resize-none"
+              />
+            </div>
+
             <Button
               type="button"
               variant="outline"
@@ -318,7 +345,7 @@ export function ProjectStep2({
               disabled={!currentMember.memberName || !currentMember.responsibility || hasConflicts(currentMember.memberId)}
               className="text-xs w-full"
             >
-              <Save className="w-3 h-3 " />
+              <Save className="w-3 h-3" />
               {hasConflicts(currentMember.memberId)
                 ? "Member Unavailable"
                 : teamAssignments.length > 0
@@ -332,37 +359,53 @@ export function ProjectStep2({
           {teamAssignments.length > 0 && (
             <div className="p-3 bg-background rounded-lg border">
               <h4 className="text-sm font-medium mb-2">Team Summary</h4>
-              <div className="space-y-2 overflow-y-auto max-h-[136px]">
+              <div className="space-y-2 overflow-y-auto max-h-[300px]">
                 {teamAssignments.map((ta) => (
-                  <div key={ta.id} className={`flex items-center justify-between p-2 rounded ${hasConflicts(ta.memberId)
-                    ? "bg-red-50 border border-red-200"
-                    : isPartiallyAvailable(ta.memberId)
-                      ? "border"
-                      : "bg-muted/20"
+                  <div key={ta.id} className={`rounded ${hasConflicts(ta.memberId)
+                      ? "bg-red-50 border border-red-200"
+                      : isPartiallyAvailable(ta.memberId)
+                        ? "border"
+                        : "bg-muted/20"
                     }`}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-2 h-2 rounded-full ${hasConflicts(ta.memberId) ? "bg-red-500"
-                          : isPartiallyAvailable(ta.memberId) ? "bg-amber-500"
-                            : "bg-green-500"
-                          }`}
-                      ></div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-gray-500">{ta.memberName}</span>
-                        <span className="text-muted-foreground text-sm">
-                          - {getRoleName(ta.responsibility)} {/* Display role name instead of ID */}
-                        </span>
+                    <div className="flex items-start justify-between p-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div
+                            className={`w-2 h-2 rounded-full flex-shrink-0 ${hasConflicts(ta.memberId) ? "bg-red-500"
+                                : isPartiallyAvailable(ta.memberId) ? "bg-amber-500"
+                                  : "bg-green-500"
+                              }`}
+                          ></div>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-medium text-sm text-gray-500 truncate">{ta.memberName}</span>
+                            <span className="text-muted-foreground text-sm flex-shrink-0">
+                              - {getRoleName(ta.roleId)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Instructions Display */}
+                        {ta.instructions && (
+                          <div className="mt-1 ml-4">
+                            <div className="flex items-start gap-1">
+                              <MessageSquare className="w-3 h-3 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <p className="text-xs text-muted-foreground truncate">
+                                {ta.instructions}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeTeamMember(ta.id)}
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0 ml-2"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeTeamMember(ta.id)}
-                      className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
                   </div>
                 ))}
               </div>

@@ -13,7 +13,7 @@ import {
   type Package as ApiPackage,
   type CreatePackagePayload,
   type UpdatePackagePayload,
-  getPackagesByMember
+  getPackagesByCompany
 } from "@/api/package";
 import { useAuth } from "@/context/AuthContext";
 import { Skeleton } from "./ui/skeleton";
@@ -44,21 +44,21 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const { user } = useAuth();
-  const memberId = user?.data?.id;
+  const companyId = user?.data?.company?.id;
 
   // Fetch packages when dialog opens
   useEffect(() => {
-    if (open && memberId) {
+    if (open && companyId) {
       fetchPackages();
     }
-  }, [open, memberId]);
+  }, [open, companyId]);
 
   const fetchPackages = async () => {
-    if (!memberId) return;
+    if (!companyId) return;
 
     setLoading(true);
     try {
-      const result = await getPackagesByMember(memberId);
+      const result = await getPackagesByCompany(companyId);
       if (result.success && result.data) {
         // Transform API response to local PackageType
         const transformedPackages = result.data.packages.map(apiPackage => ({
@@ -77,7 +77,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
           status: apiPackage.status
         }));
         setPackages(transformedPackages);
-      } else {  
+      } else {
         toast.error(result.message || "Failed to fetch packages")
       }
     } catch (error) {
@@ -107,8 +107,8 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
   };
 
   const handleDuplicatePackage = async (pkg: PackageType) => {
-    if (!memberId) {
-      toast.error("Member ID is required to create packages")
+    if (!companyId) {
+      toast.error("Company ID is required to create packages")
       return;
     }
 
@@ -127,7 +127,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
           return acc;
         }, {} as Record<string, any>),
         status: "active",
-        memberId: memberId
+        companyId: user.data.company.id
       };
 
       const result = await createPackage(createPayload);
@@ -145,8 +145,8 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
   };
 
   const handleSavePackage = async (updatedPackage: PackageType) => {
-    if (!memberId) {
-      toast.error("Member ID is required to save packages")
+    if (!companyId) {
+      toast.error("Company ID is required to save packages")
       return;
     }
 
@@ -192,7 +192,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
             return acc;
           }, {} as Record<string, any>),
           status: updatedPackage.status || "active",
-          memberId: memberId
+          companyId: user.data.company.id
         };
 
         const result = await createPackage(createPayload);
@@ -263,14 +263,18 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
                   </div>
 
                   {/* Add Package Button */}
-                  <Button
-                    onClick={handleAddPackage}
-                    className="gap-2"
-                    disabled={!memberId || loading}
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="hidden sm:inline">Add Package</span>
-                  </Button>
+                  {
+                    user.data.isAdmin &&
+                    <Button
+                      onClick={handleAddPackage}
+                      className="gap-2"
+                      disabled={!companyId || loading}
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span className="hidden sm:inline">Add Package</span>
+                    </Button>
+                  }
+
 
                   {/* Close Button */}
                   <Button
@@ -410,12 +414,12 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
                     <p className="text-muted-foreground mb-6">Get started by creating your first package</p>
                     <Button
                       onClick={handleAddPackage}
-                      disabled={!memberId}
+                      disabled={!companyId}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Package
                     </Button>
-                    {!memberId && (
+                    {!companyId && (
                       <p className="text-sm text-destructive mt-2">
                         You must be logged in to create packages
                       </p>

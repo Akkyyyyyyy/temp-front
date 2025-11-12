@@ -20,6 +20,8 @@ interface AuthContextProps {
     roles: any[];
     loadingRoles: boolean;
     refreshRoles: () => Promise<void>;
+    refreshUser: () => Promise<void>;
+    updateUser: (updates: any) => void;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -30,6 +32,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loadingRoles, setLoadingRoles] = useState(false);
     const navigate = useNavigate();
 
+    // Function to refresh user data from localStorage
+    const refreshUser = useCallback(async () => {
+        const token = localStorage.getItem("auth-token");
+        const type = localStorage.getItem("user-type");
+        const details = localStorage.getItem("user-details");
+
+        if (token && type && details) {
+            setUser({
+                token,
+                type: type as UserType,
+                data: JSON.parse(details),
+            });
+        }
+    }, []);
+
+    // Function to update user data
+    const updateUser = useCallback((updates: any) => {
+        setUser((prevUser: any) => {
+            if (!prevUser) return prevUser;
+
+            const updatedUser = {
+                ...prevUser,
+                data: {
+                    ...prevUser.data,
+                    ...updates
+                }
+            };
+
+            // Also update localStorage to persist the changes
+            localStorage.setItem("user-details", JSON.stringify(updatedUser.data));
+
+            return updatedUser;
+        });
+    }, []);
     const loadRoles = useCallback(async () => {
         if (!user) {
             setRoles([]);
@@ -39,14 +75,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             setLoadingRoles(true);
             const companyId = user.data.company.id;
-            
             if (!companyId) {
                 setRoles([]);
                 return;
             }
 
             const response = await getRolesByCompanyId(companyId);
-            
             if (response.success && response.data) {
                 let rolesData: any[] = [];
                 if (Array.isArray(response.data)) {
@@ -126,6 +160,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 roles,
                 loadingRoles,
                 refreshRoles: loadRoles,
+                refreshUser,
+                updateUser,
             }}
         >
             {children}

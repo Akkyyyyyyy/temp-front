@@ -27,7 +27,9 @@ interface TeamAvailabilityTableProps {
   isOpen: boolean;
   onClose: () => void;
   setSelectedProject: (project: any) => void;
+  setSelectedMember: (member: any) => void;
   setIsProjectClick: (projectClick: boolean) => void;
+  team: any[];
 }
 
 interface BookingEntry {
@@ -42,15 +44,16 @@ interface BookingEntry {
   timeSlot: string;
   responsibility: string;
   startDate: string;
+  memberId: string; // Add memberId to identify the member
 }
 
-export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, setIsProjectClick }: TeamAvailabilityTableProps) {
+export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, setIsProjectClick, setSelectedMember, team }: TeamAvailabilityTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
-  const companyId = user.data.company?.id || user.data.id;
+  const companyId = user.data.company?.id;
 
   // Fetch team members when dialog opens
   useEffect(() => {
@@ -119,7 +122,8 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
           dates,
           timeSlot,
           responsibility: project.newRole || "No Role Assigned",
-          startDate: project.startDate
+          startDate: project.startDate,
+          memberId: member.id // Add memberId here
         });
       });
     });
@@ -154,6 +158,17 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
     setSelectedProject(projectId);
     setIsProjectClick(true);
     onClose();
+  }
+
+  const handleMemberClick = (memberId: string) => {
+    // Find the member in the team array
+    const member = team.find(m => m.id === memberId);
+    if (member) {
+      setSelectedMember(member);
+      onClose();
+    } else {
+      console.warn(`Member with id ${memberId} not found in team array`);
+    }
   }
 
   return (
@@ -231,7 +246,10 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                         filteredBookings.map((booking, index) => (
                           <TableRow key={index}>
                             <TableCell>
-                              <div className="flex items-center gap-3 cursor-pointer">
+                              <div 
+                                className="flex items-center gap-3 cursor-pointer"
+                                onClick={() => handleMemberClick(booking.memberId)}
+                              >
                                 <Avatar className="w-10 h-10"
                                   style={{
                                     borderColor: booking.memberColor || 'hsl(var(--muted))',
