@@ -419,7 +419,7 @@ export function GanttChart() {
       }
     };
     fetchMembers();
-  }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate]);
+  }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate, user]);
 
 
   const handleJumpToToday = () => {

@@ -181,3 +181,53 @@ export const resetPassword = async (userType: "company" | "member", data: { toke
   });
   return await response.json();
 };
+
+export async function createCompanyByMember(payload: {
+  memberId: string;
+  companyName: string;
+}): Promise<ApiResponse<any>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/company/create-by-member`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
+
+export async function changeCompany(payload: {
+  memberId: string;
+  companyId: string;
+}): Promise<ApiResponse<LoginResponse>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/company/change-company`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
