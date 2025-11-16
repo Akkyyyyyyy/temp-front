@@ -13,14 +13,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { User2, Eye, EyeOff, AlertCircle, Building2 } from "lucide-react";
+import { User2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { loginMember } from "@/api/company";
 
 import { useNavigate } from "react-router-dom";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
 import { useAuth } from "@/context/AuthContext";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const schema = yup.object({
   email: yup.string().email("Invalid email format").matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format").required("Email is required"),
@@ -31,7 +30,6 @@ const schema = yup.object({
 type FormData = yup.InferType<typeof schema>;
 
 const Login = () => {
-  const [userType, setUserType] = useState<"company" | "member">("member");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -55,18 +53,10 @@ const Login = () => {
   // Load remembered email on component mount
   useEffect(() => {
     const rememberedEmail = localStorage.getItem("rememberedEmail");
-    const rememberedUserType = localStorage.getItem("user-type") as "company" | "member" | null;
     
-    // Set initial user type based on localStorage (default to "company" if none)
-    const initialUserType = rememberedUserType && (rememberedUserType === "company" || rememberedUserType === "member") 
-      ? rememberedUserType 
-      : "member";
-    
-    setUserType(initialUserType);
-
-    // Set initial email if user type matches - use setTimeout to ensure state is updated
+    // Set initial email if remembered
     setTimeout(() => {
-      if (rememberedEmail && rememberedUserType === initialUserType) {
+      if (rememberedEmail) {
         setValue("email", rememberedEmail);
         setValue("rememberMe", true);
       }
@@ -84,7 +74,6 @@ const Login = () => {
         email: formData.email,
         password: formData.password,
         rememberMe: formData.rememberMe,
-        userType:userType
       });
 
       if (!response.success) {
@@ -109,7 +98,7 @@ const Login = () => {
       if (response.data) {
         login(response.data.user.userType, {
           token: response.data.token,
-          member: response.data.user // Use the unified user object from backend
+          member: response.data.user
         });
       }
 
@@ -118,29 +107,6 @@ const Login = () => {
       toast.error(error.message || "Something went wrong");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleUserTypeChange = (type: "company" | "member") => {
-    const rememberedEmail = localStorage.getItem("rememberedEmail");
-    const rememberedUserType = localStorage.getItem("user-type");
-    
-    // Clear the form when switching user types
-    reset({
-      email: "",
-      password: "",
-      rememberMe: false,
-    });
-    
-    setUserType(type);
-    
-    // Only set email if the selected type matches the remembered type
-    if (rememberedEmail && rememberedUserType === type) {
-      // Use setTimeout to ensure the reset has completed
-      setTimeout(() => {
-        setValue("email", rememberedEmail);
-        setValue("rememberMe", true);
-      }, 0);
     }
   };
 
@@ -161,45 +127,14 @@ const Login = () => {
           <CardHeader className="text-center space-y-4 pb-6">
             {/* Icon Container */}
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary to-primary/80 rounded-2xl flex items-center justify-center shadow-lg">
-              {userType === "company" ? (
-                <Building2 className="h-7 w-7 text-primary-foreground" />
-              ) : (
-                <User2 className="h-7 w-7 text-primary-foreground" />
-              )}
+              <User2 className="h-7 w-7 text-primary-foreground" />
             </div>
 
             <div className="space-y-2">
               <CardTitle className="text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
               <CardDescription className="text-base">
-                Sign in with your {userType === "company" ? "company admin" : " member"} account
+                Sign in with your account
               </CardDescription>
-            </div>
-
-            <div className="flex justify-center space-x-8 border-b border-muted/30 pb-0">
-              <button
-                className={`relative pb-3 font-medium transition-all duration-200 ${userType === "company"
-                  ? "text-primary font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
-                onClick={() => handleUserTypeChange("company")}
-              >
-                Company
-                {userType === "company" && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full"></span>
-                )}
-              </button>
-              <button
-                className={`relative pb-3 font-medium transition-all duration-200 ${userType === "member"
-                  ? "text-primary font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-                  }`}
-                onClick={() => handleUserTypeChange("member")}
-              >
-                Member
-                {userType === "member" && (
-                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-primary rounded-full"></span>
-                )}
-              </button>
             </div>
           </CardHeader>
 
@@ -210,7 +145,7 @@ const Login = () => {
                 <Input
                   id="email"
                   type="text"
-                  placeholder={userType === "company" ? "admin@company.com" : "member@company.com"}
+                  placeholder="member@company.com"
                   {...register("email")}
                   maxLength={60}
                   className="h-11 transition-colors focus-visible:ring-2"
@@ -290,8 +225,7 @@ const Login = () => {
               </Button>
 
               <div className="pt-4 border-t border-muted/30">
-                {userType === "company" ? (
-                  <div className="text-center text-sm text-muted-foreground">
+                <div className="text-center text-sm text-muted-foreground">
                     Don't have an account?{" "}
                     <a
                       href="/register"
@@ -300,11 +234,6 @@ const Login = () => {
                       Register your company
                     </a>
                   </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground leading-relaxed">
-                    Contact your company admin to get invited to the team.
-                  </div>
-                )}
               </div>
             </form>
           </CardContent>
@@ -314,7 +243,6 @@ const Login = () => {
       <ForgotPasswordModal
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
-        userType={"member"}
         email={watchedEmail}
       />
     </>

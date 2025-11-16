@@ -191,9 +191,9 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
             <div className="flex items-center justify-between mb-3">
                 {/* <span>Documents ({documents.length})</span> */}
                 {!selectedFile && user.data.isAdmin == true ? (
-                    <Button asChild size="sm" className="flex items-center gap-2" variant="outline">
+                    <Button asChild size="sm" className="flex items-center gap-2 h-8 cursor-pointer" variant="outline">
                         <label>
-                            <Upload className="h-4 w-4" />
+                            <Upload className="h-3 w-3" />
                             Upload Document
                             <Input
                                 type="file"

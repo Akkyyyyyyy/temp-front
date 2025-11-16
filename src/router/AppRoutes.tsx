@@ -7,6 +7,7 @@ import Login from "../pages/Login";
 import Register from "../pages/Register";
 import { ProtectedRoutes } from "./ProtectedRoutes";
 import { PublicRoute } from "./PublicRoutes";
+import SetPassword from "@/pages/SetPassword";
 
 const AppRoutes = () => {
   return (
@@ -17,6 +18,7 @@ const AppRoutes = () => {
 
       {/* Single Login Route with Tabs for Company/Member */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/set-password" element={<PublicRoute><SetPassword /></PublicRoute>} />
 
       {/* Company Register */}
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />

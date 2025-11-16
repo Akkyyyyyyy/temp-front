@@ -303,10 +303,12 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                 <div className="flex gap-3 flex-wrap">
                     <Button
                         onClick={() => setIsAddFolderDialogOpen(true)}
-                        className="bg-studio-gold hover:bg-studio-gold/90 text-studio-dark font-medium"
                         disabled={loading}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
                     >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3 h-3" />
                         Add Folder
                     </Button>
                 </div>

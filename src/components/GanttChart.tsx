@@ -440,6 +440,8 @@ export function GanttChart() {
 
   };
   const addNewTeamMember = async (memberData: {
+    isInvited: boolean;
+    isOwner:boolean;
     roleId: string;
     active: boolean;
     profilePhoto: any;
@@ -501,11 +503,13 @@ export function GanttChart() {
         location: memberData.location,
         bio: memberData.bio,
         skills: memberData.skills || [],
-        isAdmin: false
+        isAdmin: false,
+        isInvited:memberData.isInvited,
+        isOwner: memberData.isOwner
       };
 
       setTeamMembers((prev) => [newMember, ...prev]);
-      toast.success(`Invitation sent to ${memberData.name}!`);
+      toast.success("Member added successfully");
 
       await refreshMembers();
 
@@ -656,14 +660,16 @@ export function GanttChart() {
         refreshMembers={refreshMembers}
         onDialogCloseTrigger={dialogCloseTrigger}
         onDateClick={handleJumpToToday}
+        setSelectedProject={setSelectedProject}
       />
 
       {/* Main Content */}
-      <div className="mt-12 lg:mt-0 flex-1 px-6 py-6 overflow-x-hidden">
+      <div className="mt-12 lg:mt-0 flex-1 py-6 px-3 lg:p-3 overflow-x-hidden">
         {/* Header */}
         <HeaderWithClock
           timeView={timeView}
           onDateClick={handleJumpToToday}
+          setSelectedProject={setSelectedProject}
         />
 
         {/* Rest of your content */}

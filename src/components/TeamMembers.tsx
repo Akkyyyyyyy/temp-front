@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { differenceInDays, format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, startOfMonth, endOfMonth } from "date-fns";
 import { Skeleton } from "./ui/skeleton";
-import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog } from "lucide-react";
+import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog, Star } from "lucide-react";
 import { Input } from "./ui/input";
 import { TimeView } from "./GanttChart";
 import { monthNames } from "@/constant/constant";
@@ -34,6 +34,8 @@ export interface TeamMember {
   active: boolean;
   roleId: string;
   countryCode?: string;
+  isInvited: boolean;
+  isOwner: boolean;
 }
 
 interface TeamMembersProps {
@@ -520,7 +522,7 @@ export function TeamMembers({
                     <div
                       className="cursor-pointer"
                       onClick={(e) => {
-                        if (user?.data?.id === member.id) {
+                        if (user?.data?.id === member.id || user.data.isAdmin) {
                           handleOpenColorDialog(member, e);
                         }
                       }}
@@ -547,14 +549,23 @@ export function TeamMembers({
                           {member.name.slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
-                      {isInactive && (
+                      {member.isOwner && (
+                        <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                          <Laptop className="w-3 h-3" />
+                        </div>
+                      )}
+
+                      {/* Inactive Badge */}
+                      {isInactive && !member.isOwner && (
                         <div className="absolute -bottom-1 -right-1 bg-muted-foreground/70 text-white rounded-full p-0.5">
                           <Ban className="w-3 h-3" />
                         </div>
                       )}
-                      {isAdmin && !isInactive && (
+
+                      {/* Admin Badge */}
+                      {isAdmin && !isInactive && !member.isOwner && (
                         <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
-                          <MonitorCog className="w-3 h-3" />
+                          <Laptop className="w-3 h-3" />
                         </div>
                       )}
                     </div>
@@ -794,12 +805,12 @@ export function TeamMembers({
                                         >
                                           <div className="space-y-2">
                                             <div className="flex items-center gap-2 font-semibold text-lg">
-                                              <Info className="w-5 h-5" 
-                                              style={{
-                                              color: isInactive
-                                                ? `${project.color}80` // Add transparency for inactive members
-                                                : project.color
-                                            }}/>
+                                              <Info className="w-5 h-5"
+                                                style={{
+                                                  color: isInactive
+                                                    ? `${project.color}80` // Add transparency for inactive members
+                                                    : project.color
+                                                }}/>
                                               <span>{project.name}</span>
                                             </div>
 

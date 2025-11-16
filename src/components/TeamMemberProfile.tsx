@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Project, toggleMemberAdmin, toggleMemberStatus, updateMember } from "@/api/member";
+import { Project, removeMemberFromCompany, sendMemberInvite, toggleMemberAdmin, toggleMemberStatus, updateMember } from "@/api/member";
 import { toast } from "sonner";
 import { TeamMember } from "./TeamMembers";
 import * as yup from 'yup';
@@ -139,6 +139,8 @@ export function TeamMemberProfile({
   const { roles } = useRole();
   const { user, updateUser } = useAuth();
   const [togglingAdmin, setTogglingAdmin] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState(false);
+
 
   const formatHour12 = (hour: any) => {
     const h = hour % 12 === 0 ? 12 : hour % 12;
@@ -171,11 +173,11 @@ export function TeamMemberProfile({
 
         // Update the parent component's state
         onUpdateMember(member.id, { active: result.member.active });
-        if (user?.data?.id === member.id) {
-          updateUser({
-            isAdmin: result.member.isAdmin
-          });
-        }
+        // if (user?.data?.id === member.id) {
+        //   updateUser({
+        //     isAdmin: result.member.isAdmin
+        //   });
+        // }
 
         refreshMembers();
 
@@ -235,6 +237,43 @@ export function TeamMemberProfile({
       console.error('Failed to toggle admin status:', error);
     } finally {
       setTogglingAdmin(false);
+    }
+  };
+  const handleSendInvite = async (memberId: string) => {
+    if (sendingInvite) return;
+
+    setSendingInvite(true);
+    try {
+      const result = await sendMemberInvite({
+        memberId,
+        companyId: user.data.company.id
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || "Failed to send invitation");
+      }
+    } catch (error: any) {
+      console.error('Failed to send invitation:', error);
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+  const handleRemoveMemberFromCompany = async (memberId: string) => {
+    try {
+      const result = await removeMemberFromCompany({
+        companyId: user.data.company.id,
+        memberId: memberId
+      });
+
+      if (result.success) {
+        setShowDeleteDialog(false);
+        onClose();
+        refreshMembers();
+      } else {
+        throw new Error(result.message || "Failed to remove member from company");
+      }
+    } catch (error: any) {
+      console.error('Error removing member from company:', error);
     }
   };
 
@@ -574,7 +613,7 @@ export function TeamMemberProfile({
       }
     }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col py-6">
-            {/* <DialogTitle className="flex items-center gap-3">
+        {/* <DialogTitle className="flex items-center gap-3">
               <div className="relative group">
                 {editingProfile && (
                   <>
@@ -633,71 +672,101 @@ export function TeamMemberProfile({
 
               <div className="flex items-center gap-1">
                 {
-                  user.data.isAdmin &&
-                  <> {/* Three-dot menu button */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem
-                          onClick={handleToggleStatus}
-                          disabled={togglingStatus}
-                          className={`flex items-center gap-2 cursor-pointer ${member.active ? 'text-green-600' : 'text-gray-600'}`}
-                        >
-                          {member.active ? (
+                  user.data.isAdmin && (
+                    <> {/* Three-dot menu button */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:bg-transparent hover:text-foreground"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          {(member.isInvited) && (
                             <>
-                              <EyeOff className="h-4 w-4" />
-                              Deactivate Member
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-4 w-4" />
-                              Activate Member
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => setShowDeleteDialog(true)}
-                          className="flex items-center gap-2 text-red-600 focus:text-red-600 cursor-pointer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete Member
-                        </DropdownMenuItem>
-                        {
-                          user.data.email === user.data.company.email && (
-                            <>
-                              <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                onClick={handleToggleAdmin}
-                                disabled={togglingAdmin}
-                                className={`flex items-center gap-2 cursor-pointer ${member.isAdmin ? 'text-orange-600' : 'text-blue-600'}`}
+                                onSelect={(e) => {
+                                  e.preventDefault(); // Prevent default behavior that closes the dropdown
+                                  handleSendInvite(member.id);
+                                }}
+                                disabled={sendingInvite}
+                                className="flex items-center gap-2 cursor-pointer"
                               >
-                                {member.isAdmin ? (
+                                {sendingInvite ? (
                                   <>
-                                    <UserMinus className="h-4 w-4" />
-                                    Revoke Admin
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+                                    Sending...
                                   </>
                                 ) : (
                                   <>
-                                    <UserPlus className="h-4 w-4" />
-                                    Make Admin
+                                    <Mail className="h-4 w-4" />
+                                    Send Invite
                                   </>
                                 )}
                               </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                             </>
-                          )
-                        }
+                          )}
 
-                      </DropdownMenuContent>
-                    </DropdownMenu></>
+                          <DropdownMenuItem
+                            onClick={handleToggleStatus}
+                            disabled={togglingStatus}
+                            className={`flex items-center gap-2 cursor-pointer`}
+                          >
+                            {member.active ? (
+                              <>
+                                <EyeOff className="h-4 w-4" />
+                                Deactivate Member
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="h-4 w-4" />
+                                Activate Member
+                              </>
+                            )}
+                          </DropdownMenuItem>
+
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            onClick={() => setShowDeleteDialog(true)}
+                            className="flex items-center gap-2 cursor-pointer"
+                          >
+                            <UserMinus className="h-4 w-4" />
+                            Remove Member
+                          </DropdownMenuItem>
+
+                          {
+                            user.data.email === user.data.company.email && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={handleToggleAdmin}
+                                  disabled={togglingAdmin}
+                                  className={`flex items-center gap-2 cursor-pointer `}
+                                >
+                                  {member.isAdmin ? (
+                                    <>
+                                      <UserMinus className="h-4 w-4" />
+                                      Revoke Admin
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserPlus className="h-4 w-4" />
+                                      Make Admin
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                              </>
+                            )
+                          }
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </>
+                  )
                 }
 
               </div>
@@ -723,9 +792,9 @@ export function TeamMemberProfile({
                       </AvatarFallback>
                     </Avatar>
                     {
-                      (user.data.id == member.id) && (
+                      (user.data.id == member.id || user.data.isAdmin) && (
                         <>
-                          <label
+                          <Label
                             htmlFor="photo-upload-form"
                             className="absolute inset-0 bg-black/70 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer backdrop-blur-sm"
                           >
@@ -737,7 +806,7 @@ export function TeamMemberProfile({
                                 <span className="text-xs font-medium">Change</span>
                               </div>
                             )}
-                          </label>
+                          </Label>
                           <input
                             id="photo-upload-form"
                             type="file"
@@ -756,7 +825,7 @@ export function TeamMemberProfile({
                   <Badge variant="secondary" className="mb-3 bg-primary/10 text-primary border-primary/20">
                     {member.role}
                   </Badge>
-                  {(user.data.id == member.id) && (
+                  {(user.data.id == member.id  || user.data.isAdmin) && (
                     <div className="flex flex-col sm:flex-row gap-3 justify-center sm:justify-start mt-4">
                       <label
                         htmlFor="photo-upload-form"
@@ -842,6 +911,7 @@ export function TeamMemberProfile({
                           }}
                           placeholder="Select your role"
                           className={`w-full transition-colors ${profileErrors.role ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}
+                          disabled={!user.data.isAdmin}
                         />
                         {profileErrors.role && (
                           <p className="text-red-500 text-xs flex items-center gap-1 mt-1">
@@ -1116,7 +1186,7 @@ export function TeamMemberProfile({
                   </Button>
                 )}
                 {
-                  (user.data.id == member.id) && (
+                  (user.data.id == member.id || user.data.isAdmin) && (
                     <Button
                       size="sm"
                       disabled={saving || uploadingPhoto}
@@ -1257,25 +1327,23 @@ export function TeamMemberProfile({
           </Card>
 
           {/* Delete Confirmation Dialog */}
+          {/* Remove from Company Confirmation Dialog */}
           <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            <DialogContent className="sm:max-w-md bg-[#101319]  text-white">
+            <DialogContent className="sm:max-w-md bg-[#101319] text-white">
               <div className="py-2 space-y-3">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-white">This action cannot be undone</p>
+                    <p className="font-medium text-white">Remove Member from Company</p>
                     <p className="text-gray-300 mt-1">
-                      You are about to permanently delete <strong className="text-red-300">{member.name}</strong> from the system.
-                      All associated data will be lost.
+                      You are about to remove <strong className="text-red-300">{member.name}</strong> from the company.
+                      {member.active && (
+                        <span className="block mt-1">
+                          This member is currently active. Consider deactivating instead.
+                        </span>
+                      )}
                     </p>
                   </div>
-                </div>
-
-                <div className="bg-red-900/30 border border-red-700 rounded-md p-3 mt-3">
-                  <p className="text-sm text-red-300 font-medium flex items-center gap-1">
-                    <AlertTriangle className="h-4 w-4" />
-                    Warning: This action is irreversible
-                  </p>
                 </div>
               </div>
 
@@ -1290,13 +1358,13 @@ export function TeamMemberProfile({
                 <Button
                   variant="destructive"
                   onClick={() => {
-                    handleDeleteMember(member.id);
+                    handleRemoveMemberFromCompany(member.id);
                     setShowDeleteDialog(false);
                   }}
                   className="gap-2 bg-red-600 hover:bg-red-700 text-white"
                 >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Member Permanently
+                  <UserMinus className="h-4 w-4" />
+                  Remove from Company
                 </Button>
               </DialogFooter>
             </DialogContent>

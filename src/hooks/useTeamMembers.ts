@@ -54,7 +54,9 @@ export function useTeamMembers({
                     projects: m.projects || [],
                     active: m.active,
                     isAdmin:m.isAdmin,
-                    roleId:m.roleId
+                    roleId:m.roleId,
+                    isInvited:m.isInvited,
+                    isOwner:m.isOwner
                 }));
 
                 setTeamMembers(transformed);

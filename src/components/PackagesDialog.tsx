@@ -412,13 +412,16 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
                     </div>
                     <h3 className="text-lg font-semibold mb-2">No packages yet</h3>
                     <p className="text-muted-foreground mb-6">Get started by creating your first package</p>
-                    <Button
-                      onClick={handleAddPackage}
-                      disabled={!companyId}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Package
-                    </Button>
+                    {
+                      user.data.isAdmin &&
+                      <Button
+                        onClick={handleAddPackage}
+                        disabled={!companyId}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Package
+                      </Button>
+                    }
                     {!companyId && (
                       <p className="text-sm text-destructive mt-2">
                         You must be logged in to create packages

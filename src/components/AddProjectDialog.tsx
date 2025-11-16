@@ -362,7 +362,6 @@ export function AddProjectDialog({
     e.preventDefault();
 
     if (!validateStep2()) {
-      toast.error('Please fix the validation errors before submitting');
       return;
     }
 

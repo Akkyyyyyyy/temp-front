@@ -1,14 +1,17 @@
-import { useState, useMemo, useEffect } from "react";
-import { Search, X, Calendar, Clock, User } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getMembersWithFutureProjects } from "@/api/member";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { TeamMember } from "./TeamMembers";
-import { getMembersWithFutureProjects } from "@/api/member";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon, Clock, Search, User, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { TeamMember } from "./TeamMembers";
+import { Calendar } from "./ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -44,13 +47,89 @@ interface BookingEntry {
   timeSlot: string;
   responsibility: string;
   startDate: string;
+  endDate: string;
   memberId: string; // Add memberId to identify the member
+}
+
+const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDate: Date }, handleDateRange: (val: { startDate: Date; endDate: Date }) => void }) => {
+  const [openDatePicker, setOpenDatePicker] = useState(false)
+  return (
+    <div className="space-y-2">
+      <Popover open={openDatePicker} onOpenChange={(val) => setOpenDatePicker(val)}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={`w-full justify-start text-left font-normal`}
+            id="dateRange"
+          >
+            <CalendarIcon className="h-4 w-4 mr-2" />
+            {date.startDate && date.endDate ? (
+              <>
+                {format(new Date(date.startDate), "PPP")} - {format(new Date(date.endDate), "PPP")}
+              </>
+            ) : date.startDate ? (
+              `Select end date for ${format(new Date(date.startDate), "PPP")}`
+            ) : (
+              <span>Filter by Date range</span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-auto p-0"
+          align="start"
+          sideOffset={4}
+        >
+          <div className="flex flex-col">
+            <div className="flex justify-between items-center p-2 border-b">
+              <span className="text-sm font-medium">
+                {date.startDate && !date.endDate
+                  ? 'Select end date'
+                  : 'Select date range'
+                }
+              </span>
+              {/* {(formData.startDate || formData.endDate) && ( */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => { handleDateRange({ startDate: null, endDate: null }) }}
+                className="h-6 px-2 text-xs"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear
+              </Button>
+              {/* )} */}
+            </div>
+            <Calendar
+              mode="range"
+              classNames={{
+                day_today: "",
+              }}
+              defaultMonth={date.startDate ? new Date(date.startDate) : new Date()}
+              selected={
+                date.startDate
+                  ? {
+                    from: new Date(date.startDate),
+                    to: date.endDate ? new Date(date.endDate) : undefined
+                  }
+                  : undefined
+              }
+              onSelect={(range) => { handleDateRange({ startDate: range.from ?? null, endDate: range.to ?? null }) }}
+              initialFocus
+              numberOfMonths={1}
+            />
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
 }
 
 export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, setIsProjectClick, setSelectedMember, team }: TeamAvailabilityTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null })
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const companyId = user.data.company?.id;
@@ -123,6 +202,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
           timeSlot,
           responsibility: project.newRole || "No Role Assigned",
           startDate: project.startDate,
+          endDate: project.endDate,
           memberId: member.id // Add memberId here
         });
       });
@@ -143,16 +223,55 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
 
   // Filter bookings based on search query
   const filteredBookings = useMemo(() => {
-    if (!searchQuery.trim()) return bookingEntries;
+    let res = bookingEntries;
 
-    const query = searchQuery.toLowerCase();
-    return bookingEntries.filter(booking =>
-      booking.memberName.toLowerCase().includes(query) ||
-      booking.memberRole.toLowerCase().includes(query) ||
-      booking.projectName.toLowerCase().includes(query) ||
-      booking.responsibility.toLowerCase().includes(query)
-    );
-  }, [bookingEntries, searchQuery]);
+    if (dateRange.startDate && dateRange.endDate) {
+      res = res.filter(booking => {
+        const selectedStart = new Date(format(dateRange.startDate, "yyyy-MM-dd")).getTime();
+        const selectedEnd = new Date(format(dateRange.endDate, "yyyy-MM-dd")).getTime();
+
+        const bookingStart = new Date(booking.startDate).getTime();
+        const bookingEnd = new Date(booking.endDate).getTime();
+
+        // Ranges overlap
+        return bookingStart <= selectedEnd && bookingEnd >= selectedStart;
+      });
+
+    } else if (dateRange.startDate && !dateRange.endDate) {
+      const selectedDate = new Date(format(dateRange.startDate, "yyyy-MM-dd")).getTime();
+
+      res = res.filter(booking => {
+        const bookingStart = new Date(booking.startDate).getTime();
+        const bookingEnd = new Date(booking.endDate).getTime();
+
+        return selectedDate >= bookingStart && selectedDate <= bookingEnd;
+      });
+
+    } else if (!dateRange.startDate && dateRange.endDate) {
+      const selectedDate = new Date(format(dateRange.endDate, "yyyy-MM-dd")).getTime();
+
+      res = res.filter(booking => {
+        const bookingStart = new Date(booking.startDate).getTime();
+        const bookingEnd = new Date(booking.endDate).getTime();
+
+        return selectedDate >= bookingStart && selectedDate <= bookingEnd;
+      });
+
+    }
+    // if (!searchQuery.trim()) return bookingEntries;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      res = res.filter(booking =>
+        booking.memberName.toLowerCase().includes(query) ||
+        booking.memberRole.toLowerCase().includes(query) ||
+        booking.projectName.toLowerCase().includes(query) ||
+        booking.responsibility.toLowerCase().includes(query)
+      );
+    }
+
+    return res
+
+  }, [bookingEntries, searchQuery, dateRange]);
 
   const handleProjectClick = (projectId: string) => {
     setSelectedProject(projectId);
@@ -176,7 +295,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
       <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
+            <CalendarIcon className="w-5 h-5" />
             Team Availability & Bookings
           </DialogTitle>
         </DialogHeader>
@@ -185,13 +304,26 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
           {/* Search Bar */}
           <div className="flex-shrink-0 mb-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search team members, roles & projects"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-10"
-              />
+              <div className="flex w-full gap-3">
+                <div className="w-3/5">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search team members, roles & projects"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                </div>
+                <div className="w-2/5 relative">
+                  <DatePicker date={{
+                    startDate: dateRange.startDate,
+                    endDate: dateRange.endDate
+                  }}
+                    handleDateRange={(val) => setDateRange(val)}
+                  />
+
+                </div>
+              </div>
               {searchQuery && (
                 <Button
                   variant="ghost"
@@ -246,7 +378,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                         filteredBookings.map((booking, index) => (
                           <TableRow key={index}>
                             <TableCell>
-                              <div 
+                              <div
                                 className="flex items-center gap-3 cursor-pointer"
                                 onClick={() => handleMemberClick(booking.memberId)}
                               >
@@ -285,7 +417,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 text-sm truncate">
-                                <Calendar className="w-3 h-3 text-muted-foreground" />
+                                <CalendarIcon className="w-3 h-3 text-muted-foreground" />
                                 {booking.dates}
                               </div>
                             </TableCell>

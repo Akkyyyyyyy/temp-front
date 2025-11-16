@@ -19,6 +19,8 @@ export interface Member {
   active:boolean;
   isAdmin:boolean;
   roleId:string;
+  isInvited:boolean;
+  isOwner:boolean;
 }
 
 export interface Project {
@@ -203,6 +205,44 @@ export interface ToggleAdminResponse {
   member?: Member;
   isAdmin: boolean;
 }
+
+export interface SendInviteRequest {
+  memberId: string;
+  companyId: string;
+}
+
+export interface SendInviteResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    inviteLink?: string; // Optional, might only return in development
+  };
+}
+
+export interface SetPasswordRequest {
+  token: string;
+  password: string;
+}
+
+export interface SetPasswordResponse {
+  data?: any;
+  success: boolean;
+  message: string;
+  token?: string;
+  user?:any;
+}
+export interface RemoveMemberFromCompanyRequest {
+  companyId: string;
+  memberId: string;
+}
+
+export interface RemoveMemberFromCompanyResponse {
+  success: boolean;
+  message: string;
+  memberId?: string;
+  companyId?: string;
+}
+
 
 export async function addMember(request: AddMemberRequest): Promise<AddMemberResponse> {
   try {
@@ -401,6 +441,9 @@ export interface RemovePhotoResponse {
   success: boolean;
   message?: string;
   member?: any;
+}
+export interface checkInviteRequest {
+  token:string;
 }
 
 export async function updateMemberProfile(
@@ -654,6 +697,142 @@ export async function toggleMemberAdmin(
       success: false,
       message: error.message || "Failed to toggle admin status",
       isAdmin: false
+    };
+  }
+}
+
+export async function sendMemberInvite(
+  request: SendInviteRequest
+): Promise<SendInviteResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    const response = await apiFetch(`${baseUrl}/member/send-invite`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to send invitation");
+    }
+
+    toast.success("Invitation sent successfully");
+    return {
+      success: true,
+      message: data.message,
+      data: data.data
+    };
+  } catch (error: any) {
+    console.error("Error sending invitation:", error);
+    return {
+      success: false,
+      message: error.message || "Failed to send invitation"
+    };
+  }
+}
+
+export async function checkMemberInvite(
+  request: checkInviteRequest
+): Promise<boolean> {
+  try {
+
+    const response = await apiFetch(`${baseUrl}/member/check-invite`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return false
+    }
+    return true
+  } catch (error: any) {
+    console.error("Error sending invitation:", error);
+    return false
+  }
+}
+
+
+export async function setMemberPassword(
+  request: SetPasswordRequest
+): Promise<SetPasswordResponse> {
+  try {
+    const response = await apiFetch(`${baseUrl}/member/set-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to set password");
+    }
+
+    toast.success("Password set successfully");
+    return {
+      success: true,
+      message: data.message,
+      data
+    };
+  } catch (error: any) {
+    console.error("Error setting password:", error);
+    toast.error(error.message || "Failed to set password");
+    return {
+      success: false,
+      message: error.message || "Failed to set password"
+    };
+  }
+}
+
+export async function removeMemberFromCompany(
+  request: RemoveMemberFromCompanyRequest
+): Promise<RemoveMemberFromCompanyResponse> {
+  try {
+    const token = localStorage.getItem('auth-token');
+
+    const response = await apiFetch(
+      `${baseUrl}/member/company/${request.companyId}/remove/${request.memberId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to remove member from company");
+    }
+
+    toast.success("Member removed from company successfully");
+    return {
+      success: true,
+      message: data.message,
+      memberId: data.memberId,
+      companyId: data.companyId
+    };
+  } catch (error: any) {
+    console.error("Error removing member from company:", error);
+    toast.error(error.message || "Failed to remove member from company");
+    return {
+      success: false,
+      message: error.message || "Failed to remove member from company"
     };
   }
 }

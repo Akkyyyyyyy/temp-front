@@ -43,13 +43,12 @@ type NewPasswordData = yup.InferType<typeof newPasswordSchema>;
 interface ForgotPasswordModalProps {
     isOpen: boolean;
     onClose: () => void;
-    userType: "company" | "member";
     email?: string;
 }
 
 type ForgotPasswordStep = 'email' | 'otp' | 'newPassword';
 
-export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: ForgotPasswordModalProps) => {
+export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordModalProps) => {
     const [step, setStep] = useState<ForgotPasswordStep>('email');
     const [loading, setLoading] = useState(false);
     const [resetEmail, setResetEmail] = useState("");
@@ -112,7 +111,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: Forgot
     const handleSendOTP = async (data: EmailData) => {
         try {
             setLoading(true);
-            const response = await requestPasswordReset(userType, { email: data.email });
+            const response = await requestPasswordReset({ email: data.email });
 
             if (response.success) {
                 setResetEmail(data.email);
@@ -138,7 +137,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: Forgot
 
         try {
             setIsResending(true);
-            const response = await requestPasswordReset(userType, { email: resetEmail });
+            const response = await requestPasswordReset({ email: resetEmail });
 
             if (response.success) {
                 if (response.data?.token) {
@@ -167,7 +166,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: Forgot
                 return;
             }
 
-            const response = await verifyOTP(userType, {
+            const response = await verifyOTP({
                 email: resetEmail,
                 otp: data.otp,
                 token: tokenToUse
@@ -191,7 +190,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: Forgot
     const handleResetPassword = async (data: NewPasswordData) => {
         try {
             setLoading(true);
-            const response = await resetPassword(userType, {
+            const response = await resetPassword({
                 token: resetToken,
                 newPassword: data.newPassword
             });
@@ -293,7 +292,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, userType, email }: Forgot
                                 <Input
                                     id="email"
                                     type="text"
-                                    placeholder={userType === "company" ? "admin@company.com" : "member@company.com"}
+                                    placeholder={"member@company.com"}
                                     {...emailForm.register("email")}
                                     disabled={loading && email && email.trim() !== ''} // Disable input during auto-send
                                 />

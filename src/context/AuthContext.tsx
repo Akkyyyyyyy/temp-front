@@ -31,14 +31,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [roles, setRoles] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const navigate = useNavigate();
-        
 
     // Function to refresh user data from localStorage
     const refreshUser = useCallback(async () => {
         const token = localStorage.getItem("auth-token");
         const type = localStorage.getItem("user-type");
         const details = localStorage.getItem("user-details");
-        
+
         if (token && type && details) {
             setUser({
                 token,
@@ -50,7 +49,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Function to update user data
     const updateUser = useCallback((updates: any) => {
-        
         setUser((prevUser: any) => {
             if (!prevUser) return prevUser;
 
@@ -61,7 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     ...updates
                 }
             };
-            console.log(user);
 
             // Also update localStorage to persist the changes
             localStorage.setItem("user-details", JSON.stringify(updatedUser.data));
@@ -127,8 +124,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [user, loadRoles]);
 
     const login = (type: UserType, data: any) => {
-        console.log(data);
-        
         localStorage.setItem("auth-token", data.token);
         localStorage.setItem("user-type", type);
         localStorage.setItem("user-details", JSON.stringify(data.member));

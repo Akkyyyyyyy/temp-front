@@ -8,6 +8,8 @@ import { TeamMember } from "./TeamMembers";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
 import { GoogleCalendarSync } from "./GoogleCalendarSync";
+import { CompanyDropdown } from "./dropdowns/CompanyDropdown";
+;
 
 interface SidebarProps {
   onAddTeamMember: () => void;
@@ -21,6 +23,7 @@ interface SidebarProps {
   refreshMembers: () => void;
   onDialogCloseTrigger: number;
   onDateClick: () => void;
+  setSelectedProject:(project:any)=>void;
 }
 
 type SidebarItem = {
@@ -41,7 +44,8 @@ export function Sidebar({
   teamMembers,
   refreshMembers,
   onDialogCloseTrigger,
-  onDateClick
+  onDateClick,
+  setSelectedProject
 }: SidebarProps) {
   const navigate = useNavigate();
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
@@ -212,7 +216,7 @@ export function Sidebar({
         
         {/* Logo */}
         <div className="flex gap-5">
-            <h1 className="text-md font-semibold text-foreground flex items-center">{user.data.company.name}</h1>
+                    <CompanyDropdown setSelectedProject={setSelectedProject} />
         </div>
       </div>
       

@@ -20,7 +20,6 @@ export interface LoginPayload {
   email: string;
   password: string;
   rememberMe?: boolean;
-  userType:any;
 }
 
 export interface ApiResponse<T> {
@@ -34,28 +33,6 @@ export interface ApiResponse<T> {
 export async function registerCompany(payload: RegisterCompanyPayload): Promise<ApiResponse<any>> {
   try {
     const response = await apiFetch(`${baseUrl}/company/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return { success: false, message: data.message, errors: data.errors };
-    }
-
-    return { success: true, data };
-  } catch (error: any) {
-    return { success: false, message: error.message || "Network error" };
-  }
-}
-
-export async function loginCompany(payload: LoginPayload): Promise<ApiResponse<LoginResponse>> {
-  try {
-    const response = await apiFetch(`${baseUrl}/company/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -138,46 +115,39 @@ export async function loginMember(payload: LoginPayload): Promise<any> {
   }
 }
 
-// Unified login function that handles both user types
-export async function loginUser(userType: 'company' | 'member', payload: LoginPayload): Promise<ApiResponse<LoginResponse>> {
-  if (userType === 'company') {
-    return loginCompany(payload);
-  } else {
-    return loginMember(payload);
-  }
-}
 
-export const requestPasswordReset = async (userType: "company" | "member", data: { email: string }) => {
+
+export const requestPasswordReset = async (data: { email: string }) => {
   const response = await apiFetch(`${baseUrl}/auth/forgot-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ ...data, userType }),
+    body: JSON.stringify({ ...data }),
   });
   const res = await response.json();
 
   return res;
 };
 
-export const verifyOTP = async (userType: "company" | "member", data: { email: string; otp: string; token: string }) => {
+export const verifyOTP = async (data: { email: string; otp: string; token: string }) => {
   const response = await apiFetch(`${baseUrl}/auth/verify-otp`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ ...data, userType }),
+    body: JSON.stringify({ ...data }),
   });
   return await response.json();
 };
 
-export const resetPassword = async (userType: "company" | "member", data: { token: string; newPassword: string }) => {
+export const resetPassword = async (data: { token: string; newPassword: string }) => {
   const response = await apiFetch(`${baseUrl}/auth/reset-password`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ ...data, userType }),
+    body: JSON.stringify({ ...data }),
   });
   return await response.json();
 };
