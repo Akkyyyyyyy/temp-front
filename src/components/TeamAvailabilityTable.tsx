@@ -12,18 +12,39 @@ import { useEffect, useMemo, useState } from "react";
 import { TeamMember } from "./TeamMembers";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { getFallback } from "@/helper/helper";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
-interface Project {
-  id: string;
-  name: string;
-  startDate: number;
-  endDate: number;
-  color: string;
-  assignedTo?: string;
-  startHour?: number;
-  endHour?: number;
+interface Event {
+  isOther: any;
+  eventId: string;
+  date: string;
+  startHour: number;
+  endHour: number;
+  location: string;
+  reminders: {
+    dayBefore: boolean;
+    weekBefore: boolean;
+  };
+  status?: string;
+  name?: string;
+  project: {
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    client: any;
+    brief: any;
+    logistics: any;
+  };
+  assignment: {
+    id: string;
+    role: string;
+    roleId: string;
+    instructions: any;
+    googleEventId: any;
+  };
 }
 
 interface TeamAvailabilityTableProps {
@@ -32,6 +53,8 @@ interface TeamAvailabilityTableProps {
   setSelectedProject: (project: any) => void;
   setSelectedMember: (member: any) => void;
   setIsProjectClick: (projectClick: boolean) => void;
+  setSelectedEvent: (event: any) => void;
+  setIsEventClick: (eventClick: boolean) => void;
   team: any[];
 }
 
@@ -40,15 +63,28 @@ interface BookingEntry {
   memberColor: string;
   memberPhoto: string;
   memberRole: string;
-  projectId: string;
+  eventId: string;
+  eventName: string;
+  eventDate: string;
+  eventStartHour: number;
+  eventEndHour: number;
   projectName: string;
+  projectId: string;
   projectColor: string;
   dates: string;
   timeSlot: string;
   responsibility: string;
   startDate: string;
   endDate: string;
-  memberId: string; // Add memberId to identify the member
+  memberId: string;
+  location: string;
+  assignment?: {
+    id: string;
+    role: string;
+    roleId: string;
+    instructions: any;
+    googleEventId: any;
+  };
 }
 
 const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDate: Date }, handleDateRange: (val: { startDate: Date; endDate: Date }) => void }) => {
@@ -68,7 +104,7 @@ const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDat
                 {format(new Date(date.startDate), "PPP")} - {format(new Date(date.endDate), "PPP")}
               </>
             ) : date.startDate ? (
-              `Select end date for ${format(new Date(date.startDate), "PPP")}`
+              `${format(new Date(date.startDate), "PPP")}`
             ) : (
               <span>Filter by Date range</span>
             )}
@@ -87,7 +123,6 @@ const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDat
                   : 'Select date range'
                 }
               </span>
-              {/* {(formData.startDate || formData.endDate) && ( */}
               <Button
                 type="button"
                 variant="ghost"
@@ -98,7 +133,6 @@ const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDat
                 <X className="h-3 w-3 mr-1" />
                 Clear
               </Button>
-              {/* )} */}
             </div>
             <Calendar
               mode="range"
@@ -125,7 +159,7 @@ const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDat
   )
 }
 
-export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, setIsProjectClick, setSelectedMember, team }: TeamAvailabilityTableProps) {
+export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, setIsProjectClick, setSelectedEvent, setIsEventClick, setSelectedMember, team }: TeamAvailabilityTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -134,7 +168,6 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
   const { user } = useAuth();
   const companyId = user.data.company?.id;
 
-  // Fetch team members when dialog opens
   useEffect(() => {
     if (isOpen) {
       fetchTeamMembers();
@@ -160,55 +193,54 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
 
     const entries: BookingEntry[] = [];
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     teamMembers.forEach(member => {
-      member?.projects?.forEach(project => {
-        // Format time in UK format (24-hour clock)
+      member?.events?.forEach((event: Event) => {
+        if (event.isOther) return;
+
         const formatTimeUK = (hour: number) => {
           if (hour === 0) return '12:00 AM';
           if (hour === 12) return '12:00 PM';
           return hour < 12 ? `${hour}:00 AM` : `${hour - 12}:00 PM`;
         };
 
-        const timeSlot = project.startHour && project.endHour
-          ? `${formatTimeUK(project.startHour)} - ${formatTimeUK(project.endHour)}`
+        const timeSlot = event.startHour && event.endHour
+          ? `${formatTimeUK(event.startHour)} - ${formatTimeUK(event.endHour)}`
           : "All day";
 
-        // Format dates as "10 Oct 2024"
-        const formatDateUK = (dateString: string) => {
-          const date = new Date(dateString);
-          return date.toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric'
-          });
-        };
+        const eventDate = new Date(event.date);
+        const formattedDate = eventDate.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
 
-        const dates = project.startDate === project.endDate
-          ? formatDateUK(project.startDate)
-          : `${formatDateUK(project.startDate)} - ${formatDateUK(project.endDate)}`;
+        const eventName = event.name || event.project.name;
 
         entries.push({
           memberName: member.name,
           memberColor: member.ringColor,
           memberPhoto: member.profilePhoto,
           memberRole: member.role,
-          projectId: project.id,
-          projectName: project.name,
-          projectColor: project.color,
-          dates,
+          eventId: event.eventId,
+          eventName: eventName,
+          eventDate: event.date,
+          eventStartHour: event.startHour,
+          eventEndHour: event.endHour,
+          projectName: event.project.name,
+          projectId: event.project.id,
+          projectColor: event.project.color,
+          dates: formattedDate,
           timeSlot,
-          responsibility: project.newRole || "No Role Assigned",
-          startDate: project.startDate,
-          endDate: project.endDate,
-          memberId: member.id // Add memberId here
+          responsibility: event.assignment.role || "No Role Assigned",
+          startDate: event.date,
+          endDate: event.date,
+          memberId: member.id,
+          location: event.location,
+          assignment: event.assignment
         });
       });
     });
 
-    // Sort by startDate first, then by memberName
     return entries.sort((a, b) => {
       const dateA = new Date(a.startDate).getTime();
       const dateB = new Date(b.startDate).getTime();
@@ -221,7 +253,6 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
     });
   }, [teamMembers]);
 
-  // Filter bookings based on search query
   const filteredBookings = useMemo(() => {
     let res = bookingEntries;
 
@@ -230,47 +261,42 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
         const selectedStart = new Date(format(dateRange.startDate, "yyyy-MM-dd")).getTime();
         const selectedEnd = new Date(format(dateRange.endDate, "yyyy-MM-dd")).getTime();
 
-        const bookingStart = new Date(booking.startDate).getTime();
-        const bookingEnd = new Date(booking.endDate).getTime();
+        const bookingDate = new Date(booking.startDate).getTime();
 
-        // Ranges overlap
-        return bookingStart <= selectedEnd && bookingEnd >= selectedStart;
+        return bookingDate >= selectedStart && bookingDate <= selectedEnd;
       });
 
     } else if (dateRange.startDate && !dateRange.endDate) {
       const selectedDate = new Date(format(dateRange.startDate, "yyyy-MM-dd")).getTime();
 
       res = res.filter(booking => {
-        const bookingStart = new Date(booking.startDate).getTime();
-        const bookingEnd = new Date(booking.endDate).getTime();
-
-        return selectedDate >= bookingStart && selectedDate <= bookingEnd;
+        const bookingDate = new Date(booking.startDate).getTime();
+        return bookingDate === selectedDate;
       });
 
     } else if (!dateRange.startDate && dateRange.endDate) {
       const selectedDate = new Date(format(dateRange.endDate, "yyyy-MM-dd")).getTime();
 
       res = res.filter(booking => {
-        const bookingStart = new Date(booking.startDate).getTime();
-        const bookingEnd = new Date(booking.endDate).getTime();
-
-        return selectedDate >= bookingStart && selectedDate <= bookingEnd;
+        const bookingDate = new Date(booking.startDate).getTime();
+        return bookingDate === selectedDate;
       });
 
     }
-    // if (!searchQuery.trim()) return bookingEntries;
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       res = res.filter(booking =>
         booking.memberName.toLowerCase().includes(query) ||
         booking.memberRole.toLowerCase().includes(query) ||
+        booking.eventName.toLowerCase().includes(query) ||
         booking.projectName.toLowerCase().includes(query) ||
-        booking.responsibility.toLowerCase().includes(query)
+        booking.responsibility.toLowerCase().includes(query) ||
+        booking.location.toLowerCase().includes(query)
       );
     }
 
-    return res
-
+    return res;
   }, [bookingEntries, searchQuery, dateRange]);
 
   const handleProjectClick = (projectId: string) => {
@@ -280,7 +306,6 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
   }
 
   const handleMemberClick = (memberId: string) => {
-    // Find the member in the team array
     const member = team.find(m => m.id === memberId);
     if (member) {
       setSelectedMember(member);
@@ -290,13 +315,43 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
     }
   }
 
+  const handleEventClick = (eventId: string, memberId: string, projectId: string) => {
+    const member = teamMembers.find(m => m.id === memberId);
+    if (member) {
+      const event = member.events?.find(e => e.eventId === eventId);
+      if (event) {
+        const eventData = {
+          id: event.eventId,
+          name: event.name || event.project.name,
+          date: event.date,
+          startHour: event.startHour,
+          endHour: event.endHour,
+          location: event.location,
+          project: event.project,
+          assignment: event.assignment,
+          member: {
+            id: memberId,
+            name: member.name,
+            role: member.role,
+            profilePhoto: member.profilePhoto
+          }
+        };
+
+        setSelectedEvent(eventData);
+        setIsEventClick(true);
+        setSelectedProject(projectId);
+        onClose();
+      }
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5" />
-            Team Availability & Bookings
+            Team Availability & Events
           </DialogTitle>
         </DialogHeader>
 
@@ -308,7 +363,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                 <div className="w-3/5">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
-                    placeholder="Search team members, roles & projects"
+                    placeholder="Search team members, roles, events & projects"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10 pr-10"
@@ -321,7 +376,6 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                   }}
                     handleDateRange={(val) => setDateRange(val)}
                   />
-
                 </div>
               </div>
               {searchQuery && (
@@ -357,32 +411,41 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
             <>
               {/* Results Summary */}
               <div className="flex-shrink-0 mb-4 text-sm text-muted-foreground">
-                Showing {filteredBookings.length} of {bookingEntries.length} bookings
+                Showing {filteredBookings.length} of {bookingEntries.length} events
               </div>
 
               {/* Table */}
               <div className="flex-1 overflow-auto">
-                <div className="min-w-[800px]">
+                <div className="min-w-[900px]">
                   <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                         <TableHead className="min-w-[150px]">Team Member</TableHead>
-                        <TableHead className="min-w-[150px]">Role</TableHead>
+                        <TableHead className="min-w-[150px]">Event Role</TableHead>
+                        <TableHead className="min-w-[150px]">Event</TableHead>
                         <TableHead className="min-w-[150px]">Project</TableHead>
-                        <TableHead className="min-w-[200px]">Dates</TableHead>
+                        <TableHead className="min-w-[120px]">Date</TableHead>
                         <TableHead className="min-w-[120px]">Time Slot</TableHead>
+                        <TableHead className="min-w-[150px]">Location</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredBookings.length > 0 ? (
                         filteredBookings.map((booking, index) => (
-                          <TableRow key={index}>
+                          <TableRow
+                            key={`${booking.eventId}-${index}`}
+                            className="group cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => handleEventClick(booking.eventId, booking.memberId, booking.projectId)}
+                          >
                             <TableCell>
                               <div
-                                className="flex items-center gap-3 cursor-pointer"
-                                onClick={() => handleMemberClick(booking.memberId)}
+                                className="flex items-center gap-3"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMemberClick(booking.memberId);
+                                }}
                               >
-                                <Avatar className="w-10 h-10"
+                                <Avatar className="w-10 h-10 transition-transform"
                                   style={{
                                     borderColor: booking.memberColor || 'hsl(var(--muted))',
                                     boxShadow: `0 0 0 2px ${booking.memberColor || 'hsl(var(--muted))'}`
@@ -392,25 +455,50 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                                     alt={booking.memberName}
                                     className="object-cover"
                                   />
-                                  <AvatarFallback>
-                                    <User className="w-4 h-4" />
+                                  <AvatarFallback className="bg-studio-gold text-studio-dark">
+                                    {getFallback(booking.memberName)}
                                   </AvatarFallback>
                                 </Avatar>
-                                <span className="font-medium truncate">{booking.memberName}</span>
+                                <span className="font-medium truncate transition-colors">
+                                  {booking.memberName}
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <span className="text-sm text-muted-foreground truncate">{booking.responsibility}</span>
+                              <span className="text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                                {booking.responsibility}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <Badge
                                 variant="outline"
-                                className="border cursor-pointer truncate"
+                                className="border truncate hover:opacity-80 transition-opacity"
                                 style={{
-                                  backgroundColor: `${booking.projectColor}`,
-                                  border: `${booking.projectColor}`
+                                  backgroundColor: `${booking.projectColor}20`,
+                                  borderColor: booking.projectColor,
+                                  color: 'inherit'
                                 }}
-                                onClick={() => handleProjectClick(booking.projectId)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProjectClick(booking.projectId);
+                                }}
+                              >
+                                {booking.eventName}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className="border truncate hover:opacity-80 transition-opacity"
+                                style={{
+                                  backgroundColor: `${booking.projectColor}20`,
+                                  borderColor: booking.projectColor,
+                                  color: 'inherit'
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleProjectClick(booking.projectId);
+                                }}
                               >
                                 {booking.projectName}
                               </Badge>
@@ -427,19 +515,29 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                                 {booking.timeSlot}
                               </div>
                             </TableCell>
+                            <TableCell>
+                              <span className="text-sm truncate" title={booking.location}>
+                                {booking.location}
+                              </span>
+                            </TableCell>
                           </TableRow>
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8">
+                          <TableCell colSpan={7} className="text-center py-8">
                             <div className="flex flex-col items-center gap-2">
                               <Search className="w-8 h-8 text-muted-foreground" />
                               <p className="text-muted-foreground">
-                                {searchQuery ? "No bookings found matching your search." : "No bookings found."}
+                                {searchQuery || dateRange.startDate || dateRange.endDate
+                                  ? "No events found matching your search."
+                                  : "No events found."}
                               </p>
-                              {searchQuery && (
-                                <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
-                                  Clear search
+                              {(searchQuery || dateRange.startDate || dateRange.endDate) && (
+                                <Button variant="outline" size="sm" onClick={() => {
+                                  setSearchQuery("");
+                                  setDateRange({ startDate: null, endDate: null });
+                                }}>
+                                  Clear filters
                                 </Button>
                               )}
                             </div>

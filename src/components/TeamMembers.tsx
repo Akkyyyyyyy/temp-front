@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { differenceInDays, format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, startOfMonth, endOfMonth } from "date-fns";
 import { Skeleton } from "./ui/skeleton";
-import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog, Star } from "lucide-react";
+import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog, Star, Folder } from "lucide-react";
 import { Input } from "./ui/input";
 import { TimeView } from "./GanttChart";
 import { monthNames } from "@/constant/constant";
@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { RingColorDialog } from "./modals/RingColorDialog";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { TimeViewToggle } from "./TimeViewToggle";
-import { DayCalendar } from "./DayCalendar";
 import { useAuth } from "@/context/AuthContext";
+import { getFallback, getTextColorBasedOnBackground } from "@/helper/helper";
+import { DayCalendar } from "./DayCalendar";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
@@ -29,13 +30,44 @@ export interface TeamMember {
   location?: string;
   bio?: string;
   skills?: string[];
-  projects?: Project[];
+  events?: TeamMemberEvent[]; // Changed from projects to events
   ringColor?: string;
   active: boolean;
   roleId: string;
   countryCode?: string;
   isInvited: boolean;
   isOwner: boolean;
+  invitation: string;
+}
+
+export interface TeamMemberEvent {
+  isOther: any;
+  eventId: string;
+  name:string;
+  date: string;
+  startHour: number;
+  endHour: number;
+  location: string;
+  reminders: {
+    weekBefore: boolean;
+    dayBefore: boolean;
+  };
+  project: {
+    id: string;
+    name: string;
+    color: string;
+    description: string;
+    client: any;
+    brief: any[];
+    logistics: any[];
+  };
+  assignment: {
+    id: string;
+    role: string;
+    roleId: string;
+    instructions: string;
+    googleEventId: string;
+  };
 }
 
 interface TeamMembersProps {
@@ -58,6 +90,7 @@ interface TeamMembersProps {
   setTimeView: (view: any) => void;
   setIsDayClick: (dayClick: boolean) => void;
   setSelectedProject: (projectId: string | null) => void;
+  setSelectedEvent: (eventId: string | null) => void;
   setSearchQuery: (query: string) => void;
   searchQuery: string,
   setIsProjectClick: (projectClick: boolean) => void;
@@ -85,6 +118,7 @@ export function TeamMembers({
   setTimeView,
   setIsDayClick,
   setSelectedProject,
+  setSelectedEvent,
   setSearchQuery,
   searchQuery,
   setIsProjectClick,
@@ -103,15 +137,28 @@ export function TeamMembers({
     selectedWeek,
     timeView,
   });
+  const { user } = useAuth();
+
+  // Filter team members based on user admin status
+  const getFilteredTeamMembers = () => {
+    // If user is admin, show all team members
+    if (user?.data?.isAdmin) {
+      return teamMembers;
+    }
+
+    // If user is not admin, only show themselves
+    return teamMembers.filter(member => member.id === user?.data?.id);
+  };
+
+  const filteredTeamMembers = getFilteredTeamMembers();
 
   // Sort team members: active first, then inactive
-  const sortedTeamMembers = [...teamMembers].sort((a, b) => {
+  const sortedTeamMembers = [...filteredTeamMembers].sort((a, b) => {
     if (a.active && !b.active) return -1; // a (active) comes before b (inactive)
     if (!a.active && b.active) return 1;  // b (active) comes before a (inactive)
-    return 0; // keep original order for same status
+    return 0;
   });
 
-  // Initialize ring colors from teamMembers data
   useEffect(() => {
     const initialColors: Record<string, string> = {};
     teamMembers.forEach(member => {
@@ -125,7 +172,6 @@ export function TeamMembers({
   const [colorDialogOpen, setColorDialogOpen] = useState(false);
   const [selectedMemberForColor, setSelectedMemberForColor] = useState<TeamMember | null>(null);
   const [isUpdatingColor, setIsUpdatingColor] = useState(false);
-  const { user } = useAuth();
 
   // Handle opening the color dialog
   const handleOpenColorDialog = (member: TeamMember, e: React.MouseEvent) => {
@@ -164,8 +210,9 @@ export function TeamMembers({
     return isoWeekStart;
   }
 
-  const getProjectPosition = (project: Project, totalPeriods: number) => {
-    if (!project.startDate || !project.endDate) {
+  // Get event position in the timeline
+  const getEventPosition = (event: TeamMemberEvent, totalPeriods: number) => {
+    if (!event.date) {
       return { startPercent: 0, widthPercent: 0 };
     }
 
@@ -175,35 +222,22 @@ export function TeamMembers({
       return { startPercent: 0, widthPercent: 0 };
     }
 
-    const visibleStart = periods[0];
-    const visibleEnd = periods[periods.length - 1];
+    const eventDate = new Date(event.date + 'T00:00:00');
 
-    const projectStart = new Date(project.startDate + 'T00:00:00');
-    const projectEnd = new Date(project.endDate + 'T00:00:00');
-
-    let firstVisibleDay = -1;
-    let lastVisibleDay = -1;
-
-    periods.forEach((day, index) => {
-      const currentDay = new Date(day);
-      currentDay.setHours(0, 0, 0, 0);
-
-      const isInProjectRange = currentDay >= projectStart && currentDay <= projectEnd;
-
-      if (isInProjectRange && firstVisibleDay === -1) {
-        firstVisibleDay = index;
-      }
-      if (isInProjectRange) {
-        lastVisibleDay = index;
-      }
+    // Find the index of the event date in the periods
+    const eventIndex = periods.findIndex(period => {
+      const periodDate = new Date(period);
+      periodDate.setHours(0, 0, 0, 0);
+      return periodDate.getTime() === eventDate.getTime();
     });
 
-    if (firstVisibleDay === -1 || lastVisibleDay === -1) {
+    if (eventIndex === -1) {
       return { startPercent: 0, widthPercent: 0 };
     }
 
-    const startPercent = (firstVisibleDay / totalPeriods) * 100;
-    const widthPercent = ((lastVisibleDay - firstVisibleDay + 1) / totalPeriods) * 100;
+    // Events are single day, so they take one column width
+    const startPercent = (eventIndex / totalPeriods) * 100;
+    const widthPercent = (1 / totalPeriods) * 100;
 
     return {
       startPercent: Math.max(0, Math.min(100, startPercent)),
@@ -231,53 +265,61 @@ export function TeamMembers({
 
   const periods = getPeriods();
 
-  // Detect overlapping projects and calculate required rows
-  const getProjectRows = (projects: Project[]): Project[][] => {
-    if (!projects.length) return [];
+  const getEventRows = (events: TeamMemberEvent[]): TeamMemberEvent[][] => {
+    if (!events || events.length === 0) return [];
 
-    const rows: Project[][] = [[]];
+    // Group events by date
+    const eventsByDate = new Map<string, TeamMemberEvent[]>();
 
-    // Sort projects by start date
-    const sortedProjects = [...projects].sort((a, b) =>
-      new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-    );
-
-    sortedProjects.forEach(project => {
-      let placed = false;
-
-      // Try to place project in existing rows
-      for (const row of rows) {
-        const lastProjectInRow = row[row.length - 1];
-
-        if (!lastProjectInRow ||
-          new Date(project.startDate) > new Date(lastProjectInRow.endDate)) {
-          row.push(project);
-          placed = true;
-          break;
-        }
+    events.forEach(event => {
+      if (!eventsByDate.has(event.date)) {
+        eventsByDate.set(event.date, []);
       }
-
-      // If couldn't place in existing rows, create new row
-      if (!placed) {
-        rows.push([project]);
-      }
+      eventsByDate.get(event.date)!.push(event);
     });
 
-    return rows;
+    // Get max number of events on any single day
+    let maxEventsPerDay = 0;
+    eventsByDate.forEach(dateEvents => {
+      maxEventsPerDay = Math.max(maxEventsPerDay, dateEvents.length);
+    });
+
+    // Create rows based on max events per day
+    const rows: TeamMemberEvent[][] = Array.from({ length: maxEventsPerDay }, () => []);
+
+    // Distribute events into rows
+    eventsByDate.forEach((dateEvents, date) => {
+      // Sort events for this date by start time
+      const sortedDateEvents = dateEvents.sort((a, b) => a.startHour - b.startHour);
+
+      sortedDateEvents.forEach((event, index) => {
+        // Place event in corresponding row (0-based index)
+        if (index < rows.length) {
+          rows[index].push(event);
+        }
+      });
+    });
+
+    return rows.filter(row => row.length > 0);
   };
 
   const handlePreviousPeriod = () => {
     if (timeView === "week") {
       let newWeek = selectedWeek - 1;
       let newYear = selectedYear;
+      let newMonth = selectedMonth;
 
       if (newWeek === 0) {
         newWeek = 52;
         newYear = selectedYear - 1;
       }
 
+      const firstDayOfWeek = getFirstDayOfWeek(newYear, newWeek);
+      newMonth = firstDayOfWeek.getMonth() + 1;
+
       setSelectedWeek(newWeek);
       setSelectedYear(newYear);
+      setSelectedMonth(newMonth);
       onWeekChange?.(newWeek, newYear);
     } else if (timeView === "day") {
       const currentDate = new Date(selectedYear, selectedMonth - 1, selectedDay);
@@ -307,20 +349,25 @@ export function TeamMembers({
       onMonthChange?.(newMonth, newYear);
     }
     setSelectedProject(null);
+    setSelectedEvent(null);
   };
 
   const handleNextPeriod = () => {
     if (timeView === "week") {
       let newWeek = selectedWeek + 1;
       let newYear = selectedYear;
+      let newMonth = selectedMonth;
 
       if (newWeek > 52) {
         newWeek = 1;
         newYear = selectedYear + 1;
       }
+      const firstDayOfWeek = getFirstDayOfWeek(newYear, newWeek);
+      newMonth = firstDayOfWeek.getMonth() + 1;
 
       setSelectedWeek(newWeek);
       setSelectedYear(newYear);
+      setSelectedMonth(newMonth);
       onWeekChange?.(newWeek, newYear);
     } else if (timeView === "day") {
       const currentDate = new Date(selectedYear, selectedMonth - 1, selectedDay);
@@ -350,6 +397,21 @@ export function TeamMembers({
       onMonthChange?.(newMonth, newYear);
     }
     setSelectedProject(null);
+    setSelectedEvent(null);
+  };
+
+  const getFirstDayOfWeek = (year, week) => {
+    // January 4th is always in week 1 (ISO week date standard)
+    const januaryFourth = new Date(year, 0, 4);
+    // Get the Monday of the week containing January 4th
+    const startOfFirstWeek = new Date(januaryFourth);
+    startOfFirstWeek.setDate(januaryFourth.getDate() - (januaryFourth.getDay() || 7) + 1);
+
+    // Calculate the first day of the target week
+    const firstDayOfWeek = new Date(startOfFirstWeek);
+    firstDayOfWeek.setDate(startOfFirstWeek.getDate() + (week - 1) * 7);
+
+    return firstDayOfWeek;
   };
 
   const getPeriodTitle = () => {
@@ -359,11 +421,11 @@ export function TeamMembers({
       const end = endOfWeek(weekStartDate, { weekStartsOn: 1 });
 
       if (start.getMonth() === end.getMonth()) {
-        return `${format(start, "d MMM")} - ${format(end, "d, yyyy")}`;
+        return `${format(start, "do")} - ${format(end, "do MMM yyyy")}`;
       } else if (start.getFullYear() === end.getFullYear()) {
-        return `${format(start, "d MMM")} - ${format(end, "d MMM, yyyy")}`;
+        return `${format(start, "do MMM")} - ${format(end, "do MMM yyyy")}`;
       } else {
-        return `${format(start, "d MMM, yyyy")} - ${format(end, "d MMM, yyyy")}`;
+        return `${format(start, "do MMM yyyy")} - ${format(end, "do MMM yyyy")}`;
       }
     } else if (timeView === "day") {
       // Validate day parameters before creating date
@@ -378,10 +440,10 @@ export function TeamMembers({
       if (isNaN(dayDate.getTime())) {
         // Fallback to current date if invalid
         const currentDate = new Date();
-        return format(currentDate, "EEEE, d MMMM yyyy");
+        return format(currentDate, "EEEE, do MMMM yyyy");
       }
 
-      return format(dayDate, "EEEE, d MMMM yyyy");
+      return format(dayDate, "EEEE, do MMMM yyyy");
     } else {
       // Month view
       return `${monthNames[selectedMonth - 1]} ${selectedYear}`;
@@ -393,22 +455,21 @@ export function TeamMembers({
     setIsDayClick(true);
     setSelectedDay(clickedDate);
     setSelectedProject(null);
-    // setTimeView('day');
-
+    setSelectedEvent(null);
   };
 
   const isDaySelected = (day: Date) => {
     return selectedDay === day.getDate();
   };
 
-  // Calculate timeline height based on number of project rows needed
+  // Calculate timeline height based on number of event rows needed
   const getTimelineHeight = (member: TeamMember) => {
-    if (!member.projects || member.projects.length === 0) {
-      return 'h-14'; // Default height for no projects
+    if (!member.events || member.events.length === 0) {
+      return 'h-14'; // Default height for no events
     }
 
-    const projectRows = getProjectRows(member.projects);
-    const rowCount = projectRows.length;
+    const eventRows = getEventRows(member.events);
+    const rowCount = eventRows.length;
 
     // Base height + additional height for extra rows
     if (rowCount === 1) return 'h-14'; // Single row
@@ -423,7 +484,7 @@ export function TeamMembers({
         <div className="relative w-full lg:w-96">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Search team members, roles & projects"
+            placeholder="Search team members, roles & events"
             className="pl-10 w-full rounded-full h-12"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
@@ -470,7 +531,6 @@ export function TeamMembers({
           setSelectedMonth={setSelectedMonth}
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
-          className="mb-4"
         />
       </div>
     </div>
@@ -484,7 +544,7 @@ export function TeamMembers({
 
       {loading ? (
         <div className="space-y-3 mt-2">
-          {Array.from({ length: 2 }).map((_, index) => (
+          {Array.from({ length: 1 }).map((_, index) => (
             <div
               key={index}
               className="flex items-center gap-2 p-2 rounded-md h-14"
@@ -498,12 +558,11 @@ export function TeamMembers({
           ))}
         </div>
       ) : sortedTeamMembers.length ? sortedTeamMembers.map((member, index) => {
-        const projectRows = getProjectRows(member.projects || []);
+        const eventRows = getEventRows(member.events || []);
         const timelineHeight = getTimelineHeight(member);
         const isInactive = !member.active;
-        const isLoggedInUser = member.id === user.data.id;  // First member is the logged-in user
-
-        const isAdmin = member.isAdmin === true; // Check if member is admin
+        const isLoggedInUser = member.id === user.data.id;
+        const isAdmin = member.isAdmin === true;
 
         return (
           <div
@@ -513,7 +572,7 @@ export function TeamMembers({
             <div className={`flex gap-2 cursor-pointer p-2 rounded-sm transition-colors max-h-16 ${isInactive
               ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
               : isLoggedInUser
-                ? ''
+                ? 'border'
                 : 'hover:bg-muted/50 hover:text-studio-gold'
               }`}>
               <div className="relative">
@@ -546,11 +605,11 @@ export function TeamMembers({
                           ? 'bg-muted-foreground/20 text-muted-foreground'
                           : 'bg-studio-gold text-studio-dark'
                           }`}>
-                          {member.name.slice(0, 2).toUpperCase()}
+                          {getFallback(member.name)}
                         </AvatarFallback>
                       </Avatar>
                       {member.isOwner && (
-                        <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                        <div className="absolute -bottom-1 -right-1 bg-studio-gold text-primary-foreground rounded-full p-0.5">
                           <Laptop className="w-3 h-3" />
                         </div>
                       )}
@@ -564,7 +623,7 @@ export function TeamMembers({
 
                       {/* Admin Badge */}
                       {isAdmin && !isInactive && !member.isOwner && (
-                        <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                        <div className="absolute -bottom-1 -right-1 bg-studio-gold text-primary-foreground rounded-full p-0.5">
                           <Laptop className="w-3 h-3" />
                         </div>
                       )}
@@ -594,11 +653,6 @@ export function TeamMembers({
                       Inactive
                     </span>
                   )}
-                  {isLoggedInUser && !isInactive && (
-                    <span className="ml-2 text-xs text-primary-foreground bg-primary px-1.5 py-0.5 rounded-md">
-                      You
-                    </span>
-                  )}
                 </h3>
                 <p className={`text-xs truncate ${isInactive ? 'text-muted-foreground/70' : 'text-muted-foreground'
                   }`}>
@@ -622,7 +676,7 @@ export function TeamMembers({
             </div>
             <h3 className="text-sm font-semibold text-foreground mb-1">No Team Members</h3>
             <p className="text-muted-foreground text-xs max-w-xs">
-              Add your first team member to organize projects.
+              Add your first team member to organise events.
             </p>
           </div>
         ) : <></>)}
@@ -721,7 +775,7 @@ export function TeamMembers({
             <div className="space-y-3">
               {sortedTeamMembers.length === 0 ? (
                 <>
-                  {Array.from({ length: 2 }).map((_, index) => (
+                  {Array.from({ length: 1 }).map((_, index) => (
                     <div
                       key={index}
                       className="grid rounded overflow-hidden h-14"
@@ -742,7 +796,7 @@ export function TeamMembers({
                 </>
               ) : (
                 sortedTeamMembers.map(member => {
-                  const projectRows = getProjectRows(member.projects || []);
+                  const eventRows = getEventRows(member.events || []);
                   const timelineHeight = getTimelineHeight(member);
                   const isInactive = !member.active;
 
@@ -766,36 +820,95 @@ export function TeamMembers({
                           </div>
                         ))}
 
-                        {/* Projects overlay - render each row */}
+                        {/* Events overlay - render each row */}
                         <div className="absolute inset-0">
-                          {projectRows.length > 0 ? (
-                            projectRows.map((row, rowIndex) => (
+                          {eventRows.length > 0 ? (
+                            eventRows.map((row, rowIndex) => (
                               <div key={rowIndex} className="absolute inset-x-0" style={{
                                 top: `${rowIndex * 2.5}rem`,
                               }}>
-                                {row.map((project) => {
-                                  const { startPercent, widthPercent } = getProjectPosition(project, periods.length);
+                                {row.map((event) => {
+                                  const { startPercent, widthPercent } = getEventPosition(event, periods.length);
+                                  const isOtherEvent = event.isOther;
 
+                                  // For other company events
+                                  if (isOtherEvent) {
+                                    return (
+                                      <TooltipProvider key={event.eventId}>
+                                        <Tooltip delayDuration={0}>
+                                          <TooltipTrigger asChild>
+                                            <div
+                                              className={`absolute my-2 h-10 rounded-md flex items-center justify-center px-2 text-gray-400 font-medium text-[0.7rem] cursor-default
+                        border border-dashed border-gray-500/50 bg-gray-800/30 transition-all duration-500 ease-out opacity-0 translate-x-[-10px] animate-fadeInSlideIn
+                      `}
+                                              style={{
+                                                left: `${startPercent}%`,
+                                                width: `${widthPercent}%`,
+                                              }}
+                                            >
+                                              <span className="opacity-90">Private</span>
+                                            </div>
+                                          </TooltipTrigger>
+                                          <TooltipContent
+                                            className="bg-[#101319] text-white text-sm rounded-md shadow-lg px-4 py-3 max-w-xs border border-white/20"
+                                            side="top"
+                                            sideOffset={8}
+                                          >
+                                            <div className="space-y-2">
+
+                                              {/* Date - Clear */}
+                                              <div className="flex items-center gap-3 text-xs text-gray-300">
+                                                <Calendar className="w-4 h-4" />
+                                                <span>
+                                                  {format(new Date(event.date), "do MMM, yyyy")}
+                                                </span>
+                                              </div>
+
+                                              {/* Event Time - Clear */}
+                                              <div className="flex items-center gap-3 text-xs text-gray-300">
+                                                <Clock className="w-4 h-4" />
+                                                <span>
+                                                  Time: {event.startHour}:00 – {event.endHour}:00
+                                                </span>
+                                              </div>
+
+
+
+                                              <div className="pt-2 border-t border-white/10">
+                                                <p className="text-xs text-gray-400 flex items-center">
+                                                  <Info className="w-3 h-3 mr-1" />
+                                                  Details are hidden for privacy reasons.
+                                                </p>
+                                              </div>
+                                            </div>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    );
+                                  }
+
+                                  // For regular events (same company)
                                   return (
-                                    <TooltipProvider key={project.id}>
+                                    <TooltipProvider key={event.eventId}>
                                       <Tooltip delayDuration={0}>
                                         <TooltipTrigger asChild>
                                           <div
                                             className={`absolute my-2 h-10 rounded-md flex items-center px-2 text-white font-medium text-xs shadow hover:shadow-lg cursor-pointer
-                                              transition-all duration-500 ease-out opacity-0 translate-x-[-10px] animate-fadeInSlideIn
-                                            `}
+                      transition-all duration-500 ease-out opacity-0 translate-x-[-10px] animate-fadeInSlideIn
+                    `}
                                             style={{
                                               left: `${startPercent}%`,
                                               width: `${widthPercent}%`,
                                               animationFillMode: 'forwards',
                                               animationDuration: '0.5s',
                                               backgroundColor: isInactive
-                                                ? `${project.color}80` // Add transparency for inactive members
-                                                : project.color
+                                                ? `${event.project.color}80`
+                                                : event.project.color,
+                                              color: getTextColorBasedOnBackground(event.project.color)
                                             }}
-                                            onClick={() => { setSelectedProject(project.id); setIsProjectClick(true); }}
+                                            onClick={() => { setSelectedProject(event.project.id); setSelectedEvent(event.eventId); setIsProjectClick(true); }}
                                           >
-                                            <span className="truncate">{project.name}</span>
+                                            <span className="truncate">{event.project.name}</span>
                                           </div>
                                         </TooltipTrigger>
                                         <TooltipContent
@@ -804,60 +917,54 @@ export function TeamMembers({
                                           sideOffset={8}
                                         >
                                           <div className="space-y-2">
-                                            <div className="flex items-center gap-2 font-semibold text-lg">
-                                              <Info className="w-5 h-5"
-                                                style={{
-                                                  color: isInactive
-                                                    ? `${project.color}80` // Add transparency for inactive members
-                                                    : project.color
-                                                }}/>
-                                              <span>{project.name}</span>
+                                            {/* Combined title */}
+                                            <div className="font-semibold text-base">
+                                              {event.project.name}
+                                              {event.name && (
+                                                <span className="font-normal text-gray-300 ml-1">• {event.name}</span>
+                                              )}
                                             </div>
 
-                                            {/* Project Description */}
-                                            {/* {project.description && (
-                                              <div className="text-xs text-gray-300">
-                                                {project.description}
-                                              </div>
-                                            )} */}
+                                            {/* Rest of the content remains the same */}
+                                            <div className="flex items-center gap-3 text-xs text-gray-300">
+                                              <Calendar className="w-4 h-4 flex-shrink-0" />
+                                              <span>{format(new Date(event.date), "do MMM, yyyy")}</span>
+                                            </div>
 
                                             <div className="flex items-center gap-3 text-xs text-gray-300">
-                                              <Calendar className="w-4 h-4" />
-                                              <span>
-                                                {format(new Date(project.startDate), "dd MMM, yyyy")} – {format(new Date(project.endDate), "dd MMM, yyyy")}
-                                              </span>
+                                              <Clock className="w-4 h-4 flex-shrink-0" />
+                                              <span>{event.startHour}:00 – {event.endHour}:00</span>
                                             </div>
 
-                                            {/* <div className="flex items-center gap-3 text-xs text-gray-300">
-                                              <Clock className="w-4 h-4" />
-                                              <span>
-                                                Duration: {differenceInDays(new Date(project.endDate), new Date(project.startDate)) + 1} days
-                                              </span>
-                                            </div> */}
-
-                                            {/* Working Hours */}
-                                            {(project.startHour !== undefined || project.endHour !== undefined) && (
+                                            {/* Role Information */}
+                                            {event.assignment.role && (
                                               <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <Clock className="w-4 h-4" />
-                                                <span>
-                                                  Hours: {project.startHour !== undefined ? `${project.startHour}:00` : 'N/A'} – {project.endHour !== undefined ? `${project.endHour}:00` : 'N/A'}
-                                                </span>
+                                                <User className="w-4 h-4" />
+                                                <span>Role: {event.assignment.role}</span>
                                               </div>
                                             )}
 
-                                            {/* Client Information */}
-                                            {project.client && (
+                                            {/* Instructions */}
+                                            {event.assignment.instructions && (
                                               <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <User className="w-4 h-4" />
-                                                <span>Client: {project.client.name || project.client}</span>
+                                                <Info className="w-4 h-4" />
+                                                <span>Instructions: {event.assignment.instructions}</span>
                                               </div>
                                             )}
 
                                             {/* Location */}
-                                            {project.location && (
+                                            {event.location && (
                                               <div className="flex items-center gap-3 text-xs text-gray-300">
                                                 <MapPin className="w-4 h-4" />
-                                                <span>Location: {project.location}</span>
+                                                <span> {event.location}</span>
+                                              </div>
+                                            )}
+
+                                            {/* Client Information */}
+                                            {event.project.client && (
+                                              <div className="flex items-center gap-3 text-xs text-gray-300">
+                                                <User className="w-4 h-4" />
+                                                <span>Client: {event.project.client.name || event.project.client}</span>
                                               </div>
                                             )}
                                           </div>

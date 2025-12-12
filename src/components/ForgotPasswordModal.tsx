@@ -13,6 +13,7 @@ import {
     DialogContent,
     DialogDescription,
     DialogHeader,
+    DialogOverlay,
     DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -23,7 +24,7 @@ const emailSchema = yup.object({
 });
 
 const otpSchema = yup.object({
-    otp: yup.string().length(6, "OTP must be 6 digits").required("OTP is required"),
+    otp: yup.string().required("OTP is required").length(6, "OTP must be 6 digits"),
 });
 
 const newPasswordSchema = yup.object({
@@ -59,6 +60,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [hasAutoSent, setHasAutoSent] = useState(false);
+    const [apiError, setApiError] = useState("");
 
     const emailForm = useForm<EmailData>({
         resolver: yupResolver(emailSchema),
@@ -101,6 +103,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
     useEffect(() => {
         if (!isOpen) {
             setHasAutoSent(false);
+            setApiError("");
         }
     }, [isOpen]);
 
@@ -111,6 +114,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
     const handleSendOTP = async (data: EmailData) => {
         try {
             setLoading(true);
+            setApiError("");
             const response = await requestPasswordReset({ email: data.email });
 
             if (response.success) {
@@ -121,7 +125,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
                 }
                 setStep('otp');
                 startResendTimer(); // Start the timer when OTP is sent
-                toast.success("OTP sent to your email!");
+                // toast.success("OTP sent to your email!");
             } else {
                 toast.error(response.message || "Failed to send OTP");
             }
@@ -137,6 +141,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
 
         try {
             setIsResending(true);
+            setApiError("");
             const response = await requestPasswordReset({ email: resetEmail });
 
             if (response.success) {
@@ -144,12 +149,12 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
                     setInitialToken(response.data.token);
                 }
                 startResendTimer(); // Restart the timer
-                toast.success("OTP resent to your email!");
+                // toast.success("OTP resent to your email!");
             } else {
-                toast.error(response.message || "Failed to resend OTP");
+                setApiError(response.message || "Failed to resend OTP");
             }
         } catch (error: any) {
-            toast.error(error.message || "Something went wrong");
+            setApiError(error.message || "Something went wrong");
         } finally {
             setIsResending(false);
         }
@@ -158,6 +163,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
     const handleVerifyOTP = async (data: OTPData) => {
         try {
             setLoading(true);
+            setApiError("");
 
             const tokenToUse = initialToken;
 
@@ -178,7 +184,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
                 setResendTimer(0); // Clear the timer when OTP is verified
                 toast.success("OTP verified successfully!");
             } else {
-                toast.error(response.message || "Invalid OTP");
+                setApiError(response.message || "Invalid OTP");
             }
         } catch (error: any) {
             toast.error(error.message || "Something went wrong");
@@ -190,6 +196,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
     const handleResetPassword = async (data: NewPasswordData) => {
         try {
             setLoading(true);
+            setApiError("");
             const response = await resetPassword({
                 token: resetToken,
                 newPassword: data.newPassword
@@ -213,6 +220,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
         setResetEmail("");
         setResetToken("");
         setInitialToken("");
+        setApiError("");
         setResendTimer(0); // Clear timer on close
         setHasAutoSent(false);
         emailForm.reset();
@@ -249,6 +257,7 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogOverlay className="fixed inset-0 bg-black/80" />
             <DialogContent className="sm:max-w-md">
                 <DialogHeader className="relative">
                     <DialogTitle className="text-xl">{getStepTitle()}</DialogTitle>
@@ -320,7 +329,22 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
                     {step === 'otp' && (
                         <form onSubmit={otpForm.handleSubmit(handleVerifyOTP)} className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="otp">Verification Code</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="otp">Verification Code</Label>
+                                    <div className="relative flex-1 text-right min-h-[24px]">
+                                        {otpForm.formState.errors.otp && (
+                                            <p className="text-sm text-destructive absolute right-0 top-0">
+                                                {otpForm.formState.errors.otp.message}
+                                            </p>
+                                        )}
+                                        {apiError && (
+                                            <p className="text-sm text-destructive absolute right-0 top-0">
+                                                {apiError}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
                                 <Input
                                     id="otp"
                                     type="text"
@@ -329,18 +353,18 @@ export const ForgotPasswordModal = ({ isOpen, onClose, email }: ForgotPasswordMo
                                     placeholder="Enter 6-digit code"
                                     maxLength={6}
                                     className="text-center text-lg font-mono tracking-widest"
-                                    {...otpForm.register("otp")}
+                                    {...otpForm.register("otp", {
+                                        onChange: () => {
+                                            if (apiError) {
+                                                setApiError("");
+                                            }
+                                        }
+                                    })}
                                     onInput={(e: React.FormEvent<HTMLInputElement>) => {
                                         const input = e.currentTarget;
                                         input.value = input.value.replace(/\D/g, ""); // keep only digits
                                     }}
                                 />
-
-                                {otpForm.formState.errors.otp && (
-                                    <p className="text-sm text-destructive">
-                                        {otpForm.formState.errors.otp.message}
-                                    </p>
-                                )}
                                 <p className="text-xs text-muted-foreground text-center">
                                     Code sent to: {resetEmail}
                                 </p>

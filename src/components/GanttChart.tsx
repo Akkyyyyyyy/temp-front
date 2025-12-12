@@ -11,7 +11,7 @@ import { TeamMember, TeamMembers } from "@/components/TeamMembers";
 import { ScheduleHourly } from "@/components/ScheduleHourly";
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { addMember, getMembersByCompanyId, Member, Project } from "@/api/member";
+import { addMember, getMembersByCompanyId, Member } from "@/api/member";
 
 import { toast } from "sonner";
 import { getISOWeek, isWithinInterval, parseISO } from "date-fns";
@@ -23,254 +23,12 @@ import { ScheduleHourlyRef } from "./ScheduleHourly";
 import { HeaderWithClock } from "./HeaderWithClock";
 import { preloadCountries } from "@/helper/countryHelpers";
 
-
-const teamMembers: TeamMember[] = [
-  // {
-  //   id: "iq",
-  //   name: "Iq",
-  //   photo: iqPhoto,
-  //   role: "Lead Photographer",
-  //   projects: [{
-  //     id: "wedding-shoot",
-  //     name: "Wedding Portfolio Shoot",
-  //     startDate: 3,
-  //     endDate: 7,
-  //     color: "bg-blue-500",
-  //     assignedTo: "iq",
-  //     startHour: 9,
-  //     endHour: 13
-  //   }, {
-  //     id: "brand-session",
-  //     name: "Brand Photography",
-  //     startDate: 15,
-  //     endDate: 18,
-  //     color: "bg-purple-500",
-  //     assignedTo: "iq",
-  //     startHour: 14,
-  //     endHour: 18
-  //   }, {
-  //     id: "luxury-event",
-  //     name: "Luxury Event Coverage",
-  //     startDate: 25,
-  //     endDate: 30,
-  //     color: "bg-orange-500",
-  //     assignedTo: "iq",
-  //     startHour: 19,
-  //     endHour: 23
-  //   }]
-  // }, {
-  //   id: "usman",
-  //   name: "Usman",
-  //   photo: usmanPhoto,
-  //   role: "Senior Photographer",
-  //   projects: [{
-  //     id: "product-catalog",
-  //     name: "Product Catalog",
-  //     startDate: 1,
-  //     endDate: 5,
-  //     color: "bg-green-500",
-  //     assignedTo: "usman",
-  //     startHour: 8,
-  //     endHour: 12
-  //   }, {
-  //     id: "corporate-headshots",
-  //     name: "Corporate Headshots",
-  //     startDate: 12,
-  //     endDate: 16,
-  //     color: "bg-red-500",
-  //     assignedTo: "usman",
-  //     startHour: 10,
-  //     endHour: 16
-  //   }, {
-  //     id: "fashion-editorial",
-  //     name: "Fashion Editorial",
-  //     startDate: 22,
-  //     endDate: 27,
-  //     color: "bg-indigo-500",
-  //     assignedTo: "usman",
-  //     startHour: 13,
-  //     endHour: 19
-  //   }]
-  // }, {
-  //   id: "jivan",
-  //   name: "Jivan",
-  //   photo: jivanPhoto,
-  //   role: "Creative Director",
-  //   projects: [{
-  //     id: "creative-direction",
-  //     name: "Creative Direction",
-  //     startDate: 8,
-  //     endDate: 12,
-  //     color: "bg-yellow-500",
-  //     assignedTo: "jivan"
-  //   }, {
-  //     id: "client-consultation",
-  //     name: "Client Consultations",
-  //     startDate: 19,
-  //     endDate: 23,
-  //     color: "bg-pink-500",
-  //     assignedTo: "jivan"
-  //   }]
-  // }, {
-  //   id: "amit",
-  //   name: "Amit",
-  //   photo: amitPhoto,
-  //   role: "Portrait Specialist",
-  //   projects: [{
-  //     id: "family-portraits",
-  //     name: "Family Portraits",
-  //     startDate: 5,
-  //     endDate: 9,
-  //     color: "bg-teal-500",
-  //     assignedTo: "amit"
-  //   }, {
-  //     id: "senior-portraits",
-  //     name: "Senior Portraits",
-  //     startDate: 16,
-  //     endDate: 20,
-  //     color: "bg-cyan-500",
-  //     assignedTo: "amit"
-  //   }, {
-  //     id: "maternity-shoot",
-  //     name: "Maternity Session",
-  //     startDate: 28,
-  //     endDate: 31,
-  //     color: "bg-lime-500",
-  //     assignedTo: "amit"
-  //   }]
-  // }, {
-  //   id: "josh",
-  //   name: "Josh",
-  //   photo: joshPhoto,
-  //   role: "Event Photographer",
-  //   projects: [{
-  //     id: "corporate-event",
-  //     name: "Corporate Event",
-  //     startDate: 2,
-  //     endDate: 4,
-  //     color: "bg-rose-500",
-  //     assignedTo: "josh",
-  //     startHour: 8,
-  //     endHour: 17
-  //   }, {
-  //     id: "birthday-party",
-  //     name: "Birthday Celebration",
-  //     startDate: 14,
-  //     endDate: 15,
-  //     color: "bg-violet-500",
-  //     assignedTo: "josh",
-  //     startHour: 15,
-  //     endHour: 20
-  //   }, {
-  //     id: "conference-coverage",
-  //     name: "Conference Coverage",
-  //     startDate: 24,
-  //     endDate: 26,
-  //     color: "bg-emerald-500",
-  //     assignedTo: "josh",
-  //     startHour: 9,
-  //     endHour: 18
-  //   }]
-  // }, {
-  //   id: "nikhil",
-  //   name: "Nikhil",
-  //   photo: nikhilPhoto,
-  //   role: "Wedding Photographer",
-  //   projects: [{
-  //     id: "engagement-shoot",
-  //     name: "Engagement Session",
-  //     startDate: 6,
-  //     endDate: 8,
-  //     color: "bg-amber-500",
-  //     assignedTo: "nikhil"
-  //   }, {
-  //     id: "wedding-ceremony",
-  //     name: "Wedding Ceremony",
-  //     startDate: 17,
-  //     endDate: 19,
-  //     color: "bg-fuchsia-500",
-  //     assignedTo: "nikhil"
-  //   }, {
-  //     id: "reception-party",
-  //     name: "Reception Coverage",
-  //     startDate: 29,
-  //     endDate: 31,
-  //     color: "bg-sky-500",
-  //     assignedTo: "nikhil"
-  //   }]
-  // }, {
-  //   id: "alan",
-  //   name: "Alan",
-  //   photo: alanPhoto,
-  //   role: "Product Photographer",
-  //   projects: [{
-  //     id: "ecommerce-shoot",
-  //     name: "E-commerce Products",
-  //     startDate: 1,
-  //     endDate: 6,
-  //     color: "bg-orange-600",
-  //     assignedTo: "alan",
-  //     startHour: 10,
-  //     endHour: 14
-  //   }, {
-  //     id: "jewelry-catalog",
-  //     name: "Jewelry Catalog",
-  //     startDate: 13,
-  //     endDate: 17,
-  //     color: "bg-purple-600",
-  //     assignedTo: "alan",
-  //     startHour: 9,
-  //     endHour: 15
-  //   }, {
-  //     id: "tech-products",
-  //     name: "Tech Product Shots",
-  //     startDate: 21,
-  //     endDate: 25,
-  //     color: "bg-blue-600",
-  //     assignedTo: "alan",
-  //     startHour: 11,
-  //     endHour: 17
-  //   }]
-  // }, {
-  //   id: "martyn",
-  //   name: "Martyn",
-  //   photo: martynPhoto,
-  //   role: "Studio Manager",
-  //   projects: [{
-  //     id: "studio-management",
-  //     name: "Studio Operations",
-  //     startDate: 1,
-  //     endDate: 31,
-  //     color: "bg-gray-500",
-  //     assignedTo: "martyn",
-  //     startHour: 7,
-  //     endHour: 19
-  //   }, {
-  //     id: "equipment-maintenance",
-  //     name: "Equipment Check",
-  //     startDate: 10,
-  //     endDate: 12,
-  //     color: "bg-red-600",
-  //     assignedTo: "martyn",
-  //     startHour: 6,
-  //     endHour: 10
-  //   }]
-  // }
-];
 export type TimeView = 'Day' | 'week' | 'month';
 
-// Generate different time periods
-const augustDates = Array.from({
-  length: 31
-}, (_, i) => i + 1);
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const years = ['2022', '2023', '2024', '2025', '2026'];
 export function GanttChart() {
-
-
   const today = new Date();
-  const { roles } = useRole(); // Get roles to look up role name by ID
-  const [timeView, setTimeView] = useState<TimeView>('month');
+  const { roles } = useRole();
+  const [timeView, setTimeView] = useState<TimeView>('week');
   const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
   const [selectedMonth, setSelectedMonth] = useState<number | null>(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number | null>(today.getFullYear());
@@ -279,12 +37,11 @@ export function GanttChart() {
   const hasMounted = useRef(false);
   const [dialogCloseTrigger, setDialogCloseTrigger] = useState(0);
   const scheduleHourlyRef = useRef<ScheduleHourlyRef>(null);
+
   const handleOpenChange = (isOpen: boolean) => {
     setShowAddTeamMember(isOpen);
-
     if (!isOpen) {
-      // Dialog just closed
-      setDialogCloseTrigger(prev => prev + 1); // trigger for child
+      setDialogCloseTrigger(prev => prev + 1);
     }
   };
   const {
@@ -299,11 +56,10 @@ export function GanttChart() {
     timeView,
   });
 
-
-
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showAvailable, setShowAvailable] = useState<boolean>(false);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [activeProjectTab, setActiveProjectTab] = useState<string>("overview");
   const [briefSections, setBriefSections] = useState([
     {
@@ -390,25 +146,27 @@ export function GanttChart() {
   const [showPackages, setShowPackages] = useState(false);
   const [isDayClick, setIsDayClick] = useState(false);
   const [isProjectClick, setIsProjectClick] = useState(false);
+  const [isEventClick, setIsEventClick] = useState(false);
+
 
   // Project selection effect
   useEffect(() => {
     if (selectedProject && scheduleHourlyRef.current && isProjectClick) {
       scheduleHourlyRef.current.scrollToProjectDetails();
-      setIsProjectClick(false); // Reset after scrolling
+      setIsProjectClick(false);
     }
   }, [selectedProject, isProjectClick]);
-  // useEffect(() => {
-  //   // Preload countries when app starts
-  //   preloadCountries();
-  // }, []);
-
+   useEffect(() => {
+    if (selectedEvent && scheduleHourlyRef.current && setIsEventClick) {
+      scheduleHourlyRef.current.scrollToProjectDetails();
+      setIsEventClick(false);
+    }
+  }, [selectedEvent, setIsEventClick]);
 
   const { user } = useAuth();
-
-
   const baseUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
+
   useEffect(() => {
     const fetchMembers = async () => {
       try {
@@ -421,25 +179,109 @@ export function GanttChart() {
     fetchMembers();
   }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate, user]);
 
-
   const handleJumpToToday = () => {
     const today = new Date();
 
     if (timeView === 'week') {
-      // Reset to current week
       setSelectedDay(today.getDate());
       setSelectedWeek(getISOWeek(today));
       setSelectedYear(today.getFullYear());
     } else {
-      // Reset to current day/month/year for month view
       setSelectedDay(today.getDate());
       setSelectedMonth(today.getMonth() + 1);
       setSelectedYear(today.getFullYear());
     }
     setIsDayClick(true);
-
   };
+
+  // Get workers for a specific day based on events
+  const getWorkersForDay = (day: number, month: number, year: number) => {
+    const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+    return teamMembers
+      .filter(member =>
+        member.events && member.events.some(event =>
+          event.date === targetDateString
+        )
+      )
+      .map(member => {
+        const dayEvents = member.events.filter(event =>
+          event.date === targetDateString
+        );
+
+        const activeProjects = dayEvents.map(event => ({
+          id: event.project.id,
+          name: event.project.name,
+          color: event.project.color,
+          time: `${event.startHour}:00 - ${event.endHour}:00`,
+          eventId: event.eventId,
+          startHour: event.startHour,
+          endHour: event.endHour,
+          location: event.location,
+          role: event.assignment.role,
+          isOther: event.isOther
+        }));
+
+        return {
+          ...member,
+          activeProjects,
+          activeEvents: dayEvents,
+        };
+      });
+  };
+
+  // Get available members for a specific day (no events on that day)
+  const getAvailableForDay = (day: number, month: number, year: number) => {
+    const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+    return teamMembers.filter(member =>
+      !member.events?.some(event => event.date === targetDateString)
+    );
+  };
+
+  // Get hourly bookings for selected day based on events
+  const getHourlyBookings = (day: number, month: number, year: number) => {
+    const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+    const bookings: Array<{
+      startHour: number;
+      endHour: number;
+      projectName: string;
+      memberName: string;
+      memberPhoto: string;
+      color: string;
+      memberRingColor: string;
+      eventId: string;
+      role: string;
+      instructions: string;
+      location: string;
+    }> = [];
+
+    teamMembers?.forEach(member => {
+      member?.events?.forEach(event => {
+        if (event.date === targetDateString) {
+          bookings.push({
+            startHour: event.startHour,
+            endHour: event.endHour,
+            projectName: event.project.name,
+            memberName: member.name,
+            memberPhoto: member.profilePhoto,
+            color: event.project.color,
+            memberRingColor: member.ringColor,
+            eventId: event.eventId,
+            role: event.assignment.role,
+            instructions: event.assignment.instructions || '',
+            location: event.location
+          });
+        }
+      });
+    });
+
+    return bookings.sort((a, b) => a.startHour - b.startHour);
+  };
+
   const addNewTeamMember = async (memberData: {
+    invitation: string;
     isInvited: boolean;
     isOwner:boolean;
     roleId: string;
@@ -456,14 +298,13 @@ export function GanttChart() {
     skills?: string[];
   }) => {
     try {
-      // Find the role name from the roles array using roleId
       const selectedRole = roles.find(r => r.id === memberData.roleId);
       const roleName = selectedRole?.name || memberData.role;
-      
+
       const response = await addMember({
         name: memberData.name,
         email: memberData.email,
-        roleId: memberData.roleId, // Use roleId instead of role
+        roleId: memberData.roleId,
         companyId: user.data.company.id,
         countryCode: memberData.countryCode,
         phone: memberData.phone,
@@ -494,18 +335,19 @@ export function GanttChart() {
         name: memberData.name,
         profilePhoto: memberData.profilePhoto,
         email: memberData.email,
-        role: roleName, // Use role name from roles array
+        role: roleName,
         active: memberData.active,
         countryCode: memberData.countryCode,
         phone: memberData.phone,
         roleId: memberData.roleId,
-        projects: response.member?.projects || [],
+        events: [], // New members start with no events
         location: memberData.location,
         bio: memberData.bio,
         skills: memberData.skills || [],
         isAdmin: false,
-        isInvited:memberData.isInvited,
-        isOwner: memberData.isOwner
+        isInvited: memberData.isInvited,
+        isOwner: memberData.isOwner,
+        invitation: memberData.invitation,
       };
 
       setTeamMembers((prev) => [newMember, ...prev]);
@@ -527,105 +369,14 @@ export function GanttChart() {
     }
   };
 
-
-
-  // Get current time periods and scale factor based on view
-  const getTimeData = () => {
-    switch (timeView) {
-      case 'month':
-        return {
-          periods: months,
-          scale: 31,
-          unit: 'day'
-        };
-      default:
-        return {
-          periods: augustDates,
-          scale: 7,
-          unit: 'day'
-        };
-    }
-  };
-  const {
-    periods,
-    scale,
-    unit
-  } = getTimeData();
-
-  const normalizeDate = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  // Get who's working on a specific day
-  const getWorkersForDay = (day: number, month: number, year: number) => {
-    const targetDate = normalizeDate(new Date(year, month - 1, day));
-
-    return teamMembers
-      .filter(member =>
-        member.projects && member.projects.some(project => {
-          const start = normalizeDate(new Date(project.startDate));
-          const end = normalizeDate(new Date(project.endDate));
-          return targetDate >= start && targetDate <= end;
-        })
-      )
-      .map(member => ({
-        ...member,
-        activeProjects: member.projects.filter(project => {
-          const start = normalizeDate(new Date(project.startDate));
-          const end = normalizeDate(new Date(project.endDate));
-          return targetDate >= start && targetDate <= end;
-        }),
-      }));
-  };
-  const getAvailableForDay = (day: number, month: number, year: number) => {
-    const targetDate = normalizeDate(new Date(year, month - 1, day));
-
-    return teamMembers.filter(member =>
-      !member.projects?.some(project => {
-        const start = normalizeDate(new Date(project.startDate));
-        const end = normalizeDate(new Date(project.endDate));
-        return targetDate >= start && targetDate <= end;
-      })
-    );
-  };
-
-  // Get hourly bookings for selected day
-  const getHourlyBookings = (day: number, month: number, year: number) => {
-    const targetDate = normalizeDate(new Date(year, month - 1, day));
-
-    const bookings: Array<{
-      startHour: number;
-      endHour: number;
-      projectName: string;
-      memberName: string;
-      memberPhoto: string;
-      color: string;
-      memberRingColor: string;
-    }> = [];
-
-    teamMembers?.forEach(member => {
-      member?.projects?.forEach(project => {
-        const start = normalizeDate(new Date(project.startDate));
-        const end = normalizeDate(new Date(project.endDate));
-
-        if (
-          targetDate >= start &&
-          targetDate <= end &&
-          project.startHour !== undefined &&
-          project.endHour !== undefined
-        ) {
-          bookings.push({
-            startHour: project.startHour,
-            endHour: project.endHour,
-            projectName: project.name,
-            memberName: member.name,
-            memberPhoto: member.profilePhoto,
-            color: project.color,
-            memberRingColor: member.ringColor
-          });
-        }
-      });
-    });
-
-    return bookings.sort((a, b) => a.startHour - b.startHour);
-  };
+  // Filter team members based on search query (updated for events)
+  const filteredTeamMembers = teamMembers.filter(member =>
+    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.events?.some(event =>
+      event.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
 
   const workersToday = (selectedDay && selectedMonth && selectedYear)
     ? getWorkersForDay(selectedDay, selectedMonth, selectedYear)
@@ -637,11 +388,6 @@ export function GanttChart() {
   const hourlyBookingsToday = (selectedDay && selectedMonth && selectedYear)
     ? getHourlyBookings(selectedDay, selectedMonth, selectedYear)
     : [];
-
-  // Filter team members based on search query
-  const filteredTeamMembers = teamMembers.filter(member => member.name.toLowerCase().includes(searchQuery.toLowerCase()) || member.role.toLowerCase().includes(searchQuery.toLowerCase()) || member.projects.some(project => project.name.toLowerCase().includes(searchQuery.toLowerCase())));
-
-
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -655,6 +401,10 @@ export function GanttChart() {
         onShowFinancialManagement={() => setShowFinancialManagement(true)}
         onShowPackages={() => setShowPackages(true)}
         selectedDay={selectedDay}
+        selectedMonth={selectedMonth}
+        selectedWeek={selectedWeek}
+        selectedYear={selectedYear}
+        timeView={timeView}
         setSelectedDay={setSelectedDay}
         teamMembers={filteredTeamMembers}
         refreshMembers={refreshMembers}
@@ -670,6 +420,10 @@ export function GanttChart() {
           timeView={timeView}
           onDateClick={handleJumpToToday}
           setSelectedProject={setSelectedProject}
+          selectedDay={selectedDay}
+          selectedMonth={selectedMonth}
+          selectedWeek={selectedWeek}
+          selectedYear={selectedYear}
         />
 
         {/* Rest of your content */}
@@ -683,7 +437,7 @@ export function GanttChart() {
             setTimeView={setTimeView}
             setSelectedMember={setSelectedMember}
             setSelectedProject={setSelectedProject}
-            // getProjectPosition={getProjectPosition}
+            setSelectedEvent={setSelectedEvent}
             setShowAddTeamMember={setShowAddTeamMember}
             selectedDay={selectedDay}
             selectedWeek={selectedWeek}
@@ -697,23 +451,28 @@ export function GanttChart() {
             setIsDayClick={setIsDayClick}
             setSearchQuery={setSearchQuery}
             searchQuery={searchQuery}
-            setIsProjectClick={setIsProjectClick}
+            setIsProjectClick={setIsProjectClick} //
             onRingColorUpdate={() => setColorUpdate(true)}
           />
 
           <ScheduleHourly
             ref={scheduleHourlyRef}
-            selectedDay={selectedDay}
+            selectedDay={selectedDay || undefined}
             setSelectedDay={setSelectedDay}
-            selectedMonth={selectedMonth}
+            selectedMonth={selectedMonth || new Date().getMonth() + 1}
             setSelectedMonth={setSelectedMonth}
-            selectedYear={selectedYear}
+            selectedYear={selectedYear || new Date().getFullYear()}
             setSelectedYear={setSelectedYear}
-            selectedWeek={selectedWeek}
+            selectedWeek={selectedWeek || getISOWeek(new Date())}
             setSelectedWeek={setSelectedWeek}
             timeView={timeView}
             teamMembers={teamMembers}
             selectedProject={selectedProject}
+            selectedEvent={selectedEvent}
+            isProjectClick={isProjectClick}
+            isEventClick={isEventClick}
+            setIsProjectClick={setIsProjectClick}
+            setIsEventClick={setIsEventClick}
             setSelectedProject={setSelectedProject}
             getWorkersForDay={getWorkersForDay}
             getAvailableForDay={getAvailableForDay}
@@ -721,22 +480,23 @@ export function GanttChart() {
             hourlyBookingsToday={hourlyBookingsToday}
             workersToday={workersToday}
             availableToday={availableToday}
-            currentMonth={selectedMonth}
-            currentYear={selectedYear}
+            currentMonth={selectedMonth || new Date().getMonth() + 1}
+            currentYear={selectedYear || new Date().getFullYear()}
             setSelectedMember={setSelectedMember}
             onAddSection={async () => {
               refreshMembers();
             }}
+            onAddTeamMember={() => { setShowAddTeamMember(true); }}
           />
         </div>
-
 
         {/* Team Availability Table Dialog */}
         <TeamAvailabilityTable
           isOpen={showTeamAvailability}
           onClose={() => setShowTeamAvailability(false)}
-          // teamMembers={teamMembers}
           setSelectedProject={setSelectedProject}
+          setSelectedEvent={setSelectedEvent}
+          setIsEventClick={setIsEventClick}
           setSelectedMember={setSelectedMember}
           setIsProjectClick={setIsProjectClick}
           team={teamMembers}
@@ -747,52 +507,49 @@ export function GanttChart() {
           onClose={() => setSelectedMember(null)}
           member={selectedMember}
           refreshMembers={refreshMembers}
+          setSelectedProject={setSelectedProject}
+          setIsProjectClick={setIsProjectClick}
+          setSelectedEvent={setSelectedEvent}
+          setIsEventClick={setIsEventClick}
           onUpdateMember={async (memberId, updates) => {
             refreshMembers();
-            // setTeamMembersState(prev => prev.map(member =>
-            //   member.id === memberId ? { ...member, ...updates } : member
-            // ));
-
             setSelectedMember(prevSelected =>
               prevSelected && prevSelected.id === memberId
                 ? { ...prevSelected, ...updates }
                 : prevSelected
             );
-
           }}
           onDeleteMember={async (memberId) => {
             setTeamMembers(prev => prev.filter(member => member.id !== memberId));
             refreshMembers();
-          }
-
-          }
-          onUpdateProject={(memberId, projectId, updates) => {
+          }}
+          onUpdateProject={(memberId, eventId, updates) => {
             setTeamMembers(prev => prev.map(member =>
               member.id === memberId
                 ? {
                   ...member,
-                  projects: member.projects.map(project =>
-                    project.id === projectId ? { ...project, ...updates } : project
+                  events: member.events.map(event =>
+                    event.eventId === eventId ? { ...event, ...updates } : event
                   )
                 }
                 : member
             ));
           }}
-          onAddProject={(memberId, projectData) => {
-            const newProject = {
-              ...projectData,
-              id: `project-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+          onAddProject={(memberId, eventData) => {
+            const newEvent = {
+              ...eventData,
+              eventId: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
             };
             setTeamMembers(prev => prev.map(member =>
               member.id === memberId
-                ? { ...member, projects: [...member.projects, newProject] }
+                ? { ...member, events: [...member.events, newEvent] }
                 : member
             ));
           }}
-          onDeleteProject={(memberId, projectId) => {
+          onDeleteProject={(memberId, eventId) => {
             setTeamMembers(prev => prev.map(member =>
               member.id === memberId
-                ? { ...member, projects: member.projects.filter(p => p.id !== projectId) }
+                ? { ...member, events: member.events.filter(e => e.eventId !== eventId) }
                 : member
             ));
             refreshMembers();

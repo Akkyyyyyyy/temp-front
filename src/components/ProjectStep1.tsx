@@ -7,9 +7,10 @@ import { Calendar } from './ui/calendar';
 import { CalendarIcon, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ProjectFormData } from './AddProjectDialog';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from './ui/textarea';
 
 interface ProjectStep1Props {
     formData: ProjectFormData;
@@ -21,7 +22,6 @@ interface ProjectStep1Props {
     updateClientField: (field: keyof ProjectFormData['client'], value: string) => void;
 }
 
-const hours = Array.from({ length: 25 }, (_, i) => i);
 
 export function ProjectStep1({
     formData,
@@ -32,50 +32,9 @@ export function ProjectStep1({
     setIncludeClient,
     updateClientField
 }: ProjectStep1Props) {
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-
-    const handleDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
-        if (!range?.from) {
-            // If no from date, clear selection
-            setFormData(prev => ({
-                ...prev,
-                startDate: '',
-                endDate: ''
-            }));
-            return;
-        }
-
-        if (range.from && range.to) {
-            // Complete range selected
-            setFormData(prev => ({
-                ...prev,
-                startDate: format(range.from!, "yyyy-MM-dd"),
-                endDate: format(range.to!, "yyyy-MM-dd")
-            }));
-
-            // Clear errors and close calendar
-            if (errors.startDate || errors.endDate) {
-                setErrors({ ...errors, startDate: '', endDate: '' });
-            }
-            setIsCalendarOpen(false);
-        } else if (range.from && !range.to) {
-            // Only start date selected, keep calendar open for end date selection
-            setFormData(prev => ({
-                ...prev,
-                startDate: format(range.from, "yyyy-MM-dd"),
-                endDate: ''
-            }));
-        }
-    };
-
-    const handleClearDates = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering popover close
-        setFormData(prev => ({
-            ...prev,
-            startDate: '',
-            endDate: ''
-        }));
-        // Don't close the calendar - let user pick new dates immediately
+    const colorInputRef = useRef<HTMLInputElement>(null);
+    const handleColorChange = (color: string) => {
+        setFormData(prev => ({ ...prev, color }));
     };
 
     const handlePhoneChange = (phone: string) => {
@@ -90,7 +49,14 @@ export function ProjectStep1({
         <div className="space-y-6">
             {/* Project Name */}
             <div className="space-y-2">
-                <Label htmlFor="projectName">Project Name *</Label>
+                <div className='flex items-center justify-between'>
+                    <Label htmlFor="projectName">Project Name <span className='text-red-500'>*</span></Label>
+                    <div className="h-6 flex items-center">
+                        {errors.projectName && (
+                            <p className="text-red-500 text-sm">{errors.projectName}</p>
+                        )}
+                    </div>
+                </div>
                 <Input
                     id="projectName"
                     value={formData.projectName}
@@ -100,132 +66,75 @@ export function ProjectStep1({
                             setErrors({ ...errors, projectName: '' });
                         }
                     }}
-                    placeholder="Enter project name"
+                    placeholder="Enter project name (This will appear on the calendar)"
                     required
-                    className={errors.projectName ? 'border-red-500' : ''}
                 />
-                {errors.projectName && (
-                    <p className="text-red-500 text-sm">{errors.projectName}</p>
-                )}
             </div>
 
-            {/* Date Range Section */}
-            <div className="space-y-2">
-                <Label htmlFor="dateRange">Select Date Range *</Label>
-                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            className={`w-full justify-start text-left font-normal ${errors.startDate || errors.endDate ? 'border-red-500' : ''}`}
-                            id="dateRange"
-                        >
-                            <CalendarIcon className="h-4 w-4 mr-2" />
-                            {formData.startDate && formData.endDate ? (
-                                <>
-                                    {format(new Date(formData.startDate), "PPP")} - {format(new Date(formData.endDate), "PPP")}
-                                </>
-                            ) : formData.startDate ? (
-                                `Select end date for ${format(new Date(formData.startDate), "PPP")}`
-                            ) : (
-                                <span>Pick a date range</span>
-                            )}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                        className="w-auto p-0"
-                        align="start"
-                        sideOffset={4}
-                    >
-                        <div className="flex flex-col">
-                            <div className="flex justify-between items-center p-2 border-b">
-                                <span className="text-sm font-medium">
-                                    {formData.startDate && !formData.endDate
-                                        ? 'Select end date'
-                                        : 'Select date range'
-                                    }
-                                </span>
-                                {(formData.startDate || formData.endDate) && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={handleClearDates}
-                                        className="h-6 px-2 text-xs"
-                                    >
-                                        <X className="h-3 w-3 mr-1" />
-                                        Clear
-                                    </Button>
-                                )}
-                            </div>
-                            <Calendar
-                                mode="range"
-                                classNames={{
-                                    day_today: "",
-                                }}
-                                defaultMonth={formData.startDate ? new Date(formData.startDate) : new Date()}
-                                selected={
-                                    formData.startDate
-                                        ? {
-                                            from: new Date(formData.startDate),
-                                            to: formData.endDate ? new Date(formData.endDate) : undefined
-                                        }
-                                        : undefined
-                                }
-                                onSelect={handleDateSelect}
-                                initialFocus
-                                numberOfMonths={1}
+            {/* Color Picker */}
+            <div className="space-y-3">
+                <div className='flex items-center justify-between'>
+                    <Label className="text-sm font-medium">Colour <span className='text-red-500'>*</span></Label>
+
+                    <div className="h-6 flex items-center">
+                        {errors.color && (
+                            <p className="text-red-500 text-sm">{errors.color}</p>
+                        )}
+                    </div>
+                </div>
+                <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                        <div className="relative">
+                            <input
+                                ref={colorInputRef}
+                                type="color"
+                                value={formData.color}
+                                onChange={(e) => handleColorChange(e.target.value)}
+                                className="absolute inset-0 w-12 h-12 opacity-0 cursor-pointer"
+                                style={{ zIndex: 10 }}
+                            />
+                            <span
+                                className={`
+                                  block w-12 h-12 rounded-md border-2 cursor-pointer transition-all duration-200
+                                  ${formData.color ? 'border-border' : 'border-dashed border-muted-foreground/30'}
+                                `}
+                                style={{ backgroundColor: formData.color }}
                             />
                         </div>
-                    </PopoverContent>
-                </Popover>
-                {(errors.startDate || errors.endDate) && (
-                    <p className="text-red-500 text-sm">{errors.startDate || errors.endDate}</p>
-                )}
+                        <div className="flex-1 space-y-2">
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-mono text-muted-foreground">
+                                    {formData.color}
+                                </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Click the color box to pick a custom color
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
 
-            {/* Time Section */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="startHour">Start Time</Label>
-                    <Select
-                        value={formData.startHour.toString()}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, startHour: parseInt(value) }))}
-                    >
-                        <SelectTrigger className="bg-background border-border">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border-border shadow-lg">
-                            {hours
-                                .filter(hour => hour !== 24)
-                                .map((hour) => (
-                                    <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                                        {`${hour}:00`}
-                                    </SelectItem>
-                                ))}
-                        </SelectContent>
-                    </Select>
+            <div className="space-y-2">
+                <div className='flex items-center justify-between'>
+                    <Label htmlFor="description">Description <span className='text-red-500'>*</span></Label>
+                    <div className="h-6 flex items-center">
+                        {errors.description && (
+                            <p className="text-red-500 text-sm">{errors.description}</p>
+                        )}
+                    </div>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="endHour">End Time</Label>
-                    <Select
-                        value={formData.endHour.toString()}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, endHour: parseInt(value) }))}
-                    >
-                        <SelectTrigger className={`bg-background ${errors.endHour ? 'border-red-500' : 'border-border'}`}>
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-background border-border shadow-lg">
-                            {hours.filter(h => h > formData.startHour).map((hour) => (
-                                <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                                    {`${hour}:00`}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {errors.endHour && (
-                        <p className="text-red-500 text-sm">{errors.endHour}</p>
-                    )}
-                </div>
+                <Textarea
+                    id="description"
+                    value={formData.description}
+                    maxLength={350}
+                    onChange={(e) => {
+                        setFormData(prev => ({ ...prev, description: e.target.value }));
+                    }}
+                    placeholder="Enter notes about this booking..."
+                    rows={4}
+                />
             </div>
 
             {/* Client Information Section - Updated to match Edit Project style */}
@@ -244,44 +153,59 @@ export function ProjectStep1({
                 {includeClient && (
                     <div className="grid grid-cols-1 gap-4 pl-6 border-l-2 border-border">
                         <div className="space-y-2">
-                            <Label htmlFor="clientName">Client Name *</Label>
+                            <div className='flex items-center justify-between'>
+                                <Label htmlFor="clientName">Client Name <span className='text-red-500'>*</span></Label>
+                                <div className="h-6 flex items-center">
+                                    {errors.clientName && (
+                                        <p className="text-red-500 text-sm">{errors.clientName}</p>
+                                    )}
+                                </div>
+                            </div>
                             <Input
                                 id="clientName"
                                 value={formData.client.name}
                                 onChange={(e) => updateClientField('name', e.target.value)}
                                 placeholder="Enter client name"
-                                className={`bg-background ${errors.clientName ? 'border-red-500' : 'border-border'}`}
+                                className={`bg-background`}
                                 maxLength={100}
                             />
-                            {errors.clientName && (
-                                <p className="text-red-500 text-sm">{errors.clientName}</p>
-                            )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="clientEmail">Client Email *</Label>
+                            <div className='flex items-center justify-between'>
+                                <Label htmlFor="clientEmail">Client Email <span className='text-red-500'>*</span></Label>
+                                <div className="h-6 flex items-center">
+
+                                    {errors.clientEmail && (
+                                        <p className="text-red-500 text-sm">{errors.clientEmail}</p>
+                                    )}</div>
+                            </div>
                             <Input
                                 id="clientEmail"
                                 type="email"
                                 value={formData.client.email}
                                 onChange={(e) => updateClientField('email', e.target.value)}
                                 placeholder="client@example.com"
-                                className={`bg-background ${errors.clientEmail ? 'border-red-500' : 'border-border'}`}
+                                className={`bg-background`}
                                 maxLength={100}
                             />
-                            {errors.clientEmail && (
-                                <p className="text-red-500 text-sm">{errors.clientEmail}</p>
-                            )}
                         </div>
 
                         {/* Client Mobile with PhoneInput */}
                         <div className="space-y-2">
-                            <Label htmlFor="clientMobile">Phone Number *</Label>
+                            <div className='flex items-center justify-between'>
+                                <Label htmlFor="clientMobile">Phone Number <span className='text-red-500'>*</span></Label>
+                                <div className="h-6 flex items-center">
+                                    {errors.clientMobile && (
+                                        <p className="text-red-500 text-sm">{errors.clientMobile}</p>
+                                    )}
+                                </div>
+                            </div>
                             <PhoneInput
                                 defaultCountry="gb"
                                 value={formData.client.mobile || ""}
                                 onChange={handlePhoneChange}
-                                className={`rounded-md gap-2 ${errors.clientMobile ? 'border-red-500' : ''}`}
+                                className={`rounded-md gap-2 `}
                                 inputClassName="!flex !h-10 !w-full border !border-input !bg-background px-3 py-2 text-sm !text-foreground
                                     !placeholder:text-muted-foreground 
                                     !rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
@@ -296,11 +220,6 @@ export function ProjectStep1({
                                 }}
                                 placeholder="Enter phone number"
                             />
-                            <div className="h-5">
-                                {errors.clientMobile && (
-                                    <p className="text-red-500 text-sm">{errors.clientMobile}</p>
-                                )}
-                            </div>
                         </div>
                     </div>
                 )}

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Palette, X, Check } from "lucide-react";
+import { getFallback } from "@/helper/helper";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -128,7 +129,7 @@ export function RingColorDialog({
                   className="object-cover"
                 />
                 <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-base">
-                  {member.name.slice(0, 2).toUpperCase()}
+                  {getFallback(member.name)}
                 </AvatarFallback>
               </Avatar>
             <div className="flex-1 min-w-0">

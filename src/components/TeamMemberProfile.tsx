@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff, MoreHorizontal, MoreVertical, UserMinus, UserPlus } from "lucide-react";
+import { Calendar, Clock, User, Mail, Phone, MapPin, Save, X, Edit, Plus, Trash2, Award, FileText, AlertCircle, BriefcaseBusiness, Delete, LogOut, AlertTriangle, Camera, Info, Eye, EyeOff, MoreHorizontal, MoreVertical, UserMinus, UserPlus, Laptop } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,10 @@ interface TeamMemberProfileProps {
   onAddProject: (memberId: string, project: Omit<Project, 'id'>) => void;
   onDeleteProject: (memberId: string, projectId: string) => void;
   refreshMembers: () => void;
+  setSelectedProject: (project: any) => void;
+  setIsProjectClick: (projectClick: boolean) => void;
+  setSelectedEvent: (event: any) => void;
+  setIsEventClick:(eventClick: boolean) => void
 }
 
 // Yup validation schemas
@@ -116,7 +120,11 @@ export function TeamMemberProfile({
   onUpdateProject,
   onAddProject,
   onDeleteProject,
-  refreshMembers
+  refreshMembers,
+  setSelectedProject,
+  setIsProjectClick,
+  setSelectedEvent,
+  setIsEventClick
 }: TeamMemberProfileProps) {
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingProject, setEditingProject] = useState<string | null>(null);
@@ -130,8 +138,8 @@ export function TeamMemberProfile({
   const [removeDialog, setRemoveDialog] = useState({
     open: false,
     memberId: null,
-    projectId: null,
-    projectName: ''
+    eventId: null,
+    eventName: ''
   });
 
   const [showCropModal, setShowCropModal] = useState(false);
@@ -215,6 +223,13 @@ export function TeamMemberProfile({
 
   const [newSkill, setNewSkill] = useState('');
 
+  const handleProjectClick = (projectId: string, eventId: string) => {
+    setSelectedProject(projectId);
+    setSelectedEvent(eventId)
+    setIsProjectClick(true);
+    setIsEventClick(true);
+    onClose();
+  }
   const handleToggleAdmin = async () => {
     if (togglingAdmin) return;
 
@@ -246,7 +261,8 @@ export function TeamMemberProfile({
     try {
       const result = await sendMemberInvite({
         memberId,
-        companyId: user.data.company.id
+        companyId: user.data.company.id,
+        adminName: user.data.name,
       });
 
       if (!result.success) {
@@ -312,7 +328,7 @@ export function TeamMemberProfile({
       const file = new File([croppedImageBlob], 'profile-photo.jpg', { type: 'image/jpeg' });
 
       // Upload using your existing function
-      const result = await uploadMemberPhoto(member.id, file);
+      const result = await uploadMemberPhoto(member.id, user.data.company.id, file);
 
       if (result.success) {
         const updatedProfileData = {
@@ -428,7 +444,6 @@ export function TeamMemberProfile({
 
     const isValid = await validateProfile(profileData);
     if (!isValid) {
-      toast.error("Please fix the validation errors before saving");
       return;
     }
 
@@ -483,20 +498,6 @@ export function TeamMemberProfile({
     }
   };
 
-
-  const handleSaveProject = async (projectId: string, updates: Partial<Project>) => {
-    const projectToValidate = { ...member?.projects.find(project => project.id === projectId), ...updates };
-    const isValid = await validateProject(projectToValidate);
-
-    if (!isValid) {
-      toast.error("Please fix the project validation errors before saving");
-      return;
-    }
-
-    onUpdateProject(member.id, projectId, updates);
-    setEditingProject(null);
-    setProjectErrors({});
-  };
 
   const handleAddProject = async () => {
     const isValid = await validateNewProject(newProject);
@@ -652,9 +653,145 @@ export function TeamMemberProfile({
                 )}
               </div>
             </DialogTitle> */}
+        <DialogTitle>
+          <div className="flex w-full justify-end cursor-pointer">
+            <X className="w-4 h-4" onClick={() => onClose()} />
+          </div>
+        </DialogTitle>
 
 
         <div className="flex-1 overflow-auto space-y-6 scrollbar-hide">
+          {/* Current Bookings */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="text-lg">Current Bookings & Projects</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {member?.events?.length > 0 ? (
+                <div className="space-y-4">
+                  {member?.events?.map((event) => {
+                    const isOtherEvent = event.isOther;
+                    const project = event.project;
+
+                    return (
+                      <div
+                        key={event.eventId}
+                        className={`border rounded-lg p-4 ${isOtherEvent ? 'border-dashed border-gray-500/50 bg-gray-800/30' : ''}`}
+                      >
+                        {isOtherEvent ? (
+                          // Private Event View
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
+                                <h4 className="font-medium text-gray-500">Private Event</h4>
+                              </div>
+                              <div className="space-y-1 text-sm text-gray-500">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="w-3 h-3" />
+                                  {format(new Date(event.date), 'do MMM yyyy')}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-3 h-3" />
+                                  {formatHour12(event.startHour)} - {formatHour12(event.endHour)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          // Regular Event View
+                          <div className="flex items-start justify-between">
+                            <div
+                              className="flex-1 cursor-pointer"
+                              onClick={() => handleProjectClick(project.id, event.eventId)}
+                            >
+                              <div className="flex items-center gap-3 mb-2">
+                                <div
+                                  className="w-3 h-3 rounded-full"
+                                  style={{ backgroundColor: project.color }}
+                                ></div>
+                                <div>
+                                  <h4 className="font-medium">{project.name}</h4>
+                                  {event.name && (
+                                    <p className="text-sm text-muted-foreground mt-0.5">{event.name}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="w-3 h-3" />
+                                  {format(new Date(event.date), 'do MMM yyyy')}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-3 h-3" />
+                                  {formatHour12(event.startHour)} - {formatHour12(event.endHour)}
+                                </div>
+                                {event.location && (
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="w-3 h-3" />
+                                    {event.location}
+                                  </div>
+                                )}
+                                {event.assignment?.role && (
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-3 h-3" />
+                                    Role: {event.assignment.role}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Dialog open={removeDialog.open} onOpenChange={(open) => setRemoveDialog(prev => ({ ...prev, open }))}>
+                                <DialogTrigger asChild>
+                                  {user.data.isAdmin == true && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setRemoveDialog({
+                                        open: true,
+                                        memberId: member.id,
+                                        eventId: event.eventId,
+                                        eventName:event.eventId
+                                      })}
+                                    >
+                                      <LogOut className="w-4 h-4" /> Remove
+                                    </Button>
+                                  )}
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Remove from Event</DialogTitle>
+                                    <DialogDescription>
+                                      Are you sure you want to remove {member?.name} from the event "{removeDialog.eventName}"?
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <DialogFooter>
+                                    <Button variant="outline" onClick={() => setRemoveDialog(prev => ({ ...prev, open: false }))}>
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      onClick={() => {
+                                        // handleRemoveEvent(removeDialog.memberId, removeDialog.eventId);
+                                        // setRemoveDialog(prev => ({ ...prev, open: false }));
+                                      }}
+                                    >
+                                      Remove from Event
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );})}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No current events assigned</p>
+              )}
+            </CardContent>
+          </Card>
           {/* Profile Information Card */}
           <Card className="shadow-sm hover:shadow-md transition-all duration-200 border-border/50">
             <CardHeader className="flex flex-row items-center justify-between pb-4 space-y-0 border-b bg-gradient-to-r from-muted/20 to-muted/10">
@@ -685,32 +822,6 @@ export function TeamMemberProfile({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          {(member.isInvited) && (
-                            <>
-                              <DropdownMenuItem
-                                onSelect={(e) => {
-                                  e.preventDefault(); // Prevent default behavior that closes the dropdown
-                                  handleSendInvite(member.id);
-                                }}
-                                disabled={sendingInvite}
-                                className="flex items-center gap-2 cursor-pointer"
-                              >
-                                {sendingInvite ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                                    Sending...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Mail className="h-4 w-4" />
-                                    Send Invite
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                            </>
-                          )}
-
                           <DropdownMenuItem
                             onClick={handleToggleStatus}
                             disabled={togglingStatus}
@@ -729,15 +840,21 @@ export function TeamMemberProfile({
                             )}
                           </DropdownMenuItem>
 
-                          <DropdownMenuSeparator />
+                          {
+                            user.data.email != member.email && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => setShowDeleteDialog(true)}
+                                  className="flex items-center gap-2 cursor-pointer"
+                                >
+                                  <UserMinus className="h-4 w-4" />
+                                  Remove Member
+                                </DropdownMenuItem>
+                              </>
+                            )
+                          }
 
-                          <DropdownMenuItem
-                            onClick={() => setShowDeleteDialog(true)}
-                            className="flex items-center gap-2 cursor-pointer"
-                          >
-                            <UserMinus className="h-4 w-4" />
-                            Remove Member
-                          </DropdownMenuItem>
 
                           {
                             user.data.email === user.data.company.email && (
@@ -791,6 +908,11 @@ export function TeamMemberProfile({
                         <User className="w-10 h-10" />
                       </AvatarFallback>
                     </Avatar>
+                    {/* {member.isAdmin && (
+                        <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                          <Laptop className="w-5 h-5" />
+                        </div>
+                      )} */}
                     {
                       (user.data.id == member.id || user.data.isAdmin) && (
                         <>
@@ -825,7 +947,7 @@ export function TeamMemberProfile({
                   <Badge variant="secondary" className="mb-3 bg-primary/10 text-primary border-primary/20">
                     {member.role}
                   </Badge>
-                  {(user.data.id == member.id  || user.data.isAdmin) && (
+                  {(user.data.id == member.id || user.data.isAdmin) && (
                     <div className="flex flex-col sm:flex-row gap-3 justify-center sm:justify-start mt-4">
                       <label
                         htmlFor="photo-upload-form"
@@ -987,7 +1109,7 @@ export function TeamMemberProfile({
                             setProfileData(prev => ({ ...prev, location: e.target.value }))
                           }
                           className={`w-full transition-colors ${profileErrors.location ? 'border-red-500 focus:ring-red-200' : 'focus:ring-primary/20'}`}
-                          placeholder="Street, city, state, ZIP code"
+                          placeholder="Street, city, state, post code"
                           maxLength={150}
                         />
                         {profileErrors.location && (
@@ -1185,8 +1307,32 @@ export function TeamMemberProfile({
                     Cancel
                   </Button>
                 )}
-                {
-                  (user.data.id == member.id || user.data.isAdmin) && (
+
+                {(user.data.id == member.id || user.data.isAdmin) && (
+                  <>
+                    {!editingProfile && (member.invitation == "not_sent" || member.invitation == "sent" || member.invitation == "rejected") && (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          handleSendInvite(member.id);
+                        }}
+                        disabled={sendingInvite}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        {sendingInvite ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+                            sending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="h-4 w-4" />
+                            Send invitation
+                          </>
+                        )}
+                      </Button>
+                    )}
+
                     <Button
                       size="sm"
                       disabled={saving || uploadingPhoto}
@@ -1231,100 +1377,12 @@ export function TeamMemberProfile({
                         </>
                       )}
                     </Button>
-                  )
-                }
-
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          {/* Rest of your existing code for Current Bookings, Delete Confirmation Dialog, and Add Project Form remains the same */}
-          {/* Current Bookings */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-              <CardTitle className="text-lg">Current Bookings & Projects</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {member?.projects?.length > 0 ? (
-                <div className="space-y-4">
-                  {member?.projects?.map((project) => (
-                    <div key={project.id} className="border rounded-lg p-4">
-                      {editingProject === project.id ? (
-                        <></>
-                      ) : (
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className={`w-3 h-3 rounded-full`}
-                                style={{ backgroundColor: project.color }}></div>
-                              <h4 className="font-medium">{project.name}</h4>
-                            </div>
-                            <div className="space-y-1 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="w-3 h-3" />
-                                {format(new Date(project.startDate), 'd MMM yyyy')} - {format(new Date(project.endDate), 'd MMM yyyy')}
-                              </div>
-                              {project.startHour !== undefined && project.endHour !== undefined && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <Clock className="w-3 h-3" />
-                                  {formatHour12(project.startHour)} - {formatHour12(project.endHour)}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Dialog open={removeDialog.open} onOpenChange={(open) => setRemoveDialog(prev => ({ ...prev, open }))}>
-                              <DialogTrigger asChild>
-                                {
-                                  user.data.isAdmin == true &&
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setRemoveDialog({
-                                      open: true,
-                                      memberId: member.id,
-                                      projectId: project.id,
-                                      projectName: project.name
-                                    })}
-                                  >
-                                    <LogOut className="w-4 h-4" /> Remove from project
-                                  </Button>
-                                }
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Remove from Project</DialogTitle>
-                                  <DialogDescription>
-                                    Are you sure you want to remove {member?.name} from the project "{removeDialog.projectName}"?
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <DialogFooter>
-                                  <Button variant="outline" onClick={() => setRemoveDialog(prev => ({ ...prev, open: false }))}>
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    variant="destructive"
-                                    onClick={() => {
-                                      handleRemoveProject(removeDialog.memberId, removeDialog.projectId);
-                                      setRemoveDialog(prev => ({ ...prev, open: false }));
-                                    }}
-                                  >
-                                    Remove from Project
-                                  </Button>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-center py-8">No current projects assigned</p>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Delete Confirmation Dialog */}
           {/* Remove from Company Confirmation Dialog */}
@@ -1464,6 +1522,7 @@ export function TeamMemberProfile({
           )}
         </div>
         <ImageCropModal
+          cropShape="round"
           isOpen={showCropModal}
           onClose={() => {
             setShowCropModal(false);

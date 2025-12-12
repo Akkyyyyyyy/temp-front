@@ -153,7 +153,12 @@ const Register = () => {
 
                         <div className="space-y-1">
                             <Label htmlFor="adminEmail">Admin Email</Label>
-                            <Input id="adminEmail" type="text" {...register("adminEmail")} maxLength={60} />
+                            <Input
+                                id="adminEmail"
+                                type="text" {...register("adminEmail")}
+                                maxLength={60}
+                                placeholder="admin@example.com"
+                            />
                             <p className="text-sm text-red-500 min-h-[20px]">
                                 {errors.adminEmail?.message || ""}
                             </p>

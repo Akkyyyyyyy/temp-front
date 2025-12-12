@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Loader2, Edit, Save, X, MoreVertical } from "lucide-react";
+import { Plus, Trash2, Loader2, Edit, Save, X, MoreVertical, Folder, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -193,45 +193,50 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
-                <span className="ml-3 text-muted-foreground">Loading Checklist...</span>
-            </div>
+        <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+        <span className="ml-3 text-muted-foreground">Loading Checklist...</span>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h4 className="font-medium text-foreground">Checklists</h4>
+      </div>
       {/* Add New Item Section */}
       {isAdding ? (
         <div className="p-3 bg-muted/30 rounded-lg border border-border/20">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <Input
               value={newItemTitle}
+              type="text"
               onChange={(e) => setNewItemTitle(e.target.value)}
               placeholder="Item title"
-              className="h-8 text-sm"
+              className="w-full text-lg font-medium bg-background border border-border px-2 py-1 rounded-lg"
               autoFocus
             />
             <Textarea
               value={newItemDescription}
               onChange={(e) => setNewItemDescription(e.target.value)}
+              rows={5}
               placeholder="Add description (optional)"
-              className="min-h-[60px] text-sm"
+              className="w-full text-sm text-foreground bg-background border border-border rounded-lg px-2 py-1"
             />
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <Button
                 size="sm"
                 onClick={handleAddItem}
-                className="h-7 text-xs"
+                className="h-9 text-md"
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Add Item
+                <Save className="w-3 h-3 mr-1" />
+                      Save
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCancelAdd}
-                className="h-7 text-xs"
+                className="h-9 text-md"
               >
                 <X className="w-3 h-3 mr-1" />
                 Cancel
@@ -245,7 +250,7 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
             onClick={handleStartAdd}
             size="sm"
             variant="outline"
-            className="h-8 text-xs"
+            className="h-10 text-sm"
           >
             <Plus className="w-3 h-3 mr-1" />
             Add New Item
@@ -253,40 +258,41 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
       )}
 
       {/* Checklist Items */}
-      <div className="space-y-2">
+      <div className="space-y-6">
         {checklist.length === 0 && !isAdding ? (
-          <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            <p className="text-sm">No items yet</p>
-            <p className="text-xs mt-1">Add your first item to get started</p>
+          <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+            <ListChecks className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p className="text-lg">No Checklists yet</p>
           </div>
         ) : (
           checklist.map((item) => (
             <div
               key={item.id}
-              className={`p-2 rounded-md border border-border/20 transition-colors group hover:border-border/40 ${item.completed ? 'bg-muted/30 opacity-75' : 'bg-background'
+              className={`p-3 rounded-md border border-border/20 transition-colors group hover:border-border/40 ${item.completed ? 'bg-muted/30 opacity-75' : 'bg-background'
                 }`}
             >
               {editingItemId === item.id ? (
                 // Edit mode
-                <div className="space-y-2">
+                <div className="space-y-4">
                   <Input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     placeholder="Item title"
-                    className="h-8 text-sm"
+                    className="w-full text-lg bg-background border border-border px-2 py-1 rounded-lg"
                     autoFocus
                   />
                   <Textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
+                    rows={5}
                     placeholder="Add description (optional)"
-                    className="min-h-[60px] text-sm"
+                    className="w-full text-sm text-foreground bg-background border border-border rounded-lg px-2 py-1"
                   />
                   <div className="flex gap-2">
                     <Button
                       size="sm"
                       onClick={handleSaveEdit}
-                      className="h-7 text-xs"
+                      className="h-9 text-md"
                     >
                       <Save className="w-3 h-3 mr-1" />
                       Save
@@ -295,7 +301,7 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
                       variant="outline"
                       size="sm"
                       onClick={handleCancelEdit}
-                      className="h-7 text-xs"
+                      className="h-9 text-md"
                     >
                       <X className="w-3 h-3 mr-1" />
                       Cancel
@@ -304,41 +310,48 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
                 </div>
               ) : (
                 // View mode
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={item.completed}
-                    onCheckedChange={() => handleToggleItem(item.id)}
-                    className="h-4 w-4 mt-0.5 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-                  />
-
+                <div className="flex items-start gap-2">
                   <div className="flex-1 min-w-0">
-                    <div
-                      className={`text-sm cursor-pointer select-none ${item.completed ? 'text-muted-foreground' : 'text-foreground'
-                        }`}
-                      onClick={() => handleToggleItem(item.id)}
-                    >
-                      {item.title}
+                    <div className="flex items-center gap-2 mb-1">
+                      <Checkbox
+                        checked={item.completed}
+                        onCheckedChange={() => handleToggleItem(item.id)}
+                        className="h-4 w-4 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
+                      />
+                      <div
+                        className={`text-lg cursor-pointer select-none ${item.completed ? 'text-muted-foreground' : 'text-foreground'
+                          }`}
+                        onClick={() => handleToggleItem(item.id)}
+                      >
+                        {item.title}
+                      </div>
                     </div>
                     {item.description && (
-                      <div className={`text-xs mt-1 ${item.completed ? 'text-muted-foreground/70' : 'text-muted-foreground'
-                        }`}>
+                      <div
+                        className={`text-md cursor-pointer pl-6 ${ 
+                          item.completed
+                            ? 'text-muted-foreground/70'
+                            : 'text-muted-foreground'
+                          }`}
+                        onClick={() => handleToggleItem(item.id)}
+                      >
                         {item.description}
                       </div>
                     )}
                   </div>
 
-                  {/* Dropdown Menu - FIXED: Use individual ref for each menu */}
+                  {/* Dropdown Menu */}
                   <div className="relative" ref={setMenuRef(item.id)}>
-                     {
-                        user.data.isAdmin == true && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleMenu(item.id)}
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    >
-                      <MoreVertical className="w-3 h-3" />
-                    </Button>)}
+                    {user.data.isAdmin == true && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleMenu(item.id)}
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      >
+                        <MoreVertical className="w-3 h-3" />
+                      </Button>
+                    )}
 
                     {/* Menu Dropdown */}
                     {activeMenu === item.id && (

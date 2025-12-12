@@ -21,8 +21,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
 import { useMoodBoard } from "@/hooks/useMoodBoard";
-import { AlertTriangle, ChevronLeft, ChevronRight, Folder, Image as ImageIcon, Loader2, Plus, Trash2, Upload, X } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Folder, Image as ImageIcon, Loader2, Plus, PlusCircle, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 interface MoodboardTabProps {
     projectId: string;
@@ -35,6 +36,10 @@ interface FolderDisplay {
     images: string[];
     createdAt: string;
     parentId?: string | null;
+}
+
+export interface filesObject extends File {
+    exclude?: boolean
 }
 
 export function MoodboardTab({ projectId }: MoodboardTabProps) {
@@ -104,16 +109,19 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
         }
     };
 
-    const handleFiles = (files: File[]) => {
-        // Validate files before setting state
+    const handleFiles = (files: filesObject[]) => {
         const validation = validateImageFiles(files);
         if (!validation.valid) {
-            return;
+            toast.error(<ul style={{ listStyleType: "disc;" }}>{
+                validation.errors.map((error) => {
+                    return <li>&#x2022; {error}</li>
+                })}</ul>)
         }
-
+        fileInputRef.current.value = null
+        const newFiles = files.filter(data => !data.exclude)
         // Append to existing files instead of replacing
-        setDraggedFiles(prev => [...prev, ...files]);
-        const urls = files.map(file => URL.createObjectURL(file));
+        setDraggedFiles(prev => [...prev, ...newFiles]);
+        const urls = newFiles.map(file => URL.createObjectURL(file));
         setPreviewUrls(prev => [...prev, ...urls]);
     };
 
@@ -278,7 +286,7 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
     // Loading state
     if (loading && folders.length === 0) {
         return (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
                 <span className="ml-3 text-muted-foreground">Loading moodboard...</span>
             </div>
@@ -297,18 +305,21 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
 
     return (
         <div className="space-y-6">
+            <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-foreground">Moodboard</h4>
+            </div>
             {/* Top Controls */}
             {
                 user.data.isAdmin &&
-                <div className="flex gap-3 flex-wrap">
+                <div className="flex">
                     <Button
                         onClick={() => setIsAddFolderDialogOpen(true)}
                         disabled={loading}
                         variant="outline"
                         size="sm"
-                        className="h-8 text-xs"
+                        className="h-10 text-sm"
                     >
-                        <Plus className="w-3 h-3" />
+                        <Plus className="w-4 h-4" />
                         Add Folder
                     </Button>
                 </div>
@@ -316,13 +327,12 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
 
             {/* Folder Display Grid */}
             {folders.length === 0 ? (
-                <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-lg">
+                <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
                     <Folder className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg mb-2">No folders yet — start by adding one ✨</p>
-                    <p className="text-sm">Organize your creative assets with folders and images</p>
+                    <p className="text-lg ">No folders yet — start by adding one</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {folders.map(folder => (
                         <Card
                             key={folder.id}
@@ -331,19 +341,30 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                         >
                             <CardContent className="p-4">
                                 <div className="flex items-center gap-3 mb-3">
-                                    <Folder className="w-8 h-8 text-studio-gold" />
+                                    <Folder className="w-6 h-6 text-studio-gold" fill="currentColor" />
+
                                     <h3 className="font-semibold text-foreground truncate flex-1">
                                         {folder.name}
                                     </h3>
                                     {
-                                        user.data.isAdmin &&
-                                        <button
-                                            onClick={(e) => handleOpenDeleteFolderDialog(e, folder)}
-                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-destructive/10 rounded-full"
-                                            title="Delete folder"
-                                        >
-                                            <Trash2 className="w-4 h-4 text-destructive" />
-                                        </button>
+                                        user.data.isAdmin && <>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenImageDialog(folder?.id)
+                                                }}
+                                                className="transition-opacity p-1.5 hover:bg-studio-gold/10 rounded-full"
+                                            >
+                                                <PlusCircle className="w-4 h-4 text-studio-gold" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleOpenDeleteFolderDialog(e, folder)}
+                                                className="transition-opacity p-1.5 hover:bg-destructive/10 rounded-full"
+                                                title="Delete folder"
+                                            >
+                                                <Trash2 className="w-4 h-4 text-destructive" />
+                                            </button>
+                                        </>
                                     }
                                 </div>
 
@@ -353,18 +374,18 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                                         {folder.images.slice(0, 3).map((imageUrl, idx) => (
                                             <div
                                                 key={`${folder.id}-${idx}`}
-                                                className="aspect-square rounded overflow-hidden bg-muted"
+                                                className="h-[100px] w-auto rounded overflow-hidden bg-muted"
                                             >
                                                 <img
                                                     src={imageUrl}
                                                     alt={`${folder.name} preview ${idx + 1}`}
-                                                    className="w-full h-full object-cover"
+                                                    className="w-full h-full object-contain"
                                                 />
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-center py-6 text-muted-foreground text-sm border border-dashed border-border rounded">
+                                    <div className="h-[100px] text-center py-10 text-muted-foreground text-sm border border-dashed border-border rounded">
                                         No images yet
                                     </div>
                                 )}
@@ -466,7 +487,9 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                         {/* Preview Grid */}
                         {previewUrls.length > 0 && (
                             <div className="space-y-2">
-                                <Label>Preview ({previewUrls.length} files)</Label>
+                                <Label>
+                                    Preview{previewUrls.length >= 2 ? ` (${previewUrls.length} files)` : ''}
+                                </Label>
                                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-2 border border-border rounded-lg">
                                     {previewUrls.map((url, index) => (
                                         <div key={index} className="relative group aspect-square">
@@ -528,7 +551,7 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                     <DialogHeader className="flex-shrink-0">
                         <div className="flex items-center justify-between">
                             <DialogTitle className="flex items-center gap-2">
-                                <Folder className="w-5 h-5 text-studio-gold" />
+                                <Folder className="w-5 h-5 text-studio-gold" fill="currentColor" />
                                 {selectedFolder?.name}
                             </DialogTitle>
                             {
@@ -580,10 +603,10 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                                 <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
                                 <p>No images in this folder yet</p>
                                 {
-                                    user.data.isAdmin && 
+                                    user.data.isAdmin &&
                                     <p className="text-sm">Click "Add Images" to upload</p>
                                 }
-                                
+
                             </div>
                         )}
                     </div>

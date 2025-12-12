@@ -45,6 +45,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
   return (
     <DayPicker
       mode="range"
+      weekStartsOn={1}
       showOutsideDays={showOutsideDays}
       selected={range}
       onSelect={setRange}
@@ -53,7 +54,7 @@ function Calendar({ className, classNames, showOutsideDays = true, ...props }: C
       onDayMouseLeave={handleDayMouseLeave}
       modifiers={{ hoverRange }}
       modifiersClassNames={{
-        hoverRange: "bg-accent/40 text-accent-foreground",
+        hoverRange: "bg-accent/90 text-accent-foreground",
       }}
       className={cn("p-3", className)}
       classNames={{

@@ -4,6 +4,7 @@ import { Edit3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EditableTimeSlot } from '@/components/EditableTimeSlot';
 import { TeamMember } from './TeamMembers';
 import { EditableBooking } from '@/hooks/useBookingEditor';
+import { useAuth } from '@/context/AuthContext';
 
 interface DayCalendarProps {
   date: string;
@@ -22,46 +23,44 @@ interface DayCalendarProps {
 export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear, selectedWeek, setSelectedWeek, setSelectedProject }: DayCalendarProps) {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const targetDate = new Date(selectedYear, selectedMonth - 1, day);
+  const { user } = useAuth();
   
-  const normalizeDate = (date: Date) =>
-    new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  // Build editableBookings from events instead of projects
+  const editableBookings: any[] = [];
+   const filteredTeamMembers = user.data.isAdmin 
+    ? teamMembers 
+    : teamMembers.filter(member => member.id === user.data.id);
 
-  const normalizedTarget = normalizeDate(targetDate);
-
-  // Helper to parse "HH:mm:ss" to number hour
-  const parseHour = (hourStr: string): number => {
-    return Number(hourStr.split(':')[0]);
-  };
-
-  // Build editableBookings directly from projects
-  const editableBookings: EditableBooking[] = [];
-
-  teamMembers.forEach(member => {
-    member.projects?.forEach((project, index) => {
-      if (!project.startDate || !project.endDate) return;
-      const start = normalizeDate(new Date(project.startDate));
-      const end = normalizeDate(new Date(project.endDate));
-
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
-
-      if (normalizedTarget >= start && normalizedTarget <= end) {
-        if (project.startHour === undefined || project.endHour === undefined) return;
-
+  filteredTeamMembers.forEach(member => {
+    member.events?.forEach((event, index) => {
+      const eventDate = new Date(event.date);
+      const targetDate = new Date(selectedYear, selectedMonth - 1, day);
+      
+      // Check if event is on the target date
+      if (
+        eventDate.getFullYear() === targetDate.getFullYear() &&
+        eventDate.getMonth() === targetDate.getMonth() &&
+        eventDate.getDate() === targetDate.getDate()
+      ) {
         editableBookings.push({
-          id: `${member.name}-${project.name}-${index}`,
-          projectName: project.name,
+          id: event.eventId,
+          projectName: event.project.name,
           memberName: member.name,
-          color: project.color,
+          color: event.project.color,
           memberRingColor: member.ringColor,
-          startHour: typeof project.startHour === 'string' ? parseHour(project.startHour) : project.startHour,
-          endHour: typeof project.endHour === 'string' ? parseHour(project.endHour) : project.endHour,
-          description: project.description || '',
-          location: project.location || '',
+          startHour: event.startHour,
+          endHour: event.endHour,
+          description: event.project.description || '',
+          location: event.location || '',
           memberPhoto: member.profilePhoto || '',
-          client: project.client || {},
-          newRole: project.newRole || '',
-          brief: project.brief,
-          logistics: project.logistics,
+          client: event.project.client || {},
+          newRole: event.assignment.role,
+          brief: event.project.brief,
+          logistics: event.project.logistics,
+          instructions: event.assignment.instructions || '',
+          eventId: event.eventId,
+          eventName: event.name,
+          isOther:event.isOther
         });
       }
     });
@@ -69,15 +68,13 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
 
   const [isEditing, setIsEditing] = useState(false);
 
-  // Functions to update/delete booking - here just placeholders as you have no editing logic now
+  // Functions to update/delete booking
   const updateBooking = (id: string, updates: Partial<EditableBooking>) => {
-    // You can implement this if you want editing later
     console.log('Update booking:', id, updates);
   };
 
   const deleteBooking = (id: string) => {
-    // You can implement this if you want deleting later
-    // console.log('Delete booking:', id);
+    console.log('Delete booking:', id);
   };
 
   const formatHour = (hour: number) => {
@@ -100,7 +97,6 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
     const week1 = new Date(d.getFullYear(), 0, 4);
-    // Use getTime() for arithmetic operations
     return 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
   };
 
@@ -155,7 +151,6 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
           <span className="text-sm sm:text-base lg:text-lg">
             Hourly Schedule
           </span>
-
         </div>
 
         {/* Date Navigation */}
@@ -185,10 +180,22 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
               <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
           </div>
+        </div> */}
 
-
+        {/* Edit Button - Desktop */}
+        {/* <div className="hidden sm:flex">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditing(!isEditing)}
+            className="flex items-center gap-2"
+          >
+            <Edit3 className="w-4 h-4" />
+            {isEditing ? 'Done Editing' : 'Edit Schedule'}
+          </Button>
         </div> */}
       </div>
+
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-1 gap-1 sm:gap-2">
@@ -202,22 +209,17 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
                     key={booking.id}
                     hour={hour}
                     booking={booking}
-                    isEditing={isEditing}
                     isStartOfBooking={hour === booking.startHour}
                     formatHour={formatHour}
-                    onUpdateBooking={updateBooking}
-                    onDeleteBooking={deleteBooking}
                     showHourLabel={idx === 0}
+                    onProjectClick={() => setSelectedProject(booking.id)}
                   />
                 ))
               ) : (
                 <EditableTimeSlot
                   hour={hour}
-                  isEditing={isEditing}
                   isStartOfBooking={false}
                   formatHour={formatHour}
-                  onUpdateBooking={() => { }}
-                  onDeleteBooking={() => { }}
                   showHourLabel={true}
                 />
               )}

@@ -179,7 +179,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-16">
+            <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
                 <span className="ml-3 text-muted-foreground">Loading Documents...</span>
             </div>
@@ -187,11 +187,14 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
     }
 
     return (
-        <div>
-            <div className="flex items-center justify-between mb-3">
+        <div className="space-y-6">
+            <div className="flex items-center justify-between ">
+                <h4 className="font-medium text-foreground">Documents</h4>
+            </div>
+            <div className="flex items-center justify-between ">
                 {/* <span>Documents ({documents.length})</span> */}
                 {!selectedFile && user.data.isAdmin == true ? (
-                    <Button asChild size="sm" className="flex items-center gap-2 h-8 cursor-pointer" variant="outline">
+                    <Button asChild size="sm" className="flex items-center gap-2 h-10 text-md cursor-pointer" variant="outline">
                         <label>
                             <Upload className="h-3 w-3" />
                             Upload Document
@@ -202,10 +205,11 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                             />
                         </label>
                     </Button>
+
                 ) : null}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-5">
                 {/* File Preview and Title Input */}
                 {selectedFile && (
                     <form
@@ -226,7 +230,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                                 </p>
                             </div>
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             <label htmlFor="document-title" className="text-sm font-medium">
                                 Document Title
                             </label>
@@ -236,7 +240,6 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                                 value={title}
                                 onChange={(e) => setTitle(e.target.value)}
                                 disabled={uploading}
-                                className="border-2 focus:border-primary"
                                 autoFocus
                             />
                         </div>
@@ -263,15 +266,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                     </form>
                 )}
 
-                {/* Documents List */}
-                {documents.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <File className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No documents yet</p>
-                    </div>
-                ) : (
-
-
+                {documents.length > 0 &&
                     <div className="border rounded-lg">
                         <Table>
                             <TableHeader>
@@ -282,66 +277,67 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {documents.map((document, index) => (
-                                    <TableRow key={index} className="">
-                                        <TableCell className="p-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="text-muted-foreground">
-                                                    {getFileIcon(document.filename)}
+                                {
+                                    documents.map((document, index) => (
+                                        <TableRow key={index} className="">
+                                            <TableCell className="p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="text-muted-foreground">
+                                                        {getFileIcon(document.filename)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium">{document.title}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-medium">{document.title}</p>
+                                            </TableCell>
+                                            <TableCell className="p-3 flex justify-end">
+                                                <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                                                    {getFileType(document.filename)}
+                                                </span>
+                                            </TableCell>
+                                            <TableCell className="p-3">
+                                                <div className="flex justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleView(document)}
+                                                        disabled={deletingId === document.filename}
+                                                        className="h-7 w-7 p-0"
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleDownload(document)}
+                                                        disabled={deletingId === document.filename}
+                                                        className="h-7 w-7 p-0"
+                                                    >
+                                                        <Download className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    {
+                                                        user.data.isAdmin == true && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleDelete(document)}
+                                                                disabled={deletingId === document.filename}
+                                                                className="h-7 w-7 p-0 text-destructive"
+                                                            >
+                                                                {deletingId === document.filename ? (
+                                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                ) : (
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                )}
+                                                            </Button>)}
                                                 </div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="p-3 flex justify-end">
-                                            <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                                {getFileType(document.filename)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell className="p-3">
-                                            <div className="flex justify-end gap-1">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleView(document)}
-                                                    disabled={deletingId === document.filename}
-                                                    className="h-7 w-7 p-0"
-                                                >
-                                                    <Eye className="h-3.5 w-3.5" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleDownload(document)}
-                                                    disabled={deletingId === document.filename}
-                                                    className="h-7 w-7 p-0"
-                                                >
-                                                    <Download className="h-3.5 w-3.5" />
-                                                </Button>
-                                                {
-                                                    user.data.isAdmin == true && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDelete(document)}
-                                                            disabled={deletingId === document.filename}
-                                                            className="h-7 w-7 p-0 text-destructive"
-                                                        >
-                                                            {deletingId === document.filename ? (
-                                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                            ) : (
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            )}
-                                                        </Button>)}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
                             </TableBody>
                         </Table>
                     </div>
-                )}
+                }
             </div>
         </div>
     );

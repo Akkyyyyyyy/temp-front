@@ -57,7 +57,7 @@ export const TimeViewToggle: React.FC<TimeViewToggleProps> = ({
   };
 
   return (
-    <div className={`w-full border border-gray-700 rounded-full bg-muted sm:w-fit ${className}`}>
+    <div className={`w-full border border-gray-700 rounded-full bg-muted sm:w-fit flex items-center ${className}`}>
       <div className="inline-flex items-center bg-muted rounded-full p-1 border border-border shadow-sm relative">
         <div
           className={`

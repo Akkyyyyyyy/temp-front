@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { apiFetch } from "./apiClient";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
@@ -199,5 +200,64 @@ export async function changeCompany(payload: {
     return { success: true, data };
   } catch (error: any) {
     return { success: false, message: error.message || "Network error" };
+  }
+}
+export async function getCompanies(payload: {
+  memberId: string;
+}): Promise<ApiResponse<any>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/company/get-companies`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
+
+export async function uploadCompanyLogo(
+  companyId: string,
+  file: File
+): Promise<any> {
+  try {
+    const formData = new FormData();
+    formData.append('companyId', companyId);
+    formData.append('photo', file);
+
+
+    const token = localStorage.getItem('auth-token');
+    const response = await apiFetch(`${baseUrl}/company/upload-logo`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || "Failed to upload photo");
+    }
+
+    return result;
+  } catch (error: any) {
+    console.error('Error uploading photo:', error);
+    toast.error(error.message || "Failed to upload profile picture");
+    return {
+      success: false,
+      message: error.message || "Failed to upload profile picture"
+    };
   }
 }

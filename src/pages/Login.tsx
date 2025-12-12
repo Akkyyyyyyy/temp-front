@@ -44,6 +44,7 @@ const Login = () => {
     formState: { errors },
     reset,
     setValue,
+    setError,
     watch
   } = useForm<FormData>({
     resolver: yupResolver(schema),
@@ -53,7 +54,7 @@ const Login = () => {
   // Load remembered email on component mount
   useEffect(() => {
     const rememberedEmail = localStorage.getItem("rememberedEmail");
-    
+
     // Set initial email if remembered
     setTimeout(() => {
       if (rememberedEmail) {
@@ -83,7 +84,8 @@ const Login = () => {
           setShowForgotPassword(true);
           return;
         }
-        toast.error(response.message || "Login failed");
+        // toast.error(response.message || "Login failed");
+        setError("root",  { message: response.message })
         return;
       }
 
@@ -139,7 +141,11 @@ const Login = () => {
           </CardHeader>
 
           <CardContent className="space-y-5 pt-2">
+            
             <form onSubmit={handleSubmit(onSubmit)} className="">
+               <p className="text-md text-red-500 min-h-[25px] text-center font-medium">
+                  {errors.root?.message || ""}
+                </p>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 <Input
@@ -226,14 +232,14 @@ const Login = () => {
 
               <div className="pt-4 border-t border-muted/30">
                 <div className="text-center text-sm text-muted-foreground">
-                    Don't have an account?{" "}
-                    <a
-                      href="/register"
-                      className="font-semibold text-primary hover:text-primary/80 transition-colors hover:underline"
-                    >
-                      Register your company
-                    </a>
-                  </div>
+                  Don't have an account?{" "}
+                  <a
+                    href="/register"
+                    className="font-semibold text-primary hover:text-primary/80 transition-colors hover:underline"
+                  >
+                    Register your company
+                  </a>
+                </div>
               </div>
             </form>
           </CardContent>
@@ -243,7 +249,7 @@ const Login = () => {
       <ForgotPasswordModal
         isOpen={showForgotPassword}
         onClose={() => setShowForgotPassword(false)}
-        email={watchedEmail}
+        email={''}
       />
     </>
   );

@@ -55,10 +55,22 @@ export interface GetProjectAssignmentsRequest {
   projectId: string;
 }
 
+// Add Event interface
+export interface EventWithAssignments {
+  eventId: string;
+  date: string;
+  startHour: string;
+  endHour: string;
+  location?: string;
+  reminders?: any[];
+  assignments: Assignment[];
+}
+
+// Update the GetProjectAssignmentsResponse
 export interface GetProjectAssignmentsResponse {
   success: boolean;
   message?: string;
-  assignments?: Assignment[];
+  events?: EventWithAssignments[];
 }
 
 export interface UpdateAssignmentInstructionsRequest {
@@ -166,26 +178,25 @@ export interface IReminders {
   weekBefore: boolean;
   dayBefore: boolean;
 }
-
-export interface GetProjectRemindersRequest {
-  projectId: string;
+export interface GetEventRemindersRequest {
+    eventId: string;
 }
 
-export interface GetProjectRemindersResponse {
-  success: boolean;
-  message?: string;
-  reminders?: IReminders;
+export interface GetEventRemindersResponse {
+    success: boolean;
+    message?: string;
+    reminders?: IReminders;
 }
 
-export interface UpdateProjectRemindersRequest {
-  projectId: string;
-  reminders: IReminders;
+export interface UpdateEventRemindersRequest {
+    eventId: string;
+    reminders: IReminders;
 }
 
-export interface UpdateProjectRemindersResponse {
-  success: boolean;
-  message: string;
-  reminders?: IReminders;
+export interface UpdateEventRemindersResponse {
+    success: boolean;
+    message: string;
+    reminders?: IReminders;
 }
 
 // Checklist API Functions
@@ -865,99 +876,105 @@ export async function deleteProjectDocuments(
   }
 }
 // Reminder API Functions
-export async function getProjectReminders(
-  request: GetProjectRemindersRequest
-): Promise<GetProjectRemindersResponse> {
-  try {
-    const token = localStorage.getItem('auth-token');
+export async function getEventReminders(
+    request: GetEventRemindersRequest
+): Promise<GetEventRemindersResponse> {
+    try {
+        const token = localStorage.getItem('auth-token');
 
-    if (!request.projectId?.trim()) {
-      return { 
-        success: false, 
-        message: "Project ID is required" 
-      };
+        if (!request.eventId?.trim()) {
+            return { 
+                success: false, 
+                message: "Event ID is required" 
+            };
+        }
+
+        const response = await apiFetch(`${baseUrl}/project/event/${request.eventId}/reminders`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const result: GetEventRemindersResponse = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to fetch event reminders");
+        }
+
+        return result;
+    } catch (error: any) {
+        console.error("Error fetching event reminders:", error);
+        return {
+            success: false,
+            message: error.message || "Network error while fetching event reminders"
+        };
     }
-
-    const response = await apiFetch(`${baseUrl}/project/${request.projectId}/reminders`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-
-    const result: GetProjectRemindersResponse = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || "Failed to fetch project reminders");
-    }
-
-    return result;
-  } catch (error: any) {
-    console.error("Error fetching project reminders:", error);
-    return {
-      success: false,
-      message: error.message || "Network error while fetching project reminders"
-    };
-  }
 }
 
-export async function updateProjectReminders(
-  request: UpdateProjectRemindersRequest
-): Promise<UpdateProjectRemindersResponse> {
-  try {
-    const token = localStorage.getItem('auth-token');
+export async function updateEventReminders(
+    request: UpdateEventRemindersRequest
+): Promise<UpdateEventRemindersResponse> {
+    try {
+        const token = localStorage.getItem('auth-token');
 
-    if (!request.projectId?.trim()) {
-      return { 
-        success: false, 
-        message: "Project ID is required" 
-      };
+        if (!request.eventId?.trim()) {
+            return { 
+                success: false, 
+                message: "Event ID is required" 
+            };
+        }
+
+        if (!request.reminders || typeof request.reminders !== 'object') {
+            return {
+                success: false,
+                message: "Reminders object is required"
+            };
+        }
+
+        // Validate reminders structure
+        if (typeof request.reminders.weekBefore !== 'boolean') {
+            return {
+                success: false,
+                message: "weekBefore must be a boolean"
+            };
+        }
+
+        if (typeof request.reminders.dayBefore !== 'boolean') {
+            return {
+                success: false,
+                message: "dayBefore must be a boolean"
+            };
+        }
+
+        const response = await apiFetch(`${baseUrl}/project/event/${request.eventId}/reminders`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ reminders: request.reminders })
+        });
+
+        const result: UpdateEventRemindersResponse = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.message || "Failed to update event reminders");
+        }
+
+        if (!result.success) {
+            console.error(result.message || "Failed to update reminders");
+        } else {
+            console.log(result.message || "Reminders updated successfully");
+        }
+
+        return result;
+    } catch (error: any) {
+        console.error("Error updating event reminders:", error);
+        toast.error(error.message || "Network error while updating reminders");
+        return {
+            success: false,
+            message: error.message || "Network error while updating reminders"
+        };
     }
-
-    if (!request.reminders || typeof request.reminders !== 'object') {
-      return {
-        success: false,
-        message: "Reminders object is required"
-      };
-    }
-
-    // Validate reminders structure
-    if (typeof request.reminders.weekBefore !== 'boolean') {
-      return {
-        success: false,
-        message: "weekBefore must be a boolean"
-      };
-    }
-
-    if (typeof request.reminders.dayBefore !== 'boolean') {
-      return {
-        success: false,
-        message: "dayBefore must be a boolean"
-      };
-    }
-
-    const response = await apiFetch(`${baseUrl}/project/${request.projectId}/reminders`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ reminders: request.reminders })
-    });
-
-    const result: UpdateProjectRemindersResponse = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || "Failed to update project reminders");
-    }
-
-    return result;
-  } catch (error: any) {
-    console.error("Error updating project reminders:", error);
-    toast.error(error.message || "Network error while updating reminders");
-    return {
-      success: false,
-      message: error.message || "Network error while updating reminders"
-    };
-  }
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Loader2, Edit, Save, X, MoreVertical } from "lucide-react";
+import { Plus, Trash2, Loader2, Edit, Save, X, MoreVertical, SaveAllIcon, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -253,77 +253,83 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
-                <span className="ml-3 text-muted-foreground">Loading Equipments...</span>
-            </div>
+        <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+        <span className="ml-3 text-muted-foreground">Loading Equipments...</span>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
+       <div className="flex items-center justify-between">
+        <h4 className="font-medium text-foreground">Equipments</h4>
+      </div>
       {/* Add New Equipment Section */}
       {isAdding ? (
         <div className="p-3 bg-muted/30 rounded-lg border border-border/20">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <Input
               value={newItemTitle}
               onChange={(e) => setNewItemTitle(e.target.value)}
               placeholder="Equipment title"
-              className="h-8 text-sm"
+              className="h-10 text-xl"
               autoFocus
             />
 
             {/* Equipment Items */}
-            <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Equipment items:</label>
-              {equipmentItems.map((item, index) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <Input
-                    value={item.name}
-                    onChange={(e) => updateEquipmentItem(item.id, e.target.value)}
-                    placeholder={`Equipment item ${index + 1}`}
-                    className="h-8 text-sm"
-                  />
-                  {equipmentItems.length > 1 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeEquipmentItem(item.id)}
-                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-muted-foreground">Equipment items:</label>
+              <div className="space-y-3">
+                {equipmentItems.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-3">
+                     <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60"></div>
+                    <Input
+                      value={item.name}
+                      onChange={(e) => updateEquipmentItem(item.id, e.target.value)}
+                      placeholder={`Equipment item ${index + 1}`}
+                      className="h-10 text-md"
+                    />
+                    {equipmentItems.length > 1 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeEquipmentItem(item.id)}
+                        className="h-9 w-9 p-0 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
 
               <Button
                 variant="outline"
                 size="sm"
                 onClick={addEquipmentItem}
-                className="h-7 text-xs"
+                className="h-8 text-xs mt-2"
               >
-                <Plus className="w-3 h-3 mr-1" />
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
                 Add More Items
               </Button>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-3 pt-2">
               <Button
                 size="sm"
                 onClick={handleAddItem}
-                className="h-7 text-xs"
+                className="h-9 text-sm"
               >
-                <Plus className="w-3 h-3 mr-1" />
-                Add Equipment
+                <Save className="w-4 h-4 mr-1.5" />
+                Save
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCancelAdd}
-                className="h-7 text-xs"
+                className="h-9 text-sm"
               >
-                <X className="w-3 h-3 mr-1" />
+                <X className="w-4 h-4 mr-1.5" />
                 Cancel
               </Button>
             </div>
@@ -335,89 +341,93 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
             onClick={handleStartAdd}
             size="sm"
             variant="outline"
-            className="h-8 text-xs"
+            className="h-10 text-sm"
           >
-            <Plus className="w-3 h-3 mr-1" />
+            <Plus className="w-4 h-4 mr-1" />
             Add New Equipment
           </Button>
         )
       )}
 
       {/* Equipment Sections */}
-      <div className="space-y-2">
+      <div className="space-y-5">
         {equipments.length === 0 && !isAdding ? (
-          <div className="text-center py-6 text-muted-foreground border border-dashed rounded-lg">
-            <p className="text-sm">No equipment sections yet</p>
-            <p className="text-xs mt-1">Add your first equipment section to get started</p>
+          <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                    <Camera className="w-12 h-12 mx-auto mb-4 opacity-50" />
+
+            <p className="text-lg">No equipments yet</p>
           </div>
         ) : (
           equipments.map((item) => (
             <div
               key={item.id}
-              className="p-3 rounded-md border border-border/20 transition-colors group hover:border-border/40 bg-background"
+              className="p-3 rounded-md border border-border/20 transition-colors group hover:border-border/40 "
             >
               {editingItemId === item.id ? (
                 // Edit mode
-                <div className="space-y-2">
+                <div className="space-y-4 ">
                   <Input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     placeholder="Equipment title"
-                    className="h-8 text-sm"
+                    className="h-10 text-sm"
                     autoFocus
                   />
 
                   {/* Edit Equipment Items */}
-                  <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground">Equipment items:</label>
-                    {editItems.map((editItem, index) => (
-                      <div key={editItem.id} className="flex items-center gap-2">
-                        <Input
-                          value={editItem.name}
-                          onChange={(e) => updateEditEquipmentItem(editItem.id, e.target.value)}
-                          placeholder={`Equipment item ${index + 1}`}
-                          className="h-8 text-sm"
-                        />
-                        {editItems.length > 1 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => removeEditEquipmentItem(editItem.id)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-muted-foreground">Equipment items:</label>
+                    <div className="space-y-3">
+                      {editItems.map((editItem, index) => (
+                        <div key={editItem.id} className="flex items-center gap-3 ">
+                           <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60"></div>
+                          <Input
+                            value={editItem.name}
+                            onChange={(e) => updateEditEquipmentItem(editItem.id, e.target.value)}
+                            placeholder={`Equipment item ${index + 1}`}
+                            className="h-10 text-sm"
+                          />
+                          {editItems.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => removeEditEquipmentItem(editItem.id)}
+                              className="h-9 w-9 p-0 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/50"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
 
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={addEditEquipmentItem}
-                      className="h-7 text-xs"
+                      className="h-8 text-xs mt-2"
                     >
-                      <Plus className="w-3 h-3 mr-1" />
+                      <Plus className="w-3.5 h-3.5 mr-1.5" />
                       Add More Items
                     </Button>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-3 pt-2">
                     <Button
                       size="sm"
                       onClick={handleSaveEdit}
-                      className="h-7 text-xs"
+                      className="h-9 text-sm"
                     >
-                      <Save className="w-3 h-3 mr-1" />
+                      <Save className="w-3.5 h-3.5 mr-1.5" />
                       Save
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={handleCancelEdit}
-                      className="h-7 text-xs"
+                      className="h-9 text-sm"
                     >
-                      <X className="w-3 h-3 mr-1" />
+                      <X className="w-3.5 h-3.5 mr-1.5" />
                       Cancel
                     </Button>
                   </div>
@@ -426,13 +436,13 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
                 // View mode
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground mb-2">
+                    <div className="text-xl font-medium text-foreground mb-2">
                       {item.title}
                     </div>
                     {Array.isArray(item.content) && item.content.length > 0 && (
-                      <ul className="text-xs text-muted-foreground space-y-1">
+                      <ul className="text-lg text-muted-foreground space-y-1">
                         {item.content.map((content, index) => (
-                          <li key={index} className="flex items-start gap-2">
+                          <li key={index} className="flex items-center gap-2">
                             <span className="mt-1.5 w-1 h-1 bg-muted-foreground rounded-full flex-shrink-0" />
                             <span>{content}</span>
                           </li>

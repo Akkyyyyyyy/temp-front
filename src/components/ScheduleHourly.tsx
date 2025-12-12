@@ -8,6 +8,7 @@ import { ProjectDetails } from "./ProjectDetails";
 import { TimeView } from "./GanttChart";
 import { TeamMember } from "./TeamMembers";
 import { monthNames } from "@/constant/constant";
+import { getFallback } from "@/helper/helper";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -23,8 +24,13 @@ interface ScheduleHourlyProps {
   timeView: TimeView;
   teamMembers: TeamMember[];
   selectedProject: string | null;
+  selectedEvent: string | null;
+  isProjectClick: boolean;
+  isEventClick:boolean;
+  setIsProjectClick: (bool:boolean) => void;
+  setIsEventClick: (bool:boolean) => void;
   setSelectedProject: (projectId: string | null) => void;
-  getWorkersForDay: (day: number, month: number, year: number) => any[];
+  getWorkersForDay: (day: number, month: number, year: number) => any[]; // Keep original signature
   getAvailableForDay: (day: number, month: number, year: number) => any[];
   getHourlyBookings: (day: number, month: number, year: number) => any[];
   hourlyBookingsToday: any[];
@@ -34,12 +40,14 @@ interface ScheduleHourlyProps {
   currentYear: number;
   setSelectedMember: (member: TeamMember) => void;
   onAddSection: () => void;
+  onAddTeamMember: () => void;
 }
 
 // Define the ref interface
 export interface ScheduleHourlyRef {
   scrollToDayCalendar: () => void;
   scrollToProjectDetails: () => void;
+  scrollToEventDetails: () => void;
 }
 
 export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>(
@@ -66,21 +74,46 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     currentYear,
     setSelectedMember,
     onAddSection,
+    onAddTeamMember,
+    selectedEvent,
+    isProjectClick,
+    isEventClick,
+    setIsProjectClick,
+    setIsEventClick
   }, ref) {
     const [showAvailable, setShowAvailable] = useState(false);
 
     // Create refs for scrolling
     const dayCalendarRef = useRef<HTMLDivElement>(null);
     const projectDetailsRef = useRef<HTMLDivElement>(null);
+    const EventDetailsRef = useRef<HTMLDivElement>(null);
 
     // Auto-scroll to project details when selectedProject changes
     useEffect(() => {
       if (selectedProject && projectDetailsRef.current) {
         setTimeout(() => {
           scrollToProjectDetails();
-        }, 50);
+        }, 600);
       }
-    }, [selectedProject]);
+    }, [selectedProject, isProjectClick]);
+
+    useEffect(() => {
+      if (selectedEvent) {
+        // Wait for next render cycle to ensure ProjectDetails is mounted
+        const scrollTimer = setTimeout(() => {
+          if (EventDetailsRef?.current) {
+            EventDetailsRef.current.scrollIntoView({
+              behavior: 'smooth',
+              block: 'start'
+            });
+          } else {
+            console.log("EventDetailsRef still null, component may not be mounted yet");
+          }
+        }, 600);
+
+        return () => clearTimeout(scrollTimer);
+      }
+    }, [selectedEvent, isProjectClick, isEventClick]);
 
     // Scroll functions
     const scrollToDayCalendar = () => {
@@ -96,33 +129,48 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
       setTimeout(() => {
         if (projectDetailsRef.current) {
           projectDetailsRef.current.scrollIntoView({
-            behavior: 'smooth', // smooth scroll animation
+            behavior: 'smooth',
             block: 'start',
           });
         }
-      }, 300); // wait 1 second before starting the animation
+      }, 600);
     };
 
+    const scrollToEventDetails = () => {
+      setTimeout(() => {
+        if (EventDetailsRef.current) {
+          EventDetailsRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      }, 600);
+    };
     // Expose the scroll functions via the forwardRef
     useImperativeHandle(ref, () => ({
       scrollToDayCalendar,
-      scrollToProjectDetails
+      scrollToProjectDetails,
+      scrollToEventDetails
     }));
 
     // Function to handle project click
     const handleProjectClick = (projectId: string) => {
       const newSelectedProject = selectedProject === projectId ? null : projectId;
       setSelectedProject(newSelectedProject);
+      setIsProjectClick(true);
     };
 
     if (!selectedDay) {
       return null;
     }
 
-    const projects = workersToday.flatMap(worker => worker.activeProjects || []);
+    // Get workers for the current day using the original function signature
+    const workers = workersToday.length > 0 ? workersToday : getWorkersForDay(selectedDay, currentMonth, currentYear);
+
+    const projects = workers.flatMap(worker => worker.activeProjects || []);
     const uniqueProjectsMap = new Map();
     projects.forEach(project => {
-      if (!uniqueProjectsMap.has(project.id)) {
+      if (!project.isOther && !uniqueProjectsMap.has(project.id)) {
         uniqueProjectsMap.set(project.id, project);
       }
     });
@@ -142,7 +190,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                 <div className="inline-flex items-center gap-1 bg-muted rounded-full p-1 border border-border shadow-sm relative">
                   <div
                     className={`
-                      absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out
+                      absolute bg-studio-gold rounded-full shadow-sm transition-all duration-300 ease-in-out
                       ${showAvailable ? 'left-1 translate-x-full' : 'left-1'}
                       w-[calc(50%-4px)] h-[calc(100%-8px)] 
                     `}
@@ -152,7 +200,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       key={view}
                       onClick={() => setShowAvailable(view === 'available')}
                       size="sm"
-                      className={`
+                      className={`bg-studio-gold
                         relative capitalize px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-full transition-all duration-300
                         hover:bg-transparent
                         ${showAvailable === (view === 'available')
@@ -192,7 +240,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       className={`
                         text-xs px-2 sm:px-3 py-1 h-7 sm:h-8 flex items-center flex-shrink-0
                         ${selectedProject === project.id
-                          ? 'bg-primary border border-transparent'
+                          ? 'bg-studio-gold border border-transparent '
                           : 'bg-background text-foreground border border-gray-800'
                         }
                       `}
@@ -237,7 +285,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                         className="object-cover"
                       />
                       <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-xs">
-                        {worker.name.slice(0, 2).toUpperCase()}
+                        {getFallback(worker.name)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -256,22 +304,28 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                         Active Projects:
                       </h5>
                       <div className="space-y-1">
-                        {(worker as any).activeProjects.map((project: any) => (
-                          <div key={project.id} className="flex items-center gap-2 text-xs sm:text-sm">
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: project.color }}
-                            />
-                            <span className="text-foreground truncate flex-1">
-                              {project.name}
-                            </span>
-                            {project.time && (
-                              <span className="text-muted-foreground text-xs whitespace-nowrap ml-2">
-                                {project.time}
+                        {(worker as any).activeProjects.map((project: any) => {
+                          const isOtherEvent = project.isOther;
+
+                          return (
+                            <div key={project.id} className="flex items-center gap-2 text-xs sm:text-sm">
+                              <div
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={isOtherEvent ? {
+                                  background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #9ca3af 50%, #4b5563 100%)'
+                                } : { backgroundColor: project.color }}
+                              />
+                              <span className={`truncate flex-1 ${isOtherEvent ? 'text-gray-500' : 'text-foreground'}`}>
+                                {isOtherEvent ? 'Private Event' : project.name}
                               </span>
-                            )}
-                          </div>
-                        ))}
+                              {project.time && (
+                                <span className={`text-xs whitespace-nowrap ml-2 ${isOtherEvent ? 'text-gray-400' : 'text-muted-foreground'}`}>
+                                  {project.time}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -292,7 +346,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
 
           {/* Project Details Section */}
           {selectedProject && (
-            <div ref={projectDetailsRef} className="mt-6 sm:mt-8">
+            <div className="mt-6 sm:mt-8">
               <ProjectDetails
                 projectId={selectedProject}
                 teamMembers={teamMembers}
@@ -300,6 +354,10 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                 setSelectedMember={setSelectedMember}
                 onAddSection={onAddSection}
                 onReady={scrollToProjectDetails}
+                onAddTeamMember={onAddTeamMember}
+                eventItem={selectedEvent}
+                EventDetailsRef={EventDetailsRef}
+                isEventClick={isEventClick}
               />
             </div>
           )}

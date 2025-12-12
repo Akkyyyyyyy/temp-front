@@ -28,6 +28,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Input } from "../ui/input";
 import { Checkbox } from "../ui/checkbox";
 import { PhoneInput } from "react-international-phone";
+import { Textarea } from "../ui/textarea";
 
 interface EditProjectFormData {
     name: string;
@@ -45,14 +46,10 @@ interface EditProjectFormData {
 }
 
 interface ProjectDetails {
+    description: string;
     id: string;
     name: string;
     color?: string;
-    location?: string;
-    startDate: string;
-    endDate: string;
-    startHour?: number;
-    endHour?: number;
     client?: {
         name: string;
         email: string;
@@ -75,14 +72,10 @@ export function EditProjectDialog({
 }: EditProjectDialogProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-    const [editFormData, setEditFormData] = useState<EditProjectFormData>({
+    const [editFormData, setEditFormData] = useState<any>({
         name: '',
         color: '#3b82f6',
-        location: '',
-        startDate: '',
-        endDate: '',
-        startHour: 9,
-        endHour: 17,
+        description: '',
         client: undefined
     });
     const [editErrors, setEditErrors] = useState<Record<string, string>>({});
@@ -94,11 +87,7 @@ export function EditProjectDialog({
             setEditFormData({
                 name: project.name || '',
                 color: project.color || '#3b82f6',
-                location: project.location || '',
-                startDate: project.startDate,
-                endDate: project.endDate,
-                startHour: project.startHour || 9,
-                endHour: project.endHour || 17,
+                description: project.description || '',
                 client: project.client ? {
                     ...project.client
                 } : undefined
@@ -123,28 +112,8 @@ export function EditProjectDialog({
         if (!editFormData.name?.trim()) {
             errors.name = "Project name is required";
         }
-
-        // Required fields validation
-        if (!editFormData.startDate) {
-            errors.startDate = "Start date is required";
-        }
-
-        if (!editFormData.endDate) {
-            errors.endDate = "End date is required";
-        }
-
-        // Date range validation
-        if (editFormData.startDate && editFormData.endDate) {
-            const start = new Date(editFormData.startDate);
-            const end = new Date(editFormData.endDate);
-            if (start > end) {
-                errors.endDate = "End date cannot be before start date";
-            }
-        }
-
-        // Time validation
-        if (editFormData.startHour >= editFormData.endHour) {
-            errors.endHour = "End time must be after start time";
+        if (!editFormData.description?.trim()) {
+            errors.description = "description is required";
         }
 
         // Client information validation
@@ -187,10 +156,6 @@ export function EditProjectDialog({
             const updateData: any = {
                 projectId: project.id,
                 name: editFormData.name.trim(),
-                startDate: editFormData.startDate,
-                endDate: editFormData.endDate,
-                startHour: editFormData.startHour,
-                endHour: editFormData.endHour,
                 isScheduleUpdate: true
             };
 
@@ -199,8 +164,8 @@ export function EditProjectDialog({
                 updateData.color = editFormData.color;
             }
 
-            if (editFormData.location) {
-                updateData.location = editFormData.location;
+            if (editFormData.description) {
+                updateData.description = editFormData.description;
             }
 
             // Add client information if included
@@ -214,7 +179,7 @@ export function EditProjectDialog({
                 // Remove client information if checkbox is unchecked
                 updateData.client = null;
             }
-            
+
             const response = await editProject(updateData);
 
             if (response.success) {
@@ -240,11 +205,7 @@ export function EditProjectDialog({
             setEditFormData({
                 name: project.name || '',
                 color: project.color || '#3b82f6',
-                location: project.location || '',
-                startDate: project.startDate,
-                endDate: project.endDate,
-                startHour: project.startHour || 9,
-                endHour: project.endHour || 17,
+                description: project.description || '',
                 client: project.client ? {
                     ...project.client
                 } : undefined
@@ -252,51 +213,6 @@ export function EditProjectDialog({
             setEditErrors({});
         }
         onOpenChange(newOpen);
-    };
-
-    // Fixed calendar date selection handler
-    const handleDateSelect = (range: { from?: Date; to?: Date } | undefined) => {
-        if (!range?.from) {
-            // If no from date, clear selection
-            setEditFormData(prev => ({
-                ...prev,
-                startDate: '',
-                endDate: ''
-            }));
-            return;
-        }
-
-        if (range.from && range.to) {
-            // Complete range selected
-            setEditFormData(prev => ({
-                ...prev,
-                startDate: format(range.from!, "yyyy-MM-dd"),
-                endDate: format(range.to!, "yyyy-MM-dd")
-            }));
-
-            // Clear errors and close calendar
-            if (editErrors.startDate || editErrors.endDate) {
-                setEditErrors({ ...editErrors, startDate: '', endDate: '' });
-            }
-            setIsCalendarOpen(false);
-        } else if (range.from && !range.to) {
-            // Only start date selected, keep calendar open for end date selection
-            setEditFormData(prev => ({
-                ...prev,
-                startDate: format(range.from, "yyyy-MM-dd"),
-                endDate: ''
-            }));
-        }
-    };
-
-    const handleClearDates = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering popover close
-        setEditFormData(prev => ({
-            ...prev,
-            startDate: '',
-            endDate: ''
-        }));
-        // Don't close the calendar - let user pick new dates immediately
     };
 
     return (
@@ -309,22 +225,26 @@ export function EditProjectDialog({
                     <div className="space-y-4 p-4 pr-4">
                         {/* Project Name */}
                         <div className="space-y-2">
-                            <Label htmlFor="projectName">Project Name *</Label>
+                            <div className='flex items-center justify-between'>
+                                <Label htmlFor="projectName">Project Name <span className="text-red-500">*</span></Label>
+                                <div className="h-6 flex items-center">
+                                    {editErrors.name && (
+                                        <p className="text-red-500 text-sm">{editErrors.name}</p>
+                                    )}
+                                </div>
+                            </div>
                             <Input
                                 id="projectName"
                                 value={editFormData.name}
                                 onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
                                 placeholder="Enter project name"
-                                className={`bg-background ${editErrors.name ? 'border-red-500' : 'border-border'}`}
+                                className={`bg-background`}
                             />
-                            {editErrors.name && (
-                                <p className="text-red-500 text-sm">{editErrors.name}</p>
-                            )}
                         </div>
 
                         {/* Project Color */}
                         <div className="space-y-3">
-                            <Label className="text-sm font-medium">Color</Label>
+                            <Label className="text-sm font-medium">Color <span className="text-red-500">*</span></Label>
                             <div className="space-y-3">
                                 <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
                                     <div className="relative">
@@ -358,136 +278,26 @@ export function EditProjectDialog({
                             </div>
                         </div>
 
-                        {/* Location */}
+                        {/* description */}
                         <div className="space-y-2">
-                            <Label htmlFor="location">Location</Label>
-                            <Input
-                                id="location"
-                                value={editFormData.location || ''}
-                                onChange={(e) => setEditFormData(prev => ({ ...prev, location: e.target.value }))}
-                                placeholder="Enter project location"
+                            <div className='flex items-center justify-between'>
+                                <Label htmlFor="description">Description <span className="text-red-500">*</span></Label>
+                                <div className="h-6 flex items-center">
+                                    {editErrors.description && (
+                                        <p className="text-red-500 text-sm">{editErrors.description}</p>
+                                    )}
+                                </div>
+                            </div>
+                            <Textarea
+                                id="description"
+                                value={editFormData.description || ''}
+                                onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
+                                placeholder="Enter project description"
                                 className="bg-background border-border"
                             />
                         </div>
 
-                        {/* Date Range Section - Fixed Calendar */}
-                        <div className="space-y-2">
-                            <Label htmlFor="dateRange">Select Date Range *</Label>
-                            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        className={`w-full justify-start text-left font-normal ${editErrors.startDate || editErrors.endDate ? 'border-red-500' : ''}`}
-                                        id="dateRange"
-                                    >
-                                        <CalendarIcon className="h-4 w-4 mr-2" />
-                                        {editFormData.startDate && editFormData.endDate ? (
-                                            <>
-                                                {format(new Date(editFormData.startDate), "PPP")} - {format(new Date(editFormData.endDate), "PPP")}
-                                            </>
-                                        ) : editFormData.startDate ? (
-                                            `Select end date for ${format(new Date(editFormData.startDate), "PPP")}`
-                                        ) : (
-                                            <span>Pick a date range</span>
-                                        )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    className="w-auto p-0"
-                                    align="start"
-                                    sideOffset={4}
-                                >
-                                    <div className="flex flex-col">
-                                        <div className="flex justify-between items-center p-2 border-b">
-                                            <span className="text-sm font-medium">
-                                                {editFormData.startDate && !editFormData.endDate
-                                                    ? 'Select end date'
-                                                    : 'Select date range'
-                                                }
-                                            </span>
-                                            {(editFormData.startDate || editFormData.endDate) && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={handleClearDates}
-                                                    className="h-6 px-2 text-xs"
-                                                >
-                                                    <X className="h-3 w-3 mr-1" />
-                                                    Clear
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <Calendar
-                                            mode="range"
-                                            classNames={{
-                                                day_today: "",
-                                            }}
-                                            defaultMonth={editFormData.startDate ? new Date(editFormData.startDate) : new Date()}
-                                            selected={
-                                                editFormData.startDate
-                                                    ? {
-                                                        from: new Date(editFormData.startDate),
-                                                        to: editFormData.endDate ? new Date(editFormData.endDate) : undefined
-                                                    }
-                                                    : undefined
-                                            }
-                                            onSelect={handleDateSelect}
-                                            initialFocus
-                                            numberOfMonths={1}
-                                        />
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                            {(editErrors.startDate || editErrors.endDate) && (
-                                <p className="text-red-500 text-sm">{editErrors.startDate || editErrors.endDate}</p>
-                            )}
-                        </div>
 
-                        {/* Time Section */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="startHour">Start Time</Label>
-                                <Select
-                                    value={editFormData.startHour.toString()}
-                                    onValueChange={(value) => setEditFormData(prev => ({ ...prev, startHour: parseInt(value) }))}
-                                >
-                                    <SelectTrigger className="bg-background border-border">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-background border-border shadow-lg max-h-[50vh]">
-                                        {hours
-                                            .filter(hour => hour !== 24)
-                                            .map((hour) => (
-                                                <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                                                    {`${hour}:00`}
-                                                </SelectItem>
-                                            ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="endHour">End Time</Label>
-                                <Select
-                                    value={editFormData.endHour.toString()}
-                                    onValueChange={(value) => setEditFormData(prev => ({ ...prev, endHour: parseInt(value) }))}
-                                >
-                                    <SelectTrigger className={`bg-background ${editErrors.endHour ? 'border-red-500' : 'border-border'}`}>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-background border-border shadow-lg max-h-[50vh]">
-                                        {hours.filter(h => h > editFormData.startHour).map((hour) => (
-                                            <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                                                {`${hour}:00`}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {editErrors.endHour && (
-                                    <p className="text-red-500 text-sm">{editErrors.endHour}</p>
-                                )}
-                            </div>
-                        </div>
 
                         {/* Client Information Section */}
                         <div className="space-y-4 pt-4 border-t border-border">
@@ -522,7 +332,14 @@ export function EditProjectDialog({
                             {editFormData.client && (
                                 <div className="grid grid-cols-1 gap-4 pl-6 border-l-2 border-border">
                                     <div className="space-y-2">
-                                        <Label htmlFor="clientName">Client Name *</Label>
+                                        <div className='flex items-center justify-between'>
+                                            <Label htmlFor="clientName">Client Name <span className="text-red-500">*</span></Label>
+                                            <div className="h-6 flex items-center">
+                                                {editErrors.clientName && (
+                                                    <p className="text-red-500 text-sm">{editErrors.clientName}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                         <Input
                                             id="clientName"
                                             value={editFormData.client.name}
@@ -534,15 +351,20 @@ export function EditProjectDialog({
                                                 }
                                             }))}
                                             placeholder="Enter client name"
-                                            className={`bg-background ${editErrors.clientName ? 'border-red-500' : 'border-border'}`}
+                                            className={`bg-background`}
                                         />
-                                        {editErrors.clientName && (
-                                            <p className="text-red-500 text-sm">{editErrors.clientName}</p>
-                                        )}
+
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="clientEmail">Email</Label>
+                                        <div className='flex items-center justify-between'>
+                                            <Label htmlFor="clientEmail">Email <span className="text-red-500">*</span></Label>
+                                            <div className="h-6 flex items-center">
+                                                {editErrors.clientEmail && (
+                                                    <p className="text-red-500 text-sm">{editErrors.clientEmail}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                         <Input
                                             id="clientEmail"
                                             type="email"
@@ -557,14 +379,18 @@ export function EditProjectDialog({
                                             placeholder="client@example.com"
                                             className={`bg-background ${editErrors.clientEmail ? 'border-red-500' : 'border-border'}`}
                                         />
-                                        {editErrors.clientEmail && (
-                                            <p className="text-red-500 text-sm">{editErrors.clientEmail}</p>
-                                        )}
                                     </div>
 
                                     {/* Client Mobile with react-international-phone */}
                                     <div className="space-y-2">
-                                        <Label htmlFor="clientMobile">Mobile</Label>
+                                        <div className='flex items-center justify-between'>
+                                            <Label htmlFor="clientMobile">Mobile <span className="text-red-500">*</span></Label>
+                                            <div className="h-6 flex items-center">
+                                                {editErrors.clientMobile && (
+                                                    <p className="text-red-500 text-sm mt-1">{editErrors.clientMobile}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                         <PhoneInput
                                             defaultCountry="gb"
                                             value={editFormData.client.mobile || ""}
@@ -584,9 +410,6 @@ export function EditProjectDialog({
                                             }}
                                             placeholder="Enter phone number"
                                         />
-                                        {editErrors.clientMobile && (
-                                            <p className="text-red-500 text-sm mt-1">{editErrors.clientMobile}</p>
-                                        )}
                                     </div>
                                 </div>
                             )}

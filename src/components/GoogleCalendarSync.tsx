@@ -1,45 +1,46 @@
 // components/GoogleCalendarSync.tsx
 import { useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
 } from "@/components/ui/dialog";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
 } from "@/components/ui/popover";
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface GoogleCalendarSyncProps {
   className?: string;
   isAuthorized?: boolean;
   isSyncing?: boolean;
   onConnect: () => Promise<void>;
-  onSync: () => Promise<void>;
+  onSyncAllEvents: () => Promise<any>;  // Updated
   onDisconnect: () => Promise<void>;
 }
 
-export function GoogleCalendarSync({ 
+export function GoogleCalendarSync({
   className,
   isAuthorized = false,
   isSyncing = false,
   onConnect,
-  onSync,
+  onSyncAllEvents,  // Updated
   onDisconnect
 }: GoogleCalendarSyncProps) {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [showDisconnectPopover, setShowDisconnectPopover] = useState(false);
+  const [syncResult, setSyncResult] = useState<any>(null);
 
   const handleConnect = async () => {
     try {
@@ -47,6 +48,7 @@ export function GoogleCalendarSync({
       setShowConnectDialog(false);
     } catch (error) {
       console.error("Connection failed:", error);
+      toast.error("Failed to connect Google Calendar");
     }
   };
 
@@ -54,15 +56,36 @@ export function GoogleCalendarSync({
     try {
       await onDisconnect();
       setShowDisconnectPopover(false);
+      toast.success("Disconnected from Google Calendar");
     } catch (error) {
       console.error("Disconnect failed:", error);
+      toast.error("Failed to disconnect");
+    }
+  };
+
+  const handleSyncEvents = async () => {
+    try {
+      const result = await onSyncAllEvents();
+      setSyncResult(result);
+      setShowDisconnectPopover(false);
+
+      // Show detailed results in toast
+      if (result?.synced > 0) {
+        toast.success(`Synced events to Google Calendar`);
+      }
+      if (result?.failed > 0) {
+        toast.warning(`Failed to sync Events`);
+      }
+    } catch (error) {
+      console.error("Sync failed:", error);
+      toast.error("Failed to sync events");
     }
   };
 
   const handleIconClick = async () => {
     if (isAuthorized) {
-      // Already authorized - sync without popup
-      // await onSync();
+      // Already authorized - open popover for sync options
+      setShowDisconnectPopover(true);
     } else {
       // Not authorized - show connect dialog
       setShowConnectDialog(true);
@@ -94,7 +117,7 @@ export function GoogleCalendarSync({
                 </PopoverTrigger>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {isSyncing ? "Syncing projects..." : "Sync projects to Google Calendar"}
+                {isSyncing ? "Syncing events..." : "Sync events to Google Calendar"}
               </TooltipContent>
             </Tooltip>
             
@@ -107,18 +130,18 @@ export function GoogleCalendarSync({
                 <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                   <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                   <span className="text-sm text-green-600 dark:text-green-400">
-                    {isSyncing ? "Syncing in progress..." : "Ready to sync"}
+                    {isSyncing ? "Syncing in progress..." : "Ready to sync events"}
                   </span>
                 </div>
 
                 <div className="flex gap-2">
                   <Button
-                    onClick={onSync}
+                    onClick={handleSyncEvents}
                     disabled={isSyncing}
                     className="flex-1"
                     size="sm"
                   >
-                    {isSyncing ? <SyncButtonText /> : "Sync Now"}
+                    {isSyncing ? <SyncButtonText /> : "Sync All Events"}
                   </Button>
                 </div>
 
@@ -165,7 +188,7 @@ export function GoogleCalendarSync({
                 Connect Google Calendar
               </DialogTitle>
               <DialogDescription>
-                Connect once and your projects will sync automatically.
+                Connect once and your events will sync automatically.
               </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 pt-4">
@@ -178,7 +201,11 @@ export function GoogleCalendarSync({
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Automatic future syncs</span>
+                    <span>Sync events automatically</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <span>Updates reflected in real-time</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">✓</span>
@@ -187,13 +214,17 @@ export function GoogleCalendarSync({
                 </ul>
               </div>
 
-              <Button 
-                onClick={handleConnect} 
+              <Button
+                onClick={handleConnect}
                 className="w-full gap-2"
                 disabled={isSyncing}
               >
                 {isSyncing ? <ConnectButtonText /> : "Connect Google Calendar"}
               </Button>
+
+              <div className="text-xs text-muted-foreground text-center">
+                By connecting, you allow our app to create and manage events in your Google Calendar
+              </div>
             </div>
           </DialogContent>
         </Dialog>

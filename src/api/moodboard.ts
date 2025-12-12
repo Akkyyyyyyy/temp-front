@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { apiFetch } from "./apiClient";
+import { filesObject } from "@/components/additional-tabs/MoodboardTab";
 
 const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -101,7 +102,7 @@ const MAX_FILES_PER_UPLOAD = 100;
  * - Checks file size (max 5MB per file)
  * - Checks total number of files (max 20)
  */
-export function validateImageFiles(files: File[]): { valid: boolean; errors: string[] } {
+export function validateImageFiles(files: filesObject[]): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (files.length === 0) {
@@ -123,6 +124,7 @@ export function validateImageFiles(files: File[]): { valid: boolean; errors: str
     // Check file size
     if (file.size > MAX_FILE_SIZE) {
       const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+      file.exclude = true
       errors.push(`File ${index + 1} (${file.name}): Size ${sizeMB}MB exceeds 5MB limit`);
     }
   });

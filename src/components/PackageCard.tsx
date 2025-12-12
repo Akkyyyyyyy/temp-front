@@ -10,6 +10,7 @@ import {
 import { Check, MoreVertical, Pencil, Copy, Trash2, DollarSign, Euro, PoundSterling, IndianRupee } from "lucide-react";
 import { PackageType } from "../components/PackagesDialog";
 import { useAuth } from "@/context/AuthContext";
+import { formatPrice, getCurrencyConfig } from "@/helper/helper";
 
 interface PackageCardProps {
   package: PackageType;
@@ -19,72 +20,7 @@ interface PackageCardProps {
   isPreview?: boolean;
 }
 
-// Function to get currency symbol and formatting based on country
-const getCurrencyConfig = (country?: string) => {
-  const countryCode = country?.toLowerCase();
 
-  switch (countryCode) {
-    case 'us':
-    case 'usa':
-    case 'united states':
-    case 'canada':
-    case 'australia':
-    case 'new zealand':
-    case 'singapore':
-    case 'hong kong':
-      return { symbol: '$', code: 'USD', icon: DollarSign, format: 'en-US' };
-
-    case 'gb':
-    case 'uk':
-    case 'united kingdom':
-      return { symbol: '£', code: 'GBP', icon: PoundSterling, format: 'en-GB' };
-
-    case 'eu':
-    case 'germany':
-    case 'france':
-    case 'italy':
-    case 'spain':
-    case 'netherlands':
-    case 'belgium':
-    case 'ireland':
-      return { symbol: '€', code: 'EUR', icon: Euro, format: 'de-DE' };
-
-    case 'in':
-    case 'india':
-      return { symbol: '₹', code: 'INR', icon: IndianRupee, format: 'en-IN' };
-
-    // Add more countries as needed
-    default:
-      return { symbol: '$', code: 'USD', icon: DollarSign, format: 'en-US' };
-  }
-};
-
-// Function to format price with proper currency formatting - handles string input
-const formatPrice = (price: string | number, country?: string) => {
-  const config = getCurrencyConfig(country);
-
-  // Convert string to number, handle empty strings and invalid values
-  const numericPrice = typeof price === 'string'
-    ? parseFloat(price) || 0
-    : price || 0;
-
-  // For currencies like JPY that typically don't use decimal places
-  if (config.code === 'JPY' || config.code === 'KRW') {
-    return new Intl.NumberFormat(config.format, {
-      style: 'currency',
-      currency: config.code,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(numericPrice);
-  }
-
-  return new Intl.NumberFormat(config.format, {
-    style: 'currency',
-    currency: config.code,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(numericPrice);
-};
 
 export function PackageCard({
   package: pkg,

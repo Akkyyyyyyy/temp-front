@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Plus, Trash2 } from 'lucide-react';
 import { EditableBooking } from '@/hooks/useBookingEditor';
 import { TeamMember } from './TeamMembers';
 import { createProject } from '@/api/project';
@@ -24,13 +24,8 @@ export interface AddProjectDialogProps {
 
 export interface ProjectFormData {
   projectName: string;
-  startDate: string;
-  endDate: string;
-  startHour: number;
-  endHour: number;
   color: string;
   description: string;
-  location: string;
   client: {
     name: string;
     mobile: string;
@@ -38,9 +33,24 @@ export interface ProjectFormData {
     cc: string;
   };
   reminders: {
-    weekBefore: boolean,
+    weekBefore: boolean;
     dayBefore: boolean;
-  }
+  };
+  events: EventFormData[]; // Changed from single event to multiple events
+}
+
+export interface EventFormData {
+  id: string;
+  name: string; // Added event name
+  date: string;
+  startHour: number;
+  endHour: number;
+  location: string;
+  reminders: {
+    weekBefore: boolean;
+    dayBefore: boolean;
+  };
+  assignments: TeamAssignment[]; // Assignments are now at event level
 }
 
 export function AddProjectDialog({
@@ -56,13 +66,8 @@ export function AddProjectDialog({
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<ProjectFormData>({
     projectName: '',
-    startDate: '',
-    endDate: '',
-    startHour: defaultHour,
-    endHour: defaultHour + 1,
     color: '',
     description: '',
-    location: '',
     client: {
       name: '',
       mobile: '',
@@ -72,60 +77,62 @@ export function AddProjectDialog({
     reminders: {
       weekBefore: true,
       dayBefore: true
-    }
+    },
+    events: [getDefaultEventData()] // Start with one default event
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [teamAssignments, setTeamAssignments] = useState<TeamAssignment[]>([]);
+  const [currentEventIndex, setCurrentEventIndex] = useState(0); // Track which event we're editing
   const [currentMember, setCurrentMember] = useState({
     memberId: '',
     memberName: '',
     memberPhoto: '',
     responsibility: '',
     roleId: '',
-    instructions:''
+    instructions: ''
   });
 
   const { user } = useAuth();
-  const [availableMembers, setAvailableMembers] = useState<AvailableMember[]>([]);
+  const [availableMembers, setAvailableMembers] = useState<any[]>([]);
   const [isLoadingAvailableMembers, setIsLoadingAvailableMembers] = useState(false);
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
   const [includeClient, setIncludeClient] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingNextStep, setIsLoadingNextStep] = useState(false);
 
+  // Helper function to create default event data
+  function getDefaultEventData(): EventFormData {
+    return {
+      id: `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: '',
+      date: '',
+      startHour: defaultHour,
+      endHour: defaultHour + 1,
+      location: '',
+      reminders: {
+        weekBefore: true,
+        dayBefore: true
+      },
+      assignments: []
+    };
+  }
 
   // Validation functions
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
 
+    if (!formData.color.trim()) {
+      newErrors.color = 'Color is required';
+    }
+
     if (!formData.projectName.trim()) {
       newErrors.projectName = 'Project name is required';
     }
 
-    if (!formData.startDate) {
-      newErrors.startDate = 'Start date is required';
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required';
     }
 
-    if (!formData.endDate) {
-      newErrors.endDate = 'End date is required';
-    }
-
-    if (formData.endDate) {
-      const endDate = new Date(formData.endDate);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Reset time to compare dates only
-
-      if (endDate < today) {
-        newErrors.endDate = 'End date must be today or later.';
-      }
-    }
-
-    if (formData.startHour >= formData.endHour) {
-      newErrors.endHour = 'End time must be after start time';
-    }
-
-    // Client validation if included
     if (includeClient) {
       if (!formData.client.name?.trim()) {
         newErrors.clientName = 'Client name is required';
@@ -154,41 +161,38 @@ export function AddProjectDialog({
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.location.trim()) {
-      newErrors.location = 'Location is required';
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-
-    if (teamAssignments.length === 0) {
-      newErrors.teamAssignments = 'At least one team member is required';
-    }
+    // Validate each event
+    formData.events.forEach((event, index) => {
+      if (!event.name?.trim()) {
+        newErrors[`event-${index}-name`] = 'Event name is required';
+      }
+      if (!event.date) {
+        newErrors[`event-${index}-date`] = 'Event date is required';
+      }
+      if (!event.location?.trim()) {
+        newErrors[`event-${index}-location`] = 'Location is required';
+      }
+      if (event.assignments.length === 0) {
+        newErrors[`event-${index}-assignments`] = 'At least one team member is required';
+      }
+    });
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Step completion checks
-  const isStep1Complete = formData.projectName && formData.startDate && formData.endDate &&
-    formData.startHour < formData.endHour &&
-    (!includeClient || (formData.client.name && formData.client.email && formData.client.mobile));
-
-  const isStep2Complete = formData.location && formData.description && teamAssignments.length > 0;
-
-  // Fetch available members
+  // Fetch available members for current event
   const checkMemberAvailability = async () => {
-    if (!formData.startDate || !formData.endDate) return;
+    const currentEvent = formData.events[currentEventIndex];
+    if (!currentEvent?.date) return;
 
     setIsLoadingAvailableMembers(true);
     try {
       const result = await getAvailableMembers({
         companyId: user.data.company.id,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        startHour: formData.startHour,
-        endHour: formData.endHour
+        eventDate: currentEvent.date,
+        startHour: currentEvent.startHour,
+        endHour: currentEvent.endHour
       });
 
       if (result.success && result.data) {
@@ -202,6 +206,10 @@ export function AddProjectDialog({
     }
   };
 
+  useEffect(() => {
+    checkMemberAvailability();
+  }, [formData.events[currentEventIndex].date, formData.events[currentEventIndex].startHour, formData.events[currentEventIndex].endHour]);
+
   const handleNextStep = async () => {
     if (!validateStep1()) {
       console.error('Please fix the validation errors before proceeding');
@@ -210,7 +218,6 @@ export function AddProjectDialog({
 
     setIsLoadingNextStep(true);
     try {
-      await checkMemberAvailability();
       setCurrentStep(2);
     } catch (error) {
       console.error('Error proceeding to next step:', error);
@@ -229,6 +236,7 @@ export function AddProjectDialog({
   useEffect(() => {
     if (!isOpen) {
       setCurrentStep(1);
+      setCurrentEventIndex(0);
       setAvailableMembers([]);
       setAvailabilityChecked(false);
       setErrors({});
@@ -239,10 +247,48 @@ export function AddProjectDialog({
     }
   }, [isOpen]);
 
+  // Event management functions
+  const addEvent = () => {
+    setFormData(prev => ({
+      ...prev,
+      events: [...prev.events, getDefaultEventData()]
+    }));
+    setCurrentEventIndex(formData.events.length); // Switch to the new event
+  };
+
+  const removeEvent = (index: number) => {
+
+    if (formData.events.length <= 1) {
+      toast.error('At least one event is required');
+      return;
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      events: prev.events.filter((_, i) => i !== index)
+    }));
+
+    // Adjust current event index if needed
+    if (currentEventIndex >= index) {
+      setCurrentEventIndex(Math.max(0, currentEventIndex - 1));
+    }
+  };
+
+  const updateCurrentEvent = (field: keyof EventFormData, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      events: prev.events.map((event, index) =>
+        index === currentEventIndex ? { ...event, [field]: value } : event
+      )
+    }));
+  };
+
+  // Team assignment functions for current event
   const addTeamMember = () => {
+    const currentEvent = formData.events[currentEventIndex];
     if (currentMember.memberName && currentMember.responsibility) {
-      setTeamAssignments(prev => [
-        ...prev,
+      updateCurrentEvent('assignments', [
+        ...currentEvent.assignments,
         {
           id: currentMember.memberId,
           memberName: currentMember.memberName,
@@ -259,13 +305,16 @@ export function AddProjectDialog({
         memberPhoto: '',
         responsibility: '',
         roleId: '',
-        instructions:'',
+        instructions: '',
       });
     }
   };
 
   const removeTeamMember = (id: string) => {
-    setTeamAssignments(prev => prev.filter(assignment => assignment.id !== id));
+    const currentEvent = formData.events[currentEventIndex];
+    updateCurrentEvent('assignments',
+      currentEvent.assignments.filter(assignment => assignment.id !== id)
+    );
   };
 
   const updateCurrentMember = (field: keyof typeof currentMember, value: string) => {
@@ -311,13 +360,8 @@ export function AddProjectDialog({
 
   const getDefaultFormData = (): ProjectFormData => ({
     projectName: '',
-    startDate: '',
-    endDate: '',
-    startHour: defaultHour,
-    endHour: defaultHour + 1,
     color: '',
     description: '',
-    location: '',
     client: {
       name: '',
       mobile: '',
@@ -327,19 +371,20 @@ export function AddProjectDialog({
     reminders: {
       weekBefore: true,
       dayBefore: true
-    }
+    },
+    events: [getDefaultEventData()]
   });
 
   const resetForm = () => {
     setFormData(getDefaultFormData());
-    setTeamAssignments([]);
+    setCurrentEventIndex(0);
     setCurrentMember({
       memberId: '',
       memberName: '',
       memberPhoto: '',
       responsibility: '',
       roleId: '',
-      instructions:'',
+      instructions: '',
     });
     setErrors({});
     setIncludeClient(false);
@@ -365,30 +410,32 @@ export function AddProjectDialog({
       return;
     }
 
-    if (!formData.projectName || teamAssignments.length === 0) return;
-
     setIsSubmitting(true);
     try {
-      const primaryMember = teamAssignments[0];
-      const allMembers = teamAssignments.map(ta =>
-        `${ta.memberName} (${ta.responsibility})`
-      ).join(', ');
-
-      const res = await createProject({
+      const apiData = {
         ...formData,
-        memberName: primaryMember.memberName,
-        description: formData.description,
-        teamAssignments: teamAssignments,
-        client: includeClient ? formData.client : undefined,
-        newRole: undefined,
-      }, user.data.company.id);
+        events: formData.events.map(event => ({
+          name: event.name,
+          date: event.date,
+          startHour: event.startHour,
+          endHour: event.endHour,
+          location: event.location,
+          reminders: event.reminders,
+          assignments: event.assignments.map(assignment => ({
+            memberId: assignment.memberId,
+            roleId: assignment.roleId,
+            instructions: assignment.instructions
+          }))
+        })),
+        client: includeClient ? formData.client : undefined
+      };
+      const res = await createProject(apiData, user.data.company.id);
 
       if (res?.success) {
         refreshMembers();
         resetForm();
         setCurrentStep(1);
         setIsOpen(false);
-        toast.success(res.message);
       } else {
         toast.error(res.message);
       }
@@ -400,8 +447,9 @@ export function AddProjectDialog({
     }
   };
 
+  const currentEvent = formData.events[currentEventIndex];
   const filteredAvailableMembers = availableMembers.filter(member =>
-    !teamAssignments.some(ta => ta.memberId === member.id)
+    !currentEvent.assignments.some(ta => ta.memberId === member.id)
   );
 
   const hasConflicts = (memberId: string) => {
@@ -416,11 +464,11 @@ export function AddProjectDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[900px]" onInteractOutside={e => e.preventDefault()}>
+      <DialogContent className="sm:max-w-[1000px]" onInteractOutside={e => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <div className="flex items-center gap-2">
-              Add New Booking - Step {currentStep} of 2
+              Add New Project - Step {currentStep} of 2
               {(isLoadingNextStep || isSubmitting) && (
                 <Loader2 className="w-4 h-4 animate-spin" />
               )}
@@ -441,24 +489,87 @@ export function AddProjectDialog({
                 updateClientField={updateClientField}
               />
             ) : (
-              <ProjectStep2
-                formData={formData}
-                setFormData={setFormData}
-                errors={errors}
-                setErrors={setErrors}
-                teamAssignments={teamAssignments}
-                currentMember={currentMember}
-                updateCurrentMember={updateCurrentMember}
-                addTeamMember={addTeamMember}
-                removeTeamMember={removeTeamMember}
-                filteredAvailableMembers={filteredAvailableMembers}
-                isLoadingAvailableMembers={isLoadingAvailableMembers}
-                hasConflicts={hasConflicts}
-                isPartiallyAvailable={isPartiallyAvailable}
-                onAddTeamMember={onAddTeamMember}
-                checkMemberAvailability={checkMemberAvailability}
-                onDialogCloseTrigger={onDialogCloseTrigger}
-              />
+              <div className="space-y-6">
+                {/* Events Header */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Events</h3>
+                </div>
+
+                {/* Event Tabs */}
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {formData.events.map((event, index) => {
+                    // Check if this event has any errors
+                    const hasEventErrors = Object.keys(errors).some(key =>
+                      key.startsWith(`event-${index}-`)
+                    );
+
+                    return (
+                      <div
+                        key={event.id}
+                        className={`flex items-center px-3 py-1 rounded-md border cursor-pointer ${currentEventIndex === index
+                            ? "bg-studio-gold text-black"
+                            : "bg-transparent"
+                          } ${hasEventErrors ? "border-red-500 border-2" : "border-gray-300"
+                          }`}
+                        onClick={() => setCurrentEventIndex(index)}
+                      >
+                        <span className="truncate mr-2">
+                          {
+                            formData.events[index].name ? (formData.events[index].name):(`Event ${index + 1}`)
+                          }
+                          {hasEventErrors && (
+                            <span className="ml-1 text-red-500">*</span>
+                          )}
+                        </span>
+
+                        {/* Delete icon */}
+                        {formData.events.length > 1 && (
+                          <Trash2
+                            className="w-3 h-3 hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeEvent(index);
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addEvent}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Event
+                  </Button>
+                </div>
+
+                {/* Current Event Form */}
+                <ProjectStep2
+                  formData={formData}
+                  setFormData={setFormData}
+                  errors={errors}
+                  setErrors={setErrors}
+                  eventData={currentEvent}
+                  updateEventData={updateCurrentEvent}
+                  teamAssignments={currentEvent.assignments}
+                  currentMember={currentMember}
+                  updateCurrentMember={updateCurrentMember}
+                  addTeamMember={addTeamMember}
+                  removeTeamMember={removeTeamMember}
+                  filteredAvailableMembers={filteredAvailableMembers}
+                  isLoadingAvailableMembers={isLoadingAvailableMembers}
+                  hasConflicts={hasConflicts}
+                  isPartiallyAvailable={isPartiallyAvailable}
+                  onAddTeamMember={onAddTeamMember}
+                  checkMemberAvailability={checkMemberAvailability}
+                  onDialogCloseTrigger={onDialogCloseTrigger}
+                  eventIndex={currentEventIndex}
+                />
+              </div>
             )}
           </div>
 
@@ -472,12 +583,11 @@ export function AddProjectDialog({
                 <Button
                   type="button"
                   onClick={handleNextStep}
-                  disabled={!isStep1Complete || isLoadingNextStep}
+                  disabled={isLoadingNextStep}
                 >
                   {isLoadingNextStep ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Checking Availability...
                     </>
                   ) : (
                     <>
@@ -509,15 +619,15 @@ export function AddProjectDialog({
                   </Button>
                   <Button
                     type="submit"
-                    disabled={!isStep2Complete || isSubmitting}
+                    disabled={isSubmitting}
                   >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Adding Booking...
+                        Creating Project...
                       </>
                     ) : (
-                      'Add Booking'
+                      'Create Project'
                     )}
                   </Button>
                 </div>

@@ -18,7 +18,7 @@ const AppRoutes = () => {
 
       {/* Single Login Route with Tabs for Company/Member */}
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/set-password" element={<PublicRoute><SetPassword /></PublicRoute>} />
+      <Route path="/set-password" element={<SetPassword />} />
 
       {/* Company Register */}
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />

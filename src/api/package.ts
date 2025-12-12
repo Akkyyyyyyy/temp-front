@@ -156,7 +156,9 @@ export async function deletePackage(id: string): Promise<ApiResponse<{ package: 
   }
 }
 
-export async function getPackagesByCompany(companyId: string): Promise<ApiResponse<{ packages: Package[] }>> {
+export async function getPackagesByCompany(companyId: string): Promise<ApiResponse<{
+  companyPrice:any; packages: Package[] 
+}>> {
   try {
     const response = await apiFetch(`${baseUrl}/package/company/${companyId}`, {
       method: "GET",
@@ -182,6 +184,71 @@ export async function getPackagesByStatus(status: "active" | "inactive"): Promis
   try {
     const response = await apiFetch(`${baseUrl}/package?status=${status}`, {
       method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
+
+export async function setCompanyPrice(companyId: string, price: number): Promise<ApiResponse<{ company: any }>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/package/company/${companyId}/price`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ price }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
+
+export async function updateCompanyPrice(companyId: string, price: number): Promise<ApiResponse<{ company: any }>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/package/company/${companyId}/price`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ price }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
+
+export async function removeCompanyPrice(companyId: string): Promise<ApiResponse<{ company: any }>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/package/company/${companyId}/price`, {
+      method: "DELETE",
       headers: {
         "Content-Type": "application/json",
       },

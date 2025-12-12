@@ -11,6 +11,7 @@ interface ImageCropModalProps {
     image: string | null;
     onCropComplete: (croppedImageBlob: Blob) => Promise<void>;
     aspect?: number;
+    cropShape: "rect" | "round";
 }
 
 export function ImageCropModal({
@@ -18,7 +19,8 @@ export function ImageCropModal({
     onClose,
     image,
     onCropComplete,
-    aspect = 1
+    aspect = 1,
+    cropShape
 }: ImageCropModalProps) {
     const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
@@ -120,7 +122,7 @@ export function ImageCropModal({
                             onCropChange={setCrop}
                             onZoomChange={setZoom}
                             onCropComplete={onCropCompleteCallback}
-                            cropShape="round"
+                            cropShape={cropShape}
                             showGrid={true}
                             objectFit="contain"
                         />
@@ -146,7 +148,7 @@ export function ImageCropModal({
                         Cancel
                     </Button>
                     <Button onClick={handleSave} disabled={loading || !croppedAreaPixels}>
-                        {loading ? "Saving..." : "Save Cropped Image"}
+                        {loading ? "Saving..." : "Upload image"}
                     </Button>
                 </DialogFooter>
             </DialogContent>

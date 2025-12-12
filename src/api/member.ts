@@ -21,6 +21,7 @@ export interface Member {
   roleId:string;
   isInvited:boolean;
   isOwner:boolean;
+  invitation:string;
 }
 
 export interface Project {
@@ -209,6 +210,7 @@ export interface ToggleAdminResponse {
 export interface SendInviteRequest {
   memberId: string;
   companyId: string;
+  adminName:string;
 }
 
 export interface SendInviteResponse {
@@ -217,6 +219,18 @@ export interface SendInviteResponse {
   data?: {
     inviteLink?: string; // Optional, might only return in development
   };
+}
+export interface SetupdateInvitationStatusRequest {
+  token: string;
+  status: boolean;
+}
+
+export interface SetupdateInvitationStatusResponse {
+  data?: any;
+  success: boolean;
+  message: string;
+  token?: string;
+  user?:any;
 }
 
 export interface SetPasswordRequest {
@@ -362,7 +376,7 @@ export async function updateMember(
 
 
 export async function getAvailableMembers(
-  request: AvailableMemberRequest
+  request: any
 ): Promise<AvailableMembersResponse> {
   try {
     const token = localStorage.getItem('auth-token');
@@ -481,12 +495,16 @@ export async function updateMemberProfile(
 // Upload profile photo
 export async function uploadMemberPhoto(
   memberId: string,
+  companyId: string,
+
   file: File
 ): Promise<UploadPhotoResponse> {
   try {
     const formData = new FormData();
     formData.append('photo', file);
     formData.append('memberId', memberId);
+    formData.append('companyId', companyId);
+
 
     const token = localStorage.getItem('auth-token');
     const response = await apiFetch(`${baseUrl}/member/upload-photo`, {
@@ -739,7 +757,7 @@ export async function sendMemberInvite(
 
 export async function checkMemberInvite(
   request: checkInviteRequest
-): Promise<boolean> {
+): Promise<any> {
   try {
 
     const response = await apiFetch(`${baseUrl}/member/check-invite`, {
@@ -751,14 +769,45 @@ export async function checkMemberInvite(
     });
 
     const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error("Error checking invitation:", error);
+    return  {
+      success: false,
+      message: error.message || "Failed to check invitation"
+    };
+  }
+}
+
+export async function updateInvitationStatus(
+  request: SetupdateInvitationStatusRequest
+): Promise<SetupdateInvitationStatusResponse> {
+  try {
+    const response = await apiFetch(`${baseUrl}/member/update-invitation-status`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    const data = await response.json();
 
     if (!response.ok) {
-      return false
+      throw new Error(data.message || "Failed to set password");
     }
-    return true
+    return {
+      success: true,
+      message: data.message,
+      data
+    };
   } catch (error: any) {
-    console.error("Error sending invitation:", error);
-    return false
+    console.error("Error setting password:", error);
+    toast.error(error.message || "Failed to set password");
+    return {
+      success: false,
+      message: error.message || "Failed to set password"
+    };
   }
 }
 

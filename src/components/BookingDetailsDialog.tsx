@@ -5,13 +5,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Calendar, Clock, MapPin, FileText, User, Phone, Mail, Camera, CheckCircle, DollarSign, Package } from 'lucide-react';
+import { Calendar, Clock, MapPin, FileText, User, Phone, Mail, Camera, CheckCircle, Package } from 'lucide-react';
 import { EditableBooking } from '@/hooks/useBookingEditor';
-const S3_URL = import.meta.env.VITE_S3_BASE_URL
+import { getFallback } from "@/helper/helper";
 
+const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
 interface BookingDetailsDialogProps {
   booking: EditableBooking | null;
@@ -33,26 +33,31 @@ export function BookingDetailsDialog({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Booking Details</DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Event Details</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
           <div className="space-y-6 py-4">
-            {/* Project Header */}
+            {/* Event Header */}
             <div className={`rounded-lg p-4 text-white`}
               style={{ backgroundColor: booking.color }}>
-              <h3 className="text-lg font-semibold mb-3">{booking.projectName}</h3>
+              <div className="mb-3">
+                <h3 className="text-lg font-semibold">{booking.projectName}</h3>
+                {booking.eventName && (
+                  <div className="text-sm opacity-90 mt-1 font-medium">
+                    {booking.eventName}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 <Avatar className="w-12 h-12 ring-2 ring-white/30"
                   style={{
                     borderColor: booking.memberRingColor || 'hsl(var(--muted))',
                     boxShadow: `0 0 0 2px ${booking.memberRingColor || 'hsl(var(--muted))'}`
                   }}>
-
                   <AvatarImage src={`${S3_URL}/${booking.memberPhoto}`} alt={booking.memberName} className="object-cover" />
-
                   <AvatarFallback className="bg-white/20 text-white font-semibold">
-                    {booking.memberName.slice(0, 2).toUpperCase()}
+                    {getFallback(booking.memberName)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -85,6 +90,22 @@ export function BookingDetailsDialog({
             </div>
 
             <Separator />
+
+            {/* Instructions */}
+            {booking.instructions && (
+              <>
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-foreground flex items-center gap-2">
+                    <FileText className="w-4 h-4" />
+                    Instructions
+                  </h4>
+                  <div className="bg-muted/30 rounded-lg p-3">
+                    <p className="text-foreground text-sm leading-relaxed">{booking.instructions}</p>
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
 
             {/* Client Information */}
             {(booking?.client?.name || booking?.client?.mobile || booking?.client?.email) && (
@@ -135,13 +156,13 @@ export function BookingDetailsDialog({
               </>
             )}
 
-            {/* Description/Brief */}
+            {/* Description */}
             {booking.description && (
               <>
                 <div className="space-y-3">
                   <h4 className="font-semibold text-foreground flex items-center gap-2">
                     <FileText className="w-4 h-4" />
-                    Project Brief
+                    Project Description
                   </h4>
                   <div className="bg-muted/30 rounded-lg p-3">
                     <p className="text-foreground text-sm leading-relaxed">{booking.description}</p>
@@ -151,7 +172,7 @@ export function BookingDetailsDialog({
               </>
             )}
 
-            {/* Deliverables */}
+            {/* Brief */}
             {booking.brief && booking.brief.length > 0 && (
               <>
                 <div className="space-y-3">
@@ -165,8 +186,6 @@ export function BookingDetailsDialog({
                         <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
                         <div>
                           <span className="font-medium text-foreground block">{item.title}</span>
-
-                          {/* Handle content as string or list */}
                           {Array.isArray(item.content) ? (
                             <ul className="list-disc ml-5 mt-1 space-y-1 text-muted-foreground text-xs">
                               {item.content.map((subItem, subIndex) => (
@@ -187,12 +206,13 @@ export function BookingDetailsDialog({
               </>
             )}
 
+            {/* Logistics/Equipment */}
             {booking.logistics && booking.logistics.length > 0 && (
               <>
                 <div className="space-y-3">
                   <h4 className="font-semibold text-foreground flex items-center gap-2">
                     <Camera className="w-4 h-4" />
-                    Equipment Needed
+                    Equipment & Logistics
                   </h4>
                   <ul className="space-y-2">
                     {booking.logistics.map((item) => (
@@ -200,8 +220,6 @@ export function BookingDetailsDialog({
                         <Package className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                         <div>
                           <span className="font-medium text-foreground block">{item.title}</span>
-
-                          {/* Handle content as string or list */}
                           {Array.isArray(item.content) ? (
                             <ul className="list-disc ml-5 mt-1 space-y-1 text-muted-foreground text-xs">
                               {item.content.map((subItem, subIndex) => (
@@ -218,53 +236,8 @@ export function BookingDetailsDialog({
                     ))}
                   </ul>
                 </div>
-                <Separator />
               </>
             )}
-
-
-            {/* {booking.shotList && booking.shotList.length > 0 && (
-              <>
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-foreground flex items-center gap-2">
-                    <Camera className="w-4 h-4" />
-                    Shot List
-                  </h4>
-                  <ul className="space-y-2">
-                    {booking.shotList.map((item, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <span className="text-muted-foreground mt-0.5 flex-shrink-0">{index + 1}.</span>
-                        <span className="text-foreground">{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <Separator />
-              </>
-            )} */}
-            {/* 
-            {booking.budget && (
-              <>
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-foreground flex items-center gap-2">
-                    <DollarSign className="w-4 h-4" />
-                    Budget
-                  </h4>
-                  <div className="bg-muted/30 rounded-lg p-3">
-                    <p className="text-lg font-semibold text-foreground">{booking.budget}</p>
-                  </div>
-                </div>
-                <Separator />
-              </>
-            )} */}
-
-
-            {/* Status Badge */}
-            {/* <div className="pt-2">
-              <Badge variant="secondary" className="text-xs">
-                Active Booking
-              </Badge>
-            </div> */}
           </div>
         </ScrollArea>
       </DialogContent>

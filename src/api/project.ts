@@ -146,39 +146,75 @@ export interface IGetProjectByIdResponse {
     updatedAt: string;
   };
 }
-
-export async function createProject(booking: Omit<EditableBooking, 'id'>, companyId: string) {
+export async function createProject(booking: Omit<any, 'id'>, companyId: string) {
   try {
+    // Validate required fields
+    if (!booking.projectName) {
+      throw new Error('Project name is required');
+    }
+
+    if (!companyId) {
+      throw new Error('Company ID is required');
+    }
+
+    // Validate that events exist and have required fields
+    if (!booking.events || !Array.isArray(booking.events) || booking.events.length === 0) {
+      throw new Error('At least one event is required');
+    }
+
+    // Prepare events array with assignments included
+    const eventsPayload = booking.events.map(event => {
+      // Validate event required fields
+      if (!event.date) {
+        throw new Error('Event date is required for all events');
+      }
+      if (event.startHour === undefined || event.startHour === null) {
+        throw new Error('Event start hour is required');
+      }
+      if (event.endHour === undefined || event.endHour === null) {
+        throw new Error('Event end hour is required');
+      }
+
+      return {
+        id: event.id, // Include event ID for assignment linking
+        name: event.name || `${booking.projectName} - Event`,
+        date: event.date,
+        startHour: event.startHour,
+        endHour: event.endHour,
+        location: event.location || '',
+        reminders: event.reminders || { weekBefore: true, dayBefore: true },
+        assignments: (event.assignments || []).map(assignment => ({
+          memberId: assignment.memberId || assignment.id,
+          roleId: assignment.roleId,
+          instructions: assignment.instructions || ''
+        }))
+      };
+    });
 
     // Prepare payload for backend API
     const apiPayload = {
       name: booking.projectName,
-      color: booking.color,
-      startDate: booking.startDate,
-      endDate: booking.endDate,
-      startHour: booking.startHour,
-      endHour: booking.endHour,
-      location: booking.location,
-      description: booking.description,
+      color: booking.color || '#3B82F6',
+      location: booking.location || '',
+      description: booking.description || '',
       companyId: companyId,
-      reminders: booking.reminders,
-      assignments: booking.teamAssignments.map(assignment => ({
-        memberId: assignment.id,
-        roleId: assignment.roleId,
-        instructions: assignment.instructions
-      })),
+      events: eventsPayload,
       // Add client data if provided
       ...(booking.client && {
         client: {
-          name: booking.client.name,
-          mobile: booking.client.mobile,
-          email: booking.client.email,
-          cc:booking.client.cc
+          name: booking.client.name || '',
+          mobile: booking.client.mobile || '',
+          email: booking.client.email || '',
+          cc: booking.client.cc || ''
         }
       })
     };
 
     const token = localStorage.getItem('auth-token');
+
+    if (!token) {
+      throw new Error('Authentication token not found');
+    }
 
     // Call the API
     const response = await apiFetch(`${baseUrl}/project/add`, {
@@ -191,9 +227,16 @@ export async function createProject(booking: Omit<EditableBooking, 'id'>, compan
     });
 
     const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to create project');
+    }
+
+    toast.success('Project created successfully!');
     return result;
   } catch (error: any) {
-    toast.error(error);
+    console.error('Error creating project:', error);
+    toast.error(error.message || 'Failed to create project');
     return { success: false, message: error.message || "Network error" };
   }
 }
@@ -205,9 +248,9 @@ export async function getProjectById(
     const token = localStorage.getItem('auth-token');
 
     if (!projectId?.trim()) {
-      return { 
-        success: false, 
-        message: "Project ID is required" 
+      return {
+        success: false,
+        message: "Project ID is required"
       };
     }
 
@@ -284,7 +327,7 @@ export async function checkProjectName(
 }
 
 export async function addMemberToProject(
-  request: IAddMemberToProjectRequest
+  request: any
 ): Promise<IAddMemberToProjectResponse> {
   try {
     const token = localStorage.getItem('auth-token');
@@ -332,7 +375,7 @@ export async function addMemberToProject(
 }
 
 export async function removeMemberFromProject(
-  request: RemoveMemberFromProjectRequest
+  request: any
 ): Promise<RemoveMemberFromProjectResponse> {
   try {
     const token = localStorage.getItem('auth-token');
@@ -448,7 +491,7 @@ export async function editProject(
 ): Promise<EditProjectResponse> {
   try {
     const token = localStorage.getItem('auth-token');
-    
+
     if (!request.projectId?.trim()) {
       toast.error("Project ID is required");
       return { success: false, message: "Project ID is required" };
@@ -529,7 +572,7 @@ export async function editProject(
 
     if (result.success) {
       toast.success(result.message || "Project updated successfully");
-    } 
+    }
 
     return result;
   } catch (error: any) {

@@ -23,36 +23,36 @@ const validationSchema = yup.object({
     .string()
     .required("Name is required")
     .max(100, "Name must be less than 100 characters"),
-  
+
   email: yup
     .string()
     .required("Email is required")
     .matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Invalid email format")
     .max(150, "Email must be less than 150 characters"),
-  
+
   roleId: yup
     .string()
     .required("Role is required"),
-  
+
   phone: yup
     .string()
     .required("Phone number is required")
     .test('is-valid-phone', 'Invalid phone number format', function (value) {
       if (!value) return false;
       const digitsOnly = value.replace(/\D/g, '');
-      return digitsOnly.length >= 7;
+      return digitsOnly.length >= 10;
     })
     .max(20, "Phone number must be less than 20 characters"),
   location: yup
     .string()
     .nullable()
     .max(150, "Address must be less than 150 characters"),
-  
+
   bio: yup
     .string()
     .nullable()
     .max(300, "Bio must be less than 300 characters"),
-  
+
   skills: yup
     .array()
     .of(
@@ -60,7 +60,7 @@ const validationSchema = yup.object({
     )
     .test('max-skills', 'Maximum 10 skills allowed', (skills) => !skills || skills.length <= 10)
     .nullable(),
-  
+
   profilePhoto: yup
     .mixed()
     .nullable()
@@ -159,7 +159,16 @@ export function AddTeamMemberDialog({ open, onOpenChange, onAddMember }: AddTeam
   };
 
   const handleAddSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
+    const trimmedSkill = newSkill.trim();
+
+    if (trimmedSkill) {
+      if (skills.includes(trimmedSkill)) {
+        setError("skills", {
+          type: "manual",
+          message: "This skill has already been added"
+        });
+        return;
+      }
       if (skills.length >= 10) {
         setError("skills", {
           type: "manual",
@@ -321,7 +330,7 @@ export function AddTeamMemberDialog({ open, onOpenChange, onAddMember }: AddTeam
                   </div>
                   <Input
                     id="email"
-                    type="email"
+                    type="text"
                     placeholder="Enter team member email"
                     {...register("email")}
                     className="w-full"
@@ -373,7 +382,7 @@ export function AddTeamMemberDialog({ open, onOpenChange, onAddMember }: AddTeam
                   </div>
                   <Input
                     id="location"
-                    placeholder="Enter street, city, state, ZIP code"
+                    placeholder="Enter street, city, post code"
                     {...register("location")}
                     className="w-full"
                   />

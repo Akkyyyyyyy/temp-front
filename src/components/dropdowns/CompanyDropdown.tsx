@@ -1,32 +1,60 @@
 // components/CompanyDropdown.tsx
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { changeCompany, createCompanyByMember } from '@/api/company';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronDown, Check } from 'lucide-react';
+import { useTeamMembers } from '@/hooks/useTeamMembers';
 
 interface CompanyDropdownProps {
   setSelectedProject: (project: any) => void;
+  selectedDay?: number;
+  selectedMonth: number;
+  selectedYear: number;
+  selectedWeek?: number;
+  timeView: any;
 }
 
-export function CompanyDropdown({ setSelectedProject }: CompanyDropdownProps) {
+export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth, selectedWeek, selectedYear, timeView }: CompanyDropdownProps) {
   const { user, login } = useAuth();
+  const {
+    refresh
+  } = useTeamMembers({
+    selectedMonth,
+    selectedYear,
+    selectedWeek,
+    timeView,
+  });
   const [isCreateCompanyDialogOpen, setIsCreateCompanyDialogOpen] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // ✅ Check if user's email matches any existing company email
   const canAddOwnCompany = !user?.data?.associatedCompanies?.some(
     (c: any) => c.email === user?.data?.email
   );
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleOpenCreateCompanyDialog = () => {
     setNewCompanyName('');
     setIsCreateCompanyDialogOpen(true);
+    setIsDropdownOpen(false);
   };
 
   // 🔄 Handle company change
@@ -40,6 +68,7 @@ export function CompanyDropdown({ setSelectedProject }: CompanyDropdownProps) {
       });
 
       if (result.success && result.data) {
+        await refresh();
         // ✅ Update token & Auth context
         setSelectedProject(null);
         localStorage.setItem("token", result.data.token);
@@ -48,7 +77,7 @@ export function CompanyDropdown({ setSelectedProject }: CompanyDropdownProps) {
           token: result.data.token,
           member: result.data.user
         });
-
+        setIsDropdownOpen(false);
       } else {
         toast.error("Failed to switch company");
       }
@@ -101,50 +130,75 @@ export function CompanyDropdown({ setSelectedProject }: CompanyDropdownProps) {
     }
   };
 
+  const currentCompany = user?.data?.company;
+  const associatedCompanies = user?.data?.associatedCompanies || [];
+
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Select
-          value={user?.data?.company?.id || ""}
-          onValueChange={(value) => {
-            if (value === "create") {
-              handleOpenCreateCompanyDialog();
-            } else {
-              handleCompanyChange(value);
-            }
-          }}
-        >
-          <SelectTrigger className="w-[220px] text-xl font-semibold bg-transparent border border-transparent rounded-md focus:ring-0 focus:ring-offset-0 focus:outline-none">
-            <SelectValue placeholder="Select company">
-              {user?.data?.company?.name || "Select company"}
-            </SelectValue>
-          </SelectTrigger>
+      {
+        (associatedCompanies.length < 2 && !canAddOwnCompany) ? (
+          <button
+            className="flex items-center gap-2 text-lg font-semibold bg-transparent border border-transparent rounded-md focus:ring-0 focus:ring-offset-0 focus:outline-none transition-colors py-1 sm:px-3 sm:py-2"
+          >
+            <span>{currentCompany?.name || "Select company"}</span>
+          </button>
+        ) : (
+          <div className="relative" ref={dropdownRef}>
+            {/* Dropdown Trigger */}
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 text-lg font-semibold bg-transparent border border-transparent rounded-md focus:ring-0 focus:ring-offset-0 focus:outline-none transition-colors py-1 sm:px-3 sm:py-2"
+            >
+              <span className="truncate max-w-[200px]">{currentCompany?.name || "Select company"}</span>
+              <ChevronDown
+                size={16}
+                className={`transition-transform duration-200 flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`}
+              />
+            </button>
 
-          <SelectContent>
-            {user?.data?.associatedCompanies?.map((c: any) => (
-              <SelectItem key={c.id} value={c.id} className='cursor-pointer'>
-                {c.name}
-              </SelectItem>
-            ))}
-            {canAddOwnCompany && (
-              <SelectItem value="create" className='pl-2 cursor-pointer'>
-                <div className="flex items-center gap-2">
-                  <Plus size={16} />
-                  <span>Create your own company</span>
+            {/* Dropdown Menu */}
+            {isDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-max bg-background rounded-md border shadow-md z-50 animate-in fade-in-0 zoom-in-95">
+                <div className="p-1">
+                  {/* Company List */}
+                  {associatedCompanies.map((company: any) => (
+                    <button
+                      key={company.id}
+                      onClick={() => handleCompanyChange(company.id)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-md rounded-sm hover:bg-accent hover:text-background transition-colors cursor-pointer text-left"
+                    >
+                      <span className="break-words whitespace-normal flex-1 min-w-0">{company.name}</span>
+                      {currentCompany?.id === company.id && (
+                        <Check size={16} className="flex-shrink-0 ml-2" />
+                      )}
+                    </button>
+                  ))}
+
+                  {/* Create Company Option */}
+                  {canAddOwnCompany && associatedCompanies.length > 0 && (
+                    <div className="border-t my-1" />
+                  )}
+
+                  {canAddOwnCompany && (
+                    <button
+                      onClick={handleOpenCreateCompanyDialog}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm rounded-sm hover:bg-accent hover:text-background transition-colors cursor-pointer text-left"
+                    >
+                      <Plus size={16} className="flex-shrink-0" />
+                      <span className="break-words whitespace-normal flex-1 min-w-0">Create your own company</span>
+                    </button>
+                  )}
                 </div>
-              </SelectItem>
+              </div>
             )}
-          </SelectContent>
-        </Select>
-      </div>
+          </div>
+        )
+      }
 
       <Dialog open={isCreateCompanyDialogOpen} onOpenChange={setIsCreateCompanyDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Company</DialogTitle>
-            <DialogDescription>
-              Enter a name for your new company. You'll be automatically switched to this company after creation.
-            </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
@@ -171,7 +225,7 @@ export function CompanyDropdown({ setSelectedProject }: CompanyDropdownProps) {
             </Button>
             <Button
               onClick={handleCreateCompany}
-              disabled={!newCompanyName.trim() || isCreatingCompany}
+              disabled={newCompanyName.trim().length < 3 || isCreatingCompany}
             >
               {isCreatingCompany ? "Creating..." : "Create Company"}
             </Button>
