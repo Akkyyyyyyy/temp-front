@@ -333,11 +333,11 @@ export function EditPackageDrawer({ open, onOpenChange, package: initialPackage,
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-[90vw] p-0 flex">
+      <SheetContent side="right" className="w-full lg:max-w-[90vw] p-0 flex flex-col lg:flex-row">
         {/* Form Section */}
-        <div className="flex-1 border-r border-border">
-          <ScrollArea className="h-screen">
-            <div className="p-6 space-y-6">
+        <div className="flex-1 lg:border-r border-border min-w-0">
+          <ScrollArea className="h-[100dvh]">
+            <div className="p-4 sm:p-6 space-y-6">
               <SheetHeader>
                 <SheetTitle className="text-2xl">
                   {initialPackage.price ? `Edit ${initialPackage.name}` : "Create New Package"}
@@ -359,7 +359,7 @@ export function EditPackageDrawer({ open, onOpenChange, package: initialPackage,
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="price">
                       Price ({currencyConfig.symbol})
@@ -579,7 +579,7 @@ export function EditPackageDrawer({ open, onOpenChange, package: initialPackage,
               </div>
 
               {/* Actions */}
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
                 <Button onClick={handleSave} className="flex-1">
                   Save Package
                 </Button>
@@ -592,8 +592,8 @@ export function EditPackageDrawer({ open, onOpenChange, package: initialPackage,
         </div>
 
         {/* Preview Section */}
-        <div className="w-[400px] bg-muted/30 p-6">
-          <div className="sticky top-6">
+        <div className="w-full lg:w-[400px] bg-muted/30 p-4 sm:p-6">
+          <div className="lg:sticky lg:top-6">
             <h3 className="text-sm font-semibold text-muted-foreground mb-4">LIVE PREVIEW</h3>
             <PackageCard
               package={editedPackage}

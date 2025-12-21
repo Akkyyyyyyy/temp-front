@@ -1205,10 +1205,10 @@ export function TeamMembers({
                   <div key={index} className="text-center">
                     {/* Date Header */}
                     <div
-                      className={`text-[10px] p-1 rounded-t border-t border-x transition-colors cursor-pointer ${isSelected
-                        ? 'bg-studio-gold text-studio-dark border-studio-gold font-bold'
+                      className={`text-[10px] p-1 rounded border-t border-x transition-colors cursor-pointer ${isSelected
+                        ? 'bg-studio-gold text-studio-dark border-studio-gold font-bold '
                         : isToday
-                          ? 'border-studio-gold bg-muted/30 text-studio-gold'
+                          ? ' bg-muted/30 text-studio-gold'
                           : 'text-muted-foreground bg-muted/30 border-border/20 hover:bg-muted/50'
                         }`}
                       onClick={() => handleDayClick(day)}

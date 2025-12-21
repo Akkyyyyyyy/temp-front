@@ -310,10 +310,10 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-7xl p-0">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-full sm:max-w-7xl p-0 max-h-[90dvh] overflow-hidden">
           {/* Single Row Header */}
-          <div className="sticky top-0 z-10 bg-background border-b border-border px-6 py-4 rounded-tl-lg rounded-tr-lg">
-            <div className="flex items-center justify-between">
+          <div className="sticky top-0 z-10 bg-background border-b border-border px-4 sm:px-6 py-4 rounded-tl-lg rounded-tr-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* Left Side: Title */}
               <div>
                 <DialogTitle className="text-2xl">Package Management</DialogTitle>
@@ -325,7 +325,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
               </div>
 
               {/* Right Side: Actions & Starting Price */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
                 {/* View Toggle - Only show when there are packages */}
                 {hasPackages && (
                   <div className="hidden sm:flex items-center gap-1 bg-card border border-border rounded-lg p-1">
@@ -351,7 +351,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
                 )}
                 {/* Starting price pill - only show when price exists */}
                 {hasStartingPrice && (
-                  <div className="flex items-center gap-3 px-4 py-1 bg-card border border-border rounded-full">
+                  <div className="flex items-center gap-3 px-3 sm:px-4 py-1 bg-card border border-border rounded-full">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Starting from</span>
                       <div className="flex items-center gap-1 font-semibold">
@@ -432,7 +432,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
           </div>
 
           {/* Content */}
-          <div className="px-6 py-6 max-h-[90vh] overflow-y-auto">
+          <div className="px-4 sm:px-6 py-6 max-h-[90dvh] overflow-y-auto">
             {loading ? (
               <div className="space-y-6">
                 {/* Skeleton Loading States */}

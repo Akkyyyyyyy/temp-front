@@ -16,12 +16,12 @@ export function PackageListItem({ package: pkg, onEdit, onDuplicate, onDelete }:
   const { user } = useAuth();
   return (
     <Card className="p-4 hover:border-primary/50 transition-colors">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6 flex-1">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 flex-1 min-w-0">
           {/* Name and Badge */}
-          <div className="min-w-[180px]">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-lg">{pkg.name || "Untitled Package"}</h3>
+          <div className="md:min-w-[180px] min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="font-semibold text-lg truncate">{pkg.name || "Untitled Package"}</h3>
               {pkg.popular && (
                 <Badge className="bg-primary text-primary-foreground text-xs">Popular</Badge>
               )}
@@ -29,25 +29,25 @@ export function PackageListItem({ package: pkg, onEdit, onDuplicate, onDelete }:
           </div>
 
           {/* Price */}
-          <div className="min-w-[120px]">
+          <div className="md:min-w-[120px]">
             <p className="text-sm text-muted-foreground">Price</p>
             <p className="font-bold text-xl text-primary">${pkg.price || "0"}</p>
           </div>
 
           {/* Duration */}
-          <div className="min-w-[120px]">
+          <div className="md:min-w-[120px]">
             <p className="text-sm text-muted-foreground">Duration</p>
             <p className="font-medium">{pkg.duration || "Not set"}</p>
           </div>
 
           {/* Features Count */}
-          <div className="min-w-[100px]">
+          <div className="md:min-w-[100px]">
             <p className="text-sm text-muted-foreground">Features</p>
             <p className="font-medium">{pkg.features.length}</p>
           </div>
 
           {/* Add-ons Count */}
-          <div className="min-w-[100px]">
+          <div className="md:min-w-[100px]">
             <p className="text-sm text-muted-foreground">Add-ons</p>
             <p className="font-medium">{pkg.addOns.length}</p>
           </div>
@@ -56,7 +56,7 @@ export function PackageListItem({ package: pkg, onEdit, onDuplicate, onDelete }:
         {/* Actions */}
         {
           user.data.isAdmin &&
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 md:justify-end">
             <Button variant="outline" size="sm" onClick={onEdit}>
               <Pencil className="w-4 h-4" />
             </Button>
