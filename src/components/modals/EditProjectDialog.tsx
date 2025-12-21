@@ -239,6 +239,7 @@ export function EditProjectDialog({
                                 onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
                                 placeholder="Enter project name"
                                 className={`bg-background`}
+                                maxLength={100}
                             />
                         </div>
 

@@ -351,13 +351,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
 
       {/* Equipment Sections */}
       <div className="space-y-5">
-        {equipments.length === 0 && !isAdding ? (
-          <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                    <Camera className="w-12 h-12 mx-auto mb-4 opacity-50" />
-
-            <p className="text-lg">No equipments yet</p>
-          </div>
-        ) : (
+        {
           equipments.map((item) => (
             <div
               key={item.id}
@@ -491,7 +485,7 @@ export function EquipmentTab({ projectId }: EquipmentTabProps) {
               )}
             </div>
           ))
-        )}
+        }
       </div>
     </div>
   );

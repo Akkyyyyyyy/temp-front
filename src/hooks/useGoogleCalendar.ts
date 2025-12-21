@@ -23,7 +23,7 @@ interface SyncResult {
   }>;
 }
 
-export function useGoogleCalendar() {
+export function useGoogleCalendar(onMemberRefresh?: () => void) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const { user } = useAuth();
@@ -85,6 +85,7 @@ export function useGoogleCalendar() {
           event.data.type === "GOOGLE_AUTH_SUCCESS" ||
           event.data.type === "GOOGLE_AUTH_COMPLETE"
         ) {
+          onMemberRefresh?.();
           popup.close();
           toast.success("Connected to Google Calendar successfully");
           checkGoogleAuthStatus();
@@ -171,9 +172,9 @@ export function useGoogleCalendar() {
         return true;
       } else {
         toast.error(result.message || "Event sync failed");
-        
-        if (result.message.includes("authentication expired") || 
-            result.message.includes("not connected")) {
+
+        if (result.message.includes("authentication expired") ||
+          result.message.includes("not connected")) {
           setIsAuthorized(false);
         }
         return false;
@@ -274,6 +275,7 @@ export function useGoogleCalendar() {
       const result = await response.json();
 
       if (result.success) {
+        onMemberRefresh?.();
         setIsAuthorized(false);
         toast.success("Disconnected from Google Calendar");
       } else {

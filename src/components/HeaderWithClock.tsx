@@ -13,6 +13,7 @@ interface HeaderWithClockProps {
   selectedMonth: number;
   selectedYear: number;
   selectedWeek?: number;
+  refreshMembers?: () => void;
 }
 
 export function HeaderWithClock({
@@ -22,7 +23,8 @@ export function HeaderWithClock({
   selectedDay,
   selectedMonth,
   selectedWeek,
-  selectedYear
+  selectedYear,
+  refreshMembers
 }: HeaderWithClockProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const { user } = useAuth();
@@ -32,7 +34,7 @@ export function HeaderWithClock({
     handleConnect,
     handleSyncAllEvents,  // Updated
     handleDisconnect
-  } = useGoogleCalendar();
+  } = useGoogleCalendar(refreshMembers);
 
   useEffect(() => {
     const timer = setInterval(() => {

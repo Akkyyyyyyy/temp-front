@@ -496,7 +496,7 @@ export function AddProjectDialog({
                 </div>
 
                 {/* Event Tabs */}
-                <div className="flex gap-2 overflow-x-auto pb-2">
+                <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap">
                   {formData.events.map((event, index) => {
                     // Check if this event has any errors
                     const hasEventErrors = Object.keys(errors).some(key =>
@@ -509,7 +509,7 @@ export function AddProjectDialog({
                         className={`flex items-center px-3 py-1 rounded-md border cursor-pointer ${currentEventIndex === index
                             ? "bg-studio-gold text-black"
                             : "bg-transparent"
-                          } ${hasEventErrors ? "border-red-500 border-2" : "border-gray-300"
+                          } ${hasEventErrors ? "border-red-500 border-2" : ""
                           }`}
                         onClick={() => setCurrentEventIndex(index)}
                       >

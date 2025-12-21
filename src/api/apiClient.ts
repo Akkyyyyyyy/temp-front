@@ -1,7 +1,11 @@
 import { toast } from "sonner";
+let sessionExpiredToastShown = false;
 export function logoutUser() {
     localStorage.clear();
-    toast.error("Session expired. Logging out...");
+    if (!sessionExpiredToastShown) {
+        sessionExpiredToastShown = true;
+        toast.error("Session expired. Logging out...");
+    }
     window.location.href = '/login';
 }
 export async function apiFetch(input: RequestInfo, init?: RequestInit): Promise<Response> {

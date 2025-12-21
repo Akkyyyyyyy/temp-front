@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Edit3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { EditableTimeSlot } from '@/components/EditableTimeSlot';
 import { TeamMember } from './TeamMembers';
-import { EditableBooking } from '@/hooks/useBookingEditor';
 import { useAuth } from '@/context/AuthContext';
 
 interface DayCalendarProps {
@@ -14,68 +13,214 @@ interface DayCalendarProps {
   selectedMonth: number;
   setSelectedMonth: (month: number) => void;
   selectedYear: number;
-  setSelectedYear: (month: number) => void;
-  selectedWeek: number;
-  setSelectedWeek: (week: number) => void;
+  setSelectedYear: (year: number) => void;
+  selectedWeek?: number;
+  setSelectedWeek?: (week: number) => void;
   setSelectedProject: (projectId: string | null) => void;
+  setSelectedEvent?: (eventId: string | null) => void;
 }
 
-export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear, selectedWeek, setSelectedWeek, setSelectedProject }: DayCalendarProps) {
+export function DayCalendar({
+  date,
+  day,
+  teamMembers,
+  setSelectedDay,
+  selectedMonth,
+  setSelectedMonth,
+  selectedYear,
+  setSelectedYear,
+  selectedWeek,
+  setSelectedWeek,
+  setSelectedProject,
+  setSelectedEvent
+}: DayCalendarProps) {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const targetDate = new Date(selectedYear, selectedMonth - 1, day);
   const { user } = useAuth();
-  
-  // Build editableBookings from events instead of projects
+
+  // Build editableBookings from events and googleCalendarEvents
   const editableBookings: any[] = [];
-   const filteredTeamMembers = user.data.isAdmin 
-    ? teamMembers 
-    : teamMembers.filter(member => member.id === user.data.id);
+  const currentUserId = user.data.id;
+  const isAdmin = user.data.isAdmin;
+
+  // Filter team members based on user permissions
+  const filteredTeamMembers = isAdmin
+    ? teamMembers
+    : teamMembers.filter(member => member.id === currentUserId);
 
   filteredTeamMembers.forEach(member => {
-    member.events?.forEach((event, index) => {
-      const eventDate = new Date(event.date);
-      const targetDate = new Date(selectedYear, selectedMonth - 1, day);
-      
-      // Check if event is on the target date
-      if (
-        eventDate.getFullYear() === targetDate.getFullYear() &&
-        eventDate.getMonth() === targetDate.getMonth() &&
-        eventDate.getDate() === targetDate.getDate()
-      ) {
-        editableBookings.push({
-          id: event.eventId,
-          projectName: event.project.name,
-          memberName: member.name,
-          color: event.project.color,
-          memberRingColor: member.ringColor,
-          startHour: event.startHour,
-          endHour: event.endHour,
-          description: event.project.description || '',
-          location: event.location || '',
-          memberPhoto: member.profilePhoto || '',
-          client: event.project.client || {},
-          newRole: event.assignment.role,
-          brief: event.project.brief,
-          logistics: event.project.logistics,
-          instructions: event.assignment.instructions || '',
-          eventId: event.eventId,
-          eventName: event.name,
-          isOther:event.isOther
-        });
-      }
-    });
+    const isCurrentUser = member.id === currentUserId;
+
+    // Process regular events (always visible for admin, or for user's own events)
+    if (isAdmin || isCurrentUser) {
+      member.events?.forEach((event) => {
+        const eventStartDate = new Date(event.date + 'T00:00:00');
+        const targetDate = new Date(selectedYear, selectedMonth - 1, day);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        // For multi-day events, check if they have endDate
+        let eventEndDate = eventStartDate;
+        if (event.endDate) {
+          eventEndDate = new Date(event.endDate + 'T23:59:59');
+        } else if (event.project?.endDate) {
+          eventEndDate = new Date(event.project.endDate + 'T23:59:59');
+        }
+        
+        // Check if target date is within the event date range
+        if (targetDate >= eventStartDate && targetDate <= eventEndDate) {
+          editableBookings.push({
+            id: event.eventId,
+            projectName: event.project.name,
+            memberName: member.name,
+            color: event.project.color,
+            memberRingColor: member.ringColor,
+            startHour: event.startHour,
+            endHour: event.endHour,
+            description: event.project.description || '',
+            location: event.location || '',
+            memberPhoto: member.profilePhoto || '',
+            client: event.project.client || {},
+            newRole: event.assignment.role,
+            brief: event.project.brief,
+            logistics: event.project.logistics,
+            instructions: event.assignment.instructions || '',
+            eventId: event.eventId,
+            eventName: event.name,
+            isOther: event.isOther,
+            source: 'event',
+            isAllDay: event.allDay || false,
+            memberId: member.id,
+            isCurrentUserEvent: isCurrentUser,
+            date: event.date,
+            endDate: event.endDate || event.project?.endDate
+          });
+        }
+      });
+    }
+
+    if (isCurrentUser) {
+      member.googleCalendarEvents?.forEach((googleEvent) => {
+        const eventStartDate = new Date(googleEvent.date + 'T00:00:00');
+        const targetDate = new Date(selectedYear, selectedMonth - 1, day);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        // For Google Calendar multi-day events
+        let eventEndDate = eventStartDate;
+        if (googleEvent.endDate) {
+          if (googleEvent.allDay) {
+            // For all-day events, subtract 1 day to make it inclusive
+            eventEndDate = new Date(googleEvent.endDate + 'T00:00:00');
+            eventEndDate.setDate(eventEndDate.getDate() - 1); // Make exclusive end date inclusive
+          } else {
+            // For timed events, endDate is inclusive
+            eventEndDate = new Date(googleEvent.endDate + 'T23:59:59');
+          }
+        }
+        
+        eventStartDate.setHours(0, 0, 0, 0);
+        eventEndDate.setHours(0, 0, 0, 0);
+        
+        // Check if target date is within the Google Calendar event date range
+        if (targetDate >= eventStartDate && targetDate <= eventEndDate) {
+          // Determine if it's an all-day event
+          const isAllDayEvent = googleEvent.allDay || (googleEvent.startHour === null && googleEvent.endHour === null);
+
+          // For all-day events, set hours to cover the entire day
+          const startHour = isAllDayEvent ? 0 : (googleEvent.startHour || 0);
+          const endHour = isAllDayEvent ? 24 : (googleEvent.endHour || 24);
+
+          editableBookings.push({
+            id: googleEvent.id,
+            projectName: googleEvent.name || 'Private Event',
+            memberName: member.name,
+            color: '#6B7280', // Gray color for Google Calendar events
+            memberRingColor: member.ringColor,
+            startHour: startHour,
+            endHour: endHour,
+            description: googleEvent.description || 'Details are private',
+            location: googleEvent.location || '',
+            memberPhoto: member.profilePhoto || '',
+            client: { name: 'Private' },
+            newRole: 'Busy',
+            brief: [],
+            logistics: [],
+            instructions: 'Private event details are not visible',
+            eventId: googleEvent.id,
+            eventName: googleEvent.name || 'Private Event',
+            isOther: true,
+            source: 'google_calendar',
+            isAllDay: isAllDayEvent,
+            isGoogleCalendarEvent: true,
+            isPrivate: true,
+            memberId: member.id,
+            isCurrentUserEvent: true,
+            date: googleEvent.date,
+            endDate: googleEvent.endDate,
+            isFirstDayOfMultiDay: targetDate.getTime() === eventStartDate.getTime(),
+            isLastDayOfMultiDay: targetDate.getTime() === eventEndDate.getTime()
+          });
+        }
+      });
+    } else if (isAdmin && member.googleCalendarEvents?.length > 0) {
+      // For admin viewing other users: show that they have Google Calendar events, but not details
+      member.googleCalendarEvents?.forEach((googleEvent) => {
+        const eventStartDate = new Date(googleEvent.date + 'T00:00:00');
+        const targetDate = new Date(selectedYear, selectedMonth - 1, day);
+        targetDate.setHours(0, 0, 0, 0);
+        
+        let eventEndDate = eventStartDate;
+        if (googleEvent.endDate) {
+          if (googleEvent.allDay) {
+            eventEndDate = new Date(googleEvent.endDate + 'T00:00:00');
+            eventEndDate.setDate(eventEndDate.getDate() - 1);
+          } else {
+            eventEndDate = new Date(googleEvent.endDate + 'T23:59:59');
+          }
+        }
+        
+        eventStartDate.setHours(0, 0, 0, 0);
+        eventEndDate.setHours(0, 0, 0, 0);
+        
+        if (targetDate >= eventStartDate && targetDate <= eventEndDate) {
+          const isAllDayEvent = googleEvent.allDay || (googleEvent.startHour === null && googleEvent.endHour === null);
+
+          const startHour = isAllDayEvent ? 0 : (googleEvent.startHour || 0);
+          const endHour = isAllDayEvent ? 24 : (googleEvent.endHour || 24);
+          editableBookings.push({
+            id: `google-private-${member.id}-${googleEvent.id}`,
+            projectName: 'Busy (Google Calendar)',
+            memberName: member.name,
+            color: '#6B7280',
+            memberRingColor: member.ringColor,
+            startHour: startHour,
+            endHour: endHour,
+            description: 'Private Google Calendar event',
+            location: '',
+            memberPhoto: member.profilePhoto || '',
+            client: { name: 'Private' },
+            newRole: 'Busy',
+            brief: [],
+            logistics: [],
+            instructions: 'Google Calendar event details are private',
+            eventId: `google-private-${member.id}`,
+            eventName: 'Busy',
+            isOther: true,
+            source: 'google_calendar_private',
+            isAllDay: isAllDayEvent,
+            isGoogleCalendarEvent: true,
+            isPrivate: true,
+            memberId: member.id,
+            isCurrentUserEvent: false,
+            date: googleEvent.date,
+            endDate: googleEvent.endDate,
+            isFirstDayOfMultiDay: targetDate.getTime() === eventStartDate.getTime(),
+            isLastDayOfMultiDay: targetDate.getTime() === eventEndDate.getTime(),
+            googleEventDetails: googleEvent
+          });
+        }
+      });
+    }
   });
-
-  const [isEditing, setIsEditing] = useState(false);
-
-  // Functions to update/delete booking
-  const updateBooking = (id: string, updates: Partial<EditableBooking>) => {
-    console.log('Update booking:', id, updates);
-  };
-
-  const deleteBooking = (id: string) => {
-    console.log('Delete booking:', id);
-  };
 
   const formatHour = (hour: number) => {
     if (hour === 0) return '12 AM';
@@ -108,7 +253,9 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
     setSelectedDay(previousDate.getDate());
     setSelectedMonth(previousDate.getMonth() + 1);
     setSelectedYear(previousDate.getFullYear());
-    setSelectedWeek(getWeek(previousDate));
+    if (setSelectedWeek) {
+      setSelectedWeek(getWeek(previousDate));
+    }
   };
 
   const goToNextDay = () => {
@@ -119,28 +266,20 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
     setSelectedDay(nextDate.getDate());
     setSelectedMonth(nextDate.getMonth() + 1);
     setSelectedYear(nextDate.getFullYear());
-    setSelectedWeek(getWeek(nextDate));
+    if (setSelectedWeek) {
+      setSelectedWeek(getWeek(nextDate));
+    }
   };
 
-  // Format date for display
-  const formatDisplayDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-UK', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
-  // Compact format for mobile
-  const formatDisplayDateMobile = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-UK', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
+  // Handle event click
+  const handleEventClick = (booking: any) => {
+    // Only allow clicks for regular company events (not private/Google events)
+    if (booking.source === 'event' && !booking.isOther) {
+      setSelectedProject(booking.id);
+      if (setSelectedEvent) {
+        setSelectedEvent(booking.eventId);
+      }
+    }
   };
 
   return (
@@ -154,11 +293,24 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
         </div>
 
         {/* Date Navigation */}
-        {/* <div className="flex items-center justify-between w-full sm:w-auto gap-2">
+        <div className="flex items-center justify-between w-full sm:w-auto gap-2">
           <div className="flex-1 sm:flex-none">
             <h4 className="text-sm sm:text-base font-semibold text-foreground text-left">
-              <span className="sm:hidden">{formatDisplayDateMobile(date)}</span>
-              <span className="hidden sm:inline">{formatDisplayDate(date)}</span>
+              <span className="sm:hidden">
+                {new Date(selectedYear, selectedMonth - 1, day).toLocaleDateString('en-UK', {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric'
+                })}
+              </span>
+              <span className="hidden sm:inline">
+                {new Date(selectedYear, selectedMonth - 1, day).toLocaleDateString('en-UK', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </span>
             </h4>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
@@ -180,22 +332,8 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
               <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
           </div>
-        </div> */}
-
-        {/* Edit Button - Desktop */}
-        {/* <div className="hidden sm:flex">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsEditing(!isEditing)}
-            className="flex items-center gap-2"
-          >
-            <Edit3 className="w-4 h-4" />
-            {isEditing ? 'Done Editing' : 'Edit Schedule'}
-          </Button>
-        </div> */}
+        </div>
       </div>
-
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-1 gap-1 sm:gap-2">
@@ -206,13 +344,16 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
               {bookingsThisHour.length > 0 ? (
                 bookingsThisHour.map((booking, idx) => (
                   <EditableTimeSlot
-                    key={booking.id}
+                    key={`${booking.id}-${idx}`}
                     hour={hour}
                     booking={booking}
                     isStartOfBooking={hour === booking.startHour}
                     formatHour={formatHour}
                     showHourLabel={idx === 0}
-                    onProjectClick={() => setSelectedProject(booking.id)}
+                    onProjectClick={() => handleEventClick(booking)}
+                    isMultiDay={!!booking.endDate && new Date(booking.date).getTime() !== new Date(booking.endDate).getTime()}
+                    isFirstDay={booking.isFirstDayOfMultiDay}
+                    isLastDay={booking.isLastDayOfMultiDay}
                   />
                 ))
               ) : (
@@ -227,25 +368,6 @@ export function DayCalendar({ date, day, teamMembers, setSelectedDay, selectedMo
           );
         })}
       </div>
-
-      {/* Mobile Edit Button Footer */}
-      {isEditing && (
-        <div className="sm:hidden mt-4 pt-4 border-t border-border/20">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">
-              Editing mode enabled
-            </span>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setIsEditing(false)}
-              className="text-xs"
-            >
-              Done Editing
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

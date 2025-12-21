@@ -26,7 +26,7 @@ import {
 } from './additional-tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { useAuth } from "@/context/AuthContext";
-import { getFallback } from "@/helper/helper";
+import { formatTime, getFallback } from "@/helper/helper";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
@@ -327,7 +327,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
     // Get the currently selected event
     const selectedEvent = projectEvents.find(event => event.id === selectedEventId) || projectEvents[0];
-    console.log("finally", selectedEventId);
 
     // Get assignments for the selected event
     const eventAssignments = useMemo(() => {
@@ -618,12 +617,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     };
 
     // Format time from hour number to readable format
-    function formatTime(hour) {
-        if (hour === 24 || hour === 0) return "12 AM"; // handle midnight
-        if (hour === 12) return "12 PM";               // handle noon
-        if (hour > 12) return `${hour - 12} PM`;       // afternoon
-        return `${hour} AM`;                           // morning
-    }
+
 
 
 
@@ -1046,7 +1040,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     )
                                 )}
                                 <div className="space-y-4">
-                                    {briefSections.length > 0 ? (
+                                    {briefSections.length > 0 && (
                                         briefSections.map((section) => (
                                             <div key={section.id} className="group relative">
                                                 {renderEditableSection(
@@ -1064,11 +1058,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                                 )}
                                             </div>
                                         ))
-                                    ) : (
-                                        <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                            <p>No Creative Brief yet</p>
-                                        </div>
                                     )}
 
                                 </div>
@@ -1095,7 +1084,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                     )
                                 )}
                                 <div className="space-y-4">
-                                    {logisticsSections.length > 0 ? (
+                                    {logisticsSections.length > 0 && (
                                         logisticsSections.map((section) => (
                                             <div key={section.id} className="group relative">
                                                 {renderEditableSection(
@@ -1113,12 +1102,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                                 )}
                                             </div>
                                         ))
-                                    ) : (
-                                        <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                                            <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                            <p>No Logistics yet</p>
-                                        </div>
-                                    )}
+                                    ) }
                                 </div>
                             </div>
                         )}
@@ -1191,7 +1175,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                             }`}
                                     >
                                         <div
-                                            onClick={() => setSelectedEventId(isExpanded ? null : event.id)}
+                                            onClick={() => setSelectedEventId(isExpanded ? "" : event.id)}
                                             className={`p-3 sm:p-4 cursor-pointer flex items-center justify-between transition-all duration-300 ${isExpanded
                                                 ? 'bg-background'
                                                 : 'bg-background hover:bg-muted/30'

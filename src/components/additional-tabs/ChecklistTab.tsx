@@ -259,12 +259,7 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
 
       {/* Checklist Items */}
       <div className="space-y-6">
-        {checklist.length === 0 && !isAdding ? (
-          <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-            <ListChecks className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg">No Checklists yet</p>
-          </div>
-        ) : (
+        {
           checklist.map((item) => (
             <div
               key={item.id}
@@ -377,7 +372,7 @@ export function ChecklistTab({ projectId }: ChecklistTabProps) {
               )}
             </div>
           ))
-        )}
+        }
       </div>
     </div>
   );

@@ -75,6 +75,57 @@ export interface LoginResponse {
   };
   forceReset?: boolean;
 }
+export interface LockDateRequest {
+  companyId: string;
+  date: string;
+}
+
+export interface UnlockDateRequest {
+  companyId: string;
+  date: string;
+}
+
+export interface LockMultipleDatesRequest {
+  companyId: string;
+  dates: string[];
+}
+
+export interface UnlockMultipleDatesRequest {
+  companyId: string;
+  dates: string[];
+}
+
+export interface ClearLockedDatesRequest {
+  companyId: string;
+}
+
+export interface GetLockedDatesRequest {
+  companyId: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface LockDateResponse {
+  success: boolean;
+  message: string;
+  date: string;
+  lockedDates: string[];
+  company: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface LockedDatesResponse {
+  success: boolean;
+  message: string;
+  lockedDates: string[];
+  totalLockedDates: number;
+  company: {
+    id: string;
+    name: string;
+  };
+}
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -99,11 +150,11 @@ export async function loginMember(payload: LoginPayload): Promise<any> {
     if (!response.ok) {
       // Handle force reset case
       if (response.status === 403 && data.forceReset) {
-        return { 
-          success: false, 
-          message: data.message, 
+        return {
+          success: false,
+          message: data.message,
           errors: data.errors,
-          forceReset: true 
+          forceReset: true
         };
       }
       return { success: false, message: data.message, errors: data.errors };
@@ -259,5 +310,53 @@ export async function uploadCompanyLogo(
       success: false,
       message: error.message || "Failed to upload profile picture"
     };
+  }
+}
+
+
+
+// Lock a single date
+export async function lockDate(payload: LockDateRequest): Promise<ApiResponse<LockDateResponse>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/company/lock-date`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
+  }
+}
+
+// Unlock a single date
+export async function unlockDate(payload: UnlockDateRequest): Promise<ApiResponse<LockDateResponse>> {
+  try {
+    const response = await apiFetch(`${baseUrl}/company/unlock-date`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    return { success: false, message: error.message || "Network error" };
   }
 }

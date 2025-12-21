@@ -306,7 +306,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>
-                                                    <Button
+                                                    {/* <Button
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleDownload(document)}
@@ -314,7 +314,7 @@ export function DocumentsTab({ projectId }: DocumentsTabProps) {
                                                         className="h-7 w-7 p-0"
                                                     >
                                                         <Download className="h-3.5 w-3.5" />
-                                                    </Button>
+                                                    </Button> */}
                                                     {
                                                         user.data.isAdmin == true && (
                                                             <Button

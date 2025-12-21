@@ -66,6 +66,7 @@ export function ProjectStep1({
                             setErrors({ ...errors, projectName: '' });
                         }
                     }}
+                    maxLength={100}
                     placeholder="Enter project name (This will appear on the calendar)"
                     required
                 />

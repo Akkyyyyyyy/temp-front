@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { Calendar } from './ui/calendar';
 import { Calendar2 } from './ui/calendar2';
 import { Badge } from './ui/badge';
+import { formatTime } from '@/helper/helper';
 
 export interface TeamAssignment {
   id: string;
@@ -176,6 +177,7 @@ export function ProjectStep2({
               value={eventData.name}
               onChange={(e) => updateEventField('name', e.target.value)}
               placeholder="Enter event name"
+              maxLength={100}
               required
             />
           </div>
@@ -262,7 +264,7 @@ export function ProjectStep2({
                     .filter(hour => hour !== 24)
                     .map((hour) => (
                       <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                        {`${hour}:00`}
+                        {formatTime(hour)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -280,7 +282,7 @@ export function ProjectStep2({
                 <SelectContent className="bg-background border-border shadow-lg">
                   {hours.filter(h => h > eventData.startHour).map((hour) => (
                     <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                      {`${hour}:00`}
+                      {formatTime(hour)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -396,10 +398,10 @@ export function ProjectStep2({
                               <span>{member.name}</span>
                               <span className="text-muted-foreground text-xs">- {member.role || "No role assigned"}</span>
                               {member.availabilityStatus === 'unavailable' && (
-                              <Badge variant="destructive" className="text-xs">
-                                Unavailable
-                              </Badge>
-                            )}
+                                <Badge variant="destructive" className="text-xs">
+                                  Unavailable
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </SelectItem>

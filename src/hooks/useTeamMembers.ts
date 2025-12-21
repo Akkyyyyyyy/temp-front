@@ -17,10 +17,15 @@ export function useTeamMembers({
 }) {
     const { user } = useAuth();
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
+    const [lockedDates, setLockedDates] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(true);
+    console.log(lockedDates);
+    
+    
 
     const refresh = useCallback(async () => {
+    console.log("refreshing");
         if (isRefreshing) setLoading(true);
         try {
             const companyId = user.data.company.id;
@@ -33,8 +38,11 @@ export function useTeamMembers({
                 year: selectedYear,
                 memberId
             });
-
+    console.log(response);
             const members = response.data.members;
+                    
+                setLockedDates(response.data.lockedDates);
+        
 
             const transformed = members.map((m: any) => ({
                 id: m.id,
@@ -49,6 +57,8 @@ export function useTeamMembers({
                 skills: m.skills || [],
                 companyId: companyId,
                 events: m.events || [], // Changed from projects to events
+                googleCalendarEvents: m.googleCalendarEvents || [], // Add Google Calendar events
+                hasGoogleCalendar: m.hasGoogleCalendar || false, // Add connection status
                 active: m.active,
                 isAdmin: m.isAdmin,
                 roleId: m.roleId,
@@ -67,5 +77,5 @@ export function useTeamMembers({
         }
     }, [user, selectedMonth, selectedYear, selectedWeek, timeView]);
 
-    return { teamMembers, loading, refresh, setTeamMembers };
+    return { teamMembers, loading, refresh, setTeamMembers, lockedDates };
 }

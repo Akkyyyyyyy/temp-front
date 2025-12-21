@@ -17,6 +17,7 @@ import { useRole } from '@/hooks/useRole';
 import { RoleDropdown } from '../dropdowns/RoleDropdown';
 import { Switch } from '../ui/switch';
 import { createEvent, updateEvent } from '@/api/event';
+import { formatTime } from '@/helper/helper';
 
 export interface EventDialogData {
     reminders: any;
@@ -382,6 +383,7 @@ export function AddEditEventDialog({
                                     }}
                                     placeholder="Enter event name"
                                     required
+                                    maxLength={100}
                                 />
                             </div>
 
@@ -467,7 +469,7 @@ export function AddEditEventDialog({
                                                 .filter(hour => hour !== 24)
                                                 .map((hour) => (
                                                     <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                                                        {`${hour}:00`}
+                                                        {formatTime(hour)}
                                                     </SelectItem>
                                                 ))}
                                         </SelectContent>
@@ -487,7 +489,7 @@ export function AddEditEventDialog({
                                                 .filter(h => h > formData.startHour)
                                                 .map((hour) => (
                                                     <SelectItem key={hour} value={hour.toString()} className="hover:bg-muted">
-                                                        {`${hour}:00`}
+                                                        {formatTime(hour)}
                                                     </SelectItem>
                                                 ))}
                                         </SelectContent>
@@ -739,7 +741,7 @@ export function AddEditEventDialog({
                                     </div>
                                 )}
 
-                                
+
                             </div>
                         )}
                     </div>

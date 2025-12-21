@@ -316,6 +316,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
   }
 
   const handleEventClick = (eventId: string, memberId: string, projectId: string) => {
+    
     const member = teamMembers.find(m => m.id === memberId);
     if (member) {
       const event = member.events?.find(e => e.eventId === eventId);
@@ -337,7 +338,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
           }
         };
 
-        setSelectedEvent(eventData);
+        setSelectedEvent(event.eventId);
         setIsEventClick(true);
         setSelectedProject(projectId);
         onClose();
@@ -435,7 +436,6 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                           <TableRow
                             key={`${booking.eventId}-${index}`}
                             className="group cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => handleEventClick(booking.eventId, booking.memberId, booking.projectId)}
                           >
                             <TableCell>
                               <div
@@ -478,30 +478,16 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
                                   borderColor: booking.projectColor,
                                   color: 'inherit'
                                 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProjectClick(booking.projectId);
-                                }}
+                                onClick={() => handleEventClick(booking.eventId, booking.memberId, booking.projectId)}
                               >
                                 {booking.eventName}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="border truncate hover:opacity-80 transition-opacity"
-                                style={{
-                                  backgroundColor: `${booking.projectColor}20`,
-                                  borderColor: booking.projectColor,
-                                  color: 'inherit'
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleProjectClick(booking.projectId);
-                                }}
+                              <span
                               >
                                 {booking.projectName}
-                              </Badge>
+                              </span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1 text-sm truncate">

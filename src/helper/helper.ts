@@ -15,9 +15,9 @@ export const getFallback = (name) => {
 export const getTextColorBasedOnBackground = (backgroundColor) => {
   // If color has transparency, remove the alpha channel for calculation
   const hex = backgroundColor.replace(/[^0-9A-F]/gi, '');
-  
+
   let r, g, b;
-  
+
   if (hex.length === 3) {
     r = parseInt(hex[0] + hex[0], 16);
     g = parseInt(hex[1] + hex[1], 16);
@@ -30,10 +30,10 @@ export const getTextColorBasedOnBackground = (backgroundColor) => {
     // Default to white if invalid color
     return 'white';
   }
-  
+
   // Calculate relative luminance (per ITU-R BT.709)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  
+
   // Use black text on bright backgrounds, white on dark backgrounds
   return luminance > 0.5 ? 'black' : 'white';
 };
@@ -104,3 +104,34 @@ export const formatPrice = (price: string | number, country?: string) => {
     maximumFractionDigits: 2,
   }).format(numericPrice);
 };
+export function formatReminderDateTime(reminder: any): string {
+  const date = new Date(reminder.reminderDate);
+
+  // Day of week: Sunday
+  const dayOfWeek = date.toLocaleDateString('en-GB', { weekday: 'long' });
+
+  // Day: 25
+  const day = date.getDate();
+
+  // Month: Dec (short month name)
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[date.getMonth()];
+
+  // Year: 2025
+  const year = date.getFullYear();
+
+  // Time: 6:00pm (with leading zero for minutes)
+  const hour = reminder.reminderHour;
+  const ampm = hour >= 12 ? ' pm' : ' am';
+  const displayHour = hour % 12 || 12; // Convert 0 to 12 for 12am
+  const minutes = '00';
+
+  return `${dayOfWeek}, ${day} ${month} ${year} at ${displayHour}:${minutes}${ampm}`;
+}
+
+export function formatTime(hour) {
+  if (hour === 24 || hour === 0) return "12:00 AM";
+  if (hour === 12) return "12:00 PM";
+  if (hour > 12) return `${hour - 12}:00 PM`;
+  return `${hour}:00 AM`;
+}

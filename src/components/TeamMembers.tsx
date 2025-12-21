@@ -1,10 +1,10 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "./ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { differenceInDays, format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, startOfMonth, endOfMonth } from "date-fns";
 import { Skeleton } from "./ui/skeleton";
-import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog, Star, Folder } from "lucide-react";
+import { Calendar, Clock, Info, Search, Palette, User, MapPin, Ban, Laptop, Settings, Settings2, MonitorCog, Star, Folder, Globe, Lock, Shield, Unlock, Loader2 } from "lucide-react";
 import { Input } from "./ui/input";
 import { TimeView } from "./GanttChart";
 import { monthNames } from "@/constant/constant";
@@ -14,8 +14,12 @@ import { RingColorDialog } from "./modals/RingColorDialog";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { TimeViewToggle } from "./TimeViewToggle";
 import { useAuth } from "@/context/AuthContext";
-import { getFallback, getTextColorBasedOnBackground } from "@/helper/helper";
+import { formatTime, getFallback, getTextColorBasedOnBackground } from "@/helper/helper";
 import { DayCalendar } from "./DayCalendar";
+import { GoogleCalendarEvent } from "./eventRows/GoogleCalendarEvent";
+import { OtherEvent } from "./eventRows/OtherEvent";
+import { ProjectEvent } from "./eventRows/ProjectEvent";
+import { lockDate, unlockDate } from "@/api/company";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
@@ -30,7 +34,9 @@ export interface TeamMember {
   location?: string;
   bio?: string;
   skills?: string[];
-  events?: TeamMemberEvent[]; // Changed from projects to events
+  events?: TeamMemberEvent[];
+  googleCalendarEvents?: GoogleCalendarEvent[];
+  hasGoogleCalendar?: boolean;
   ringColor?: string;
   active: boolean;
   roleId: string;
@@ -39,11 +45,42 @@ export interface TeamMember {
   isOwner: boolean;
   invitation: string;
 }
+export interface LockStatus {
+  date: string;
+  isLocked: boolean;
+  processing?: boolean;
+}
+
+export interface GoogleCalendarEvent {
+  endDate?: any;
+  id: string;
+  name: string;
+  date: string;
+  startHour: number | null;
+  startMinute: number | null;
+  endHour: number | null;
+  endMinute: number | null;
+  location: string;
+  isGoogleCalendarEvent: true;
+  source: 'google_calendar';
+  htmlLink: string;
+  description: string;
+  allDay: boolean;
+  organizer?: string;
+  attendees?: Array<any>;
+  extendedProperties?: any;
+  project: null;
+  assignment: null;
+  reminders: null;
+  isOther: false;
+}
 
 export interface TeamMemberEvent {
+  endDate?: any;
+  allDay: any;
   isOther: any;
   eventId: string;
-  name:string;
+  name: string;
   date: string;
   startHour: number;
   endHour: number;
@@ -53,6 +90,7 @@ export interface TeamMemberEvent {
     dayBefore: boolean;
   };
   project: {
+    endDate: any;
     id: string;
     name: string;
     color: string;
@@ -73,6 +111,7 @@ export interface TeamMemberEvent {
 interface TeamMembersProps {
   refreshMembers: () => void;
   teamMembers: TeamMember[];
+  lockedDates: string[];
   timeView: any;
   selectedDay?: number;
   setSelectedDay: (day: number) => void;
@@ -96,11 +135,13 @@ interface TeamMembersProps {
   setIsProjectClick: (projectClick: boolean) => void;
   onRingColorUpdate?: (bool: boolean) => void;
   onDayChange?: (day: number, month: number, year: number) => void;
+  setIsEventClick: (eventClick: boolean) => void;
 }
 
 export function TeamMembers({
   refreshMembers,
   teamMembers,
+  lockedDates,
   timeView,
   selectedDay,
   setSelectedDay,
@@ -123,12 +164,14 @@ export function TeamMembers({
   searchQuery,
   setIsProjectClick,
   onRingColorUpdate,
-  onDayChange
+  onDayChange,
+  setIsEventClick
 }: TeamMembersProps) {
   const minColumnWidth = timeView === "week" ? "40px" : "8px";
 
   const [memberRingColors, setMemberRingColors] = useState<Record<string, string>>({});
   const [openPopover, setOpenPopover] = useState<string | null>(null);
+  const [lockProcessing, setLockProcessing] = useState<Record<string, boolean>>({});
   const {
     refresh
   } = useTeamMembers({
@@ -138,6 +181,57 @@ export function TeamMembers({
     timeView,
   });
   const { user } = useAuth();
+
+  const isDateLocked = useCallback((date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return lockedDates.includes(dateStr);
+  }, [lockedDates]);
+
+  const handleToggleDateLock = async (date: Date, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const companyId = user?.data?.company?.id;
+    if (!companyId) {
+      console.error("Company not found");
+      return;
+    }
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const isCurrentlyLocked = isDateLocked(date);
+
+    // Set processing state
+    setLockProcessing(prev => ({ ...prev, [dateStr]: true }));
+
+    try {
+      if (isCurrentlyLocked) {
+        // Unlock the date
+        const response = await unlockDate({ companyId, date: dateStr });
+        if (response.success) {
+          // Update local state - you might want to refresh or update lockedDates
+          // toast.success(`Date unlocked: ${format(date, 'MMM dd, yyyy')}`);
+          // Refresh team members to get updated locked dates
+          refreshMembers();
+        } else {
+          console.error(response.message || "Failed to unlock date");
+        }
+      } else {
+        // Lock the date
+        const response = await lockDate({ companyId, date: dateStr });
+        if (response.success) {
+          // toast.success(`Date locked: ${format(date, 'MMM dd, yyyy')}`);
+          // Refresh team members to get updated locked dates
+          refreshMembers();
+        } else {
+          console.error(response.message || "Failed to lock date");
+        }
+      }
+    } catch (error) {
+      console.error("Error toggling date lock:", error);
+      console.error("Failed to update date lock");
+    } finally {
+      setLockProcessing(prev => ({ ...prev, [dateStr]: false }));
+    }
+  };
+
 
   // Filter team members based on user admin status
   const getFilteredTeamMembers = () => {
@@ -152,10 +246,19 @@ export function TeamMembers({
 
   const filteredTeamMembers = getFilteredTeamMembers();
 
-  // Sort team members: active first, then inactive
+  // Sort team members: logged-in user first, then active, then inactive
   const sortedTeamMembers = [...filteredTeamMembers].sort((a, b) => {
-    if (a.active && !b.active) return -1; // a (active) comes before b (inactive)
-    if (!a.active && b.active) return 1;  // b (active) comes before a (inactive)
+    const isUserA = a.id === user?.data?.id;
+    const isUserB = b.id === user?.data?.id;
+
+    // Logged-in user always comes first
+    if (isUserA && !isUserB) return -1;
+    if (!isUserA && isUserB) return 1;
+
+    // Then sort by active status
+    if (a.active && !b.active) return -1;
+    if (!a.active && b.active) return 1;
+
     return 0;
   });
 
@@ -210,40 +313,6 @@ export function TeamMembers({
     return isoWeekStart;
   }
 
-  // Get event position in the timeline
-  const getEventPosition = (event: TeamMemberEvent, totalPeriods: number) => {
-    if (!event.date) {
-      return { startPercent: 0, widthPercent: 0 };
-    }
-
-    const periods = getPeriods();
-
-    if (periods.length === 0) {
-      return { startPercent: 0, widthPercent: 0 };
-    }
-
-    const eventDate = new Date(event.date + 'T00:00:00');
-
-    // Find the index of the event date in the periods
-    const eventIndex = periods.findIndex(period => {
-      const periodDate = new Date(period);
-      periodDate.setHours(0, 0, 0, 0);
-      return periodDate.getTime() === eventDate.getTime();
-    });
-
-    if (eventIndex === -1) {
-      return { startPercent: 0, widthPercent: 0 };
-    }
-
-    // Events are single day, so they take one column width
-    const startPercent = (eventIndex / totalPeriods) * 100;
-    const widthPercent = (1 / totalPeriods) * 100;
-
-    return {
-      startPercent: Math.max(0, Math.min(100, startPercent)),
-      widthPercent: Math.max(0, Math.min(100 - startPercent, widthPercent)),
-    };
-  };
 
   // Calculate periods based on timeView
   const getPeriods = () => {
@@ -265,43 +334,408 @@ export function TeamMembers({
 
   const periods = getPeriods();
 
-  const getEventRows = (events: TeamMemberEvent[]): TeamMemberEvent[][] => {
-    if (!events || events.length === 0) return [];
+  // NEW: Get events for each day (handles multi-day events)
+  const getEventsForPeriod = (member: TeamMember, periodIndex: number) => {
+    const isLoggedInUser = member.id === user?.data?.id;
 
-    // Group events by date
-    const eventsByDate = new Map<string, TeamMemberEvent[]>();
+    // Start with all events
+    let eventsToShow = [...(member.events || [])];
 
-    events.forEach(event => {
-      if (!eventsByDate.has(event.date)) {
-        eventsByDate.set(event.date, []);
+    // Filter out isOther events ONLY for logged-in user
+    if (isLoggedInUser) {
+      eventsToShow = eventsToShow.filter(event => !event.isOther);
+    }
+
+    // Combine filtered events with Google Calendar events
+    const allEvents: (any)[] = [
+      ...eventsToShow,
+      ...(member.googleCalendarEvents || [])
+    ];
+
+    if (allEvents.length === 0) return [];
+
+    const currentPeriod = periods[periodIndex];
+    const periodDate = new Date(currentPeriod);
+    periodDate.setHours(0, 0, 0, 0);
+
+    // Find events that occur on this day
+    const eventsOnThisDay: (any)[] = [];
+
+    allEvents.forEach(event => {
+      const eventStartDate = new Date(event.date + 'T00:00:00');
+
+      // For Google Calendar events, check if they have endDate for multi-day events
+      let eventEndDate = eventStartDate;
+      if (event.isGoogleCalendarEvent && event.endDate) {
+        eventEndDate = new Date(event.endDate + 'T23:59:59');
       }
-      eventsByDate.get(event.date)!.push(event);
+      // For regular events (not Google Calendar), check if they have endDate too
+      if (!event.isGoogleCalendarEvent && event.project?.endDate) {
+        eventEndDate = new Date(event.project.endDate + 'T23:59:59');
+      }
+
+      // Check if the period date is within the event date range
+      if (periodDate >= eventStartDate && periodDate <= eventEndDate) {
+        eventsOnThisDay.push({
+          ...event,
+          periodIndex: periodIndex,
+          isFirstDay: periodDate.getTime() === eventStartDate.getTime(),
+          isLastDay: periodDate.getTime() === eventEndDate.getTime()
+        });
+      }
     });
 
-    // Get max number of events on any single day
-    let maxEventsPerDay = 0;
-    eventsByDate.forEach(dateEvents => {
-      maxEventsPerDay = Math.max(maxEventsPerDay, dateEvents.length);
+    // Sort events for this day by start time
+    return eventsOnThisDay.sort((a, b) => {
+      const aStart = 'startHour' in a ? a.startHour : (a.allDay ? -1 : 0);
+      const bStart = 'startHour' in b ? b.startHour : (b.allDay ? -1 : 0);
+      return aStart - bStart;
     });
-
-    // Create rows based on max events per day
-    const rows: TeamMemberEvent[][] = Array.from({ length: maxEventsPerDay }, () => []);
-
-    // Distribute events into rows
-    eventsByDate.forEach((dateEvents, date) => {
-      // Sort events for this date by start time
-      const sortedDateEvents = dateEvents.sort((a, b) => a.startHour - b.startHour);
-
-      sortedDateEvents.forEach((event, index) => {
-        // Place event in corresponding row (0-based index)
-        if (index < rows.length) {
-          rows[index].push(event);
-        }
-      });
-    });
-
-    return rows.filter(row => row.length > 0);
   };
+
+  // NEW: Get max events per day across all periods
+  const getMaxEventsPerDay = (member: TeamMember) => {
+    let maxEvents = 0;
+
+    for (let i = 0; i < periods.length; i++) {
+      const eventsOnDay = getEventsForPeriod(member, i);
+      maxEvents = Math.max(maxEvents, eventsOnDay.length);
+    }
+
+    return maxEvents;
+  };
+
+  const getEventRows = (member: TeamMember): any[][] => {
+    const isLoggedInUser = member.id === user?.data?.id;
+
+    let eventsToShow = [...(member.events || [])];
+
+    // Hide "isOther" only for logged-in user
+    if (isLoggedInUser) {
+      eventsToShow = eventsToShow.filter(event => !event.isOther);
+    }
+
+    const allEvents: any[] = [
+      ...eventsToShow,
+      ...(member.googleCalendarEvents || [])
+    ];
+
+    if (allEvents.length === 0) return [];
+
+    /**
+     * Helper: get event start/end indexes within periods
+     */
+    const getEventSpanIndexes = (event: any) => {
+      const startDate = new Date(event.date + "T00:00:00");
+
+      let endDate = startDate;
+
+      // Determine end date
+      if (event.isGoogleCalendarEvent) {
+        // Google Calendar events
+        if (event.endDate) {
+          // IMPORTANT: For Google Calendar all-day events, endDate is EXCLUSIVE
+          // Example: Event from Dec 19-24 means Dec 19, 20, 21, 22, 23 (5 days)
+          // The endDate "2025-12-24" means the event does NOT include Dec 24
+          if (event.allDay) {
+            // For all-day events, subtract 1 day to make it inclusive
+            endDate = new Date(event.endDate + "T00:00:00");
+            endDate.setDate(endDate.getDate() - 1); // Make exclusive end date inclusive
+          } else {
+            // For timed events, endDate is inclusive
+            endDate = new Date(event.endDate + "T23:59:59");
+          }
+        } else if (event.allDay) {
+          // Single day all-day event
+          endDate = new Date(startDate);
+          endDate.setHours(23, 59, 59, 999);
+        }
+      } else {
+        // Project events - end dates are inclusive
+        if (event.endDate) {
+          endDate = new Date(event.endDate + "T23:59:59");
+        } else if (event.project?.endDate) {
+          endDate = new Date(event.project.endDate + "T23:59:59");
+        } else {
+          // Single day event
+          endDate = new Date(startDate);
+          endDate.setHours(23, 59, 59, 999);
+        }
+      }
+
+      // Make sure dates are at midnight for comparison
+      const startMidnight = new Date(startDate);
+      startMidnight.setHours(0, 0, 0, 0);
+
+      const endMidnight = new Date(endDate);
+      endMidnight.setHours(0, 0, 0, 0);
+
+      // Find indices in periods array
+      let startIndex = -1;
+      let endIndex = -1;
+
+      // Find the exact dates in periods
+      for (let i = 0; i < periods.length; i++) {
+        const periodDate = new Date(periods[i]);
+        periodDate.setHours(0, 0, 0, 0);
+
+        if (startIndex === -1 && periodDate.getTime() === startMidnight.getTime()) {
+          startIndex = i;
+        }
+        if (endIndex === -1 && periodDate.getTime() === endMidnight.getTime()) {
+          endIndex = i;
+        }
+        if (startIndex !== -1 && endIndex !== -1) break;
+      }
+
+      // CRITICAL FIX: For events that start before our date range
+      // If start date is before first period, start at period 0
+      const firstPeriodDate = new Date(periods[0]);
+      firstPeriodDate.setHours(0, 0, 0, 0);
+
+      const lastPeriodDate = new Date(periods[periods.length - 1]);
+      lastPeriodDate.setHours(0, 0, 0, 0);
+
+      // If event starts before our date range, start at first period
+      if (startIndex === -1 && startMidnight < firstPeriodDate) {
+        startIndex = 0;
+      }
+
+      // If event ends after our date range, end at last period
+      if (endIndex === -1 && endMidnight > lastPeriodDate) {
+        endIndex = periods.length - 1;
+      }
+
+      // For events that start within our range but we couldn't find exact match
+      if (startIndex === -1) {
+        // Find first period that is >= start date
+        for (let i = 0; i < periods.length; i++) {
+          const periodDate = new Date(periods[i]);
+          if (periodDate >= startMidnight) {
+            startIndex = Math.max(0, i);
+            break;
+          }
+        }
+        // If still not found, use last period
+        if (startIndex === -1) startIndex = periods.length - 1;
+      }
+
+      if (endIndex === -1) {
+        // Find last period that is <= end date
+        for (let i = periods.length - 1; i >= 0; i--) {
+          const periodDate = new Date(periods[i]);
+          if (periodDate <= endMidnight) {
+            endIndex = Math.min(periods.length - 1, i);
+            break;
+          }
+        }
+        // If still not found, use startIndex
+        if (endIndex === -1) endIndex = startIndex;
+      }
+
+      // For events that start before and end after our date range
+      // We should show them spanning the entire range
+      if (startMidnight < firstPeriodDate && endMidnight > lastPeriodDate) {
+        startIndex = 0;
+        endIndex = periods.length - 1;
+      }
+
+      // Ensure start <= end
+      if (startIndex > endIndex) {
+        [startIndex, endIndex] = [endIndex, startIndex];
+      }
+
+      return {
+        startIndex: Math.max(0, Math.min(startIndex, periods.length - 1)),
+        endIndex: Math.max(0, Math.min(endIndex, periods.length - 1)),
+      };
+    };
+
+    /**
+     * Track which rows are occupied per day
+     * dayIndex -> Set<rowIndex>
+     */
+    const occupiedRowsPerDay = new Map<number, Set<number>>();
+    periods.forEach((_, i) => occupiedRowsPerDay.set(i, new Set()));
+
+    const rows: any[][] = [];
+    const usedEvents = new Set<string>();
+
+    const getEventKey = (event: any) =>
+      event.isGoogleCalendarEvent ? `google-${event.id}` : `event-${event.eventId}`;
+
+    /**
+     * Sort events by start date AND duration (longer events first)
+     */
+    const sortedEvents = [...allEvents].sort((a, b) => {
+      const aSpan = getEventSpanIndexes(a);
+      const bSpan = getEventSpanIndexes(b);
+      const aDuration = aSpan.endIndex - aSpan.startIndex;
+      const bDuration = bSpan.endIndex - bSpan.startIndex;
+
+      // Sort by start date first, then by duration (longest first)
+      if (aSpan.startIndex !== bSpan.startIndex) {
+        return aSpan.startIndex - bSpan.startIndex;
+      }
+      return bDuration - aDuration;
+    });
+
+    for (const event of sortedEvents) {
+      const eventKey = getEventKey(event);
+      if (usedEvents.has(eventKey)) continue;
+
+      const { startIndex, endIndex } = getEventSpanIndexes(event);
+      const duration = endIndex - startIndex;
+
+      let placed = false;
+
+      // Try existing rows
+      for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+        let canPlace = true;
+
+        // Check if this row is free for all days of this event
+        for (let d = startIndex; d <= endIndex; d++) {
+          if (occupiedRowsPerDay.get(d)?.has(rowIndex)) {
+            canPlace = false;
+            break;
+          }
+        }
+
+        if (canPlace) {
+          // Initialize row if needed
+          if (!rows[rowIndex]) {
+            rows[rowIndex] = [];
+          }
+
+          // Find the correct position to insert in the row array
+          let insertIndex = 0;
+          for (let i = 0; i < rows[rowIndex].length; i++) {
+            const existingEvent = rows[rowIndex][i];
+            if (existingEvent.periodIndex > startIndex) {
+              break;
+            }
+            insertIndex = i + 1;
+          }
+
+          rows[rowIndex].splice(insertIndex, 0, {
+            ...event,
+            periodIndex: startIndex,
+            spanDays: duration + 1,
+            isFirstDay: startIndex > 0, // Not first day if it starts before our range
+            isLastDay: endIndex < periods.length - 1 // Not last day if it ends after our range
+          });
+
+          // Mark this row as occupied for all days of this event
+          for (let d = startIndex; d <= endIndex; d++) {
+            occupiedRowsPerDay.get(d)?.add(rowIndex);
+          }
+
+          usedEvents.add(eventKey);
+          placed = true;
+          break;
+        }
+      }
+
+      // Create new row if needed
+      if (!placed) {
+        const newRowIndex = rows.length;
+        rows[newRowIndex] = [{
+          ...event,
+          periodIndex: startIndex,
+          spanDays: duration + 1,
+          isFirstDay: startIndex > 0,
+          isLastDay: endIndex < periods.length - 1
+        }];
+
+        // Mark this row as occupied for all days of this event
+        for (let d = startIndex; d <= endIndex; d++) {
+          occupiedRowsPerDay.get(d)?.add(newRowIndex);
+        }
+
+        usedEvents.add(eventKey);
+      }
+    }
+
+    return rows;
+  };
+
+
+  // Update the getEventPosition function to handle multi-day events properly
+  const getEventPosition = (event: any, totalPeriods: number) => {
+    const periods = getPeriods();
+    if (isSingleDayOutsideRange(event, periods)) {
+      return null; // do not render
+    }
+    const { startIndex, endIndex } = getEventSpanIndexes(event, periods);
+
+    if (startIndex === -1 || endIndex === -1) {
+      return { startPercent: 0, widthPercent: 0 };
+    }
+
+    const spanDays = endIndex - startIndex + 1;
+
+    return {
+      startPercent: (startIndex / totalPeriods) * 100,
+      widthPercent: (spanDays / totalPeriods) * 100,
+    };
+  };
+
+  const getEventSpanIndexes = (event: any, periods: Date[]) => {
+    const startDate = new Date(event.date + "T00:00:00");
+
+    let endDate = startDate;
+
+    // Google Calendar handling
+    if (event.isGoogleCalendarEvent && event.endDate) {
+      if (event.allDay) {
+        endDate = new Date(event.endDate + "T00:00:00");
+        endDate.setDate(endDate.getDate() - 1); // Google endDate is exclusive
+      } else {
+        endDate = new Date(event.endDate + "T23:59:59");
+      }
+    }
+
+    // Normalize
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(0, 0, 0, 0);
+
+    const firstPeriod = new Date(periods[0]);
+    const lastPeriod = new Date(periods[periods.length - 1]);
+    firstPeriod.setHours(0, 0, 0, 0);
+    lastPeriod.setHours(0, 0, 0, 0);
+
+    // If event does not intersect visible range at all
+    if (endDate < firstPeriod || startDate > lastPeriod) {
+      return { startIndex: -1, endIndex: -1 };
+    }
+
+    // Clip to visible range
+    const visibleStart = startDate < firstPeriod ? firstPeriod : startDate;
+    const visibleEnd = endDate > lastPeriod ? lastPeriod : endDate;
+
+    let startIndex = periods.findIndex(
+      d => new Date(d).getTime() === visibleStart.getTime()
+    );
+    let endIndex = periods.findIndex(
+      d => new Date(d).getTime() === visibleEnd.getTime()
+    );
+
+    return { startIndex, endIndex };
+  };
+  const isSingleDayOutsideRange = (event: any, periods: Date[]) => {
+    if (event.endDate) return false; // multi-day handled elsewhere
+
+    const eventDate = new Date(event.date + 'T00:00:00');
+    eventDate.setHours(0, 0, 0, 0);
+
+    const rangeStart = new Date(periods[0]);
+    const rangeEnd = new Date(periods[periods.length - 1]);
+    rangeStart.setHours(0, 0, 0, 0);
+    rangeEnd.setHours(0, 0, 0, 0);
+
+    return eventDate < rangeStart || eventDate > rangeEnd;
+  };
+
 
   const handlePreviousPeriod = () => {
     if (timeView === "week") {
@@ -400,6 +834,12 @@ export function TeamMembers({
     setSelectedEvent(null);
   };
 
+  const handleEventClick = (event) => {
+    setSelectedProject(event.project.id);
+    setSelectedEvent(event.eventId);
+    setIsEventClick(true);
+  }
+
   const getFirstDayOfWeek = (year, week) => {
     // January 4th is always in week 1 (ISO week date standard)
     const januaryFourth = new Date(year, 0, 4);
@@ -464,18 +904,15 @@ export function TeamMembers({
 
   // Calculate timeline height based on number of event rows needed
   const getTimelineHeight = (member: TeamMember) => {
-    if (!member.events || member.events.length === 0) {
-      return 'h-14'; // Default height for no events
-    }
+    const maxEventsPerDay = getMaxEventsPerDay(member);
 
-    const eventRows = getEventRows(member.events);
-    const rowCount = eventRows.length;
+    if (maxEventsPerDay === 0) return 'h-14'; // Default height for no events
 
     // Base height + additional height for extra rows
-    if (rowCount === 1) return 'h-14'; // Single row
-    if (rowCount === 2) return 'h-24'; // Two rows
-    if (rowCount === 3) return 'h-[8.5rem]'; // Three rows
-    return 'h-36'; // Four or more rows
+    if (maxEventsPerDay === 1) return 'h-14'; // Single row
+    if (maxEventsPerDay === 2) return 'h-24'; // Two rows
+    if (maxEventsPerDay === 3) return 'h-[8.5rem]'; // Three rows
+    return 'h-44'; // Four or more rows
   };
 
   const periodNavigation = (
@@ -540,7 +977,7 @@ export function TeamMembers({
   const renderTeamMemberList = () => (
     <div className="w-[130px] md:w-[180px] shrink-0 space-y-3 mr-3">
       {/* Empty space for header alignment */}
-      <div className="h-12"></div>
+      <div className="h-[4.1rem]"></div>
 
       {loading ? (
         <div className="space-y-3 mt-2">
@@ -558,7 +995,6 @@ export function TeamMembers({
           ))}
         </div>
       ) : sortedTeamMembers.length ? sortedTeamMembers.map((member, index) => {
-        const eventRows = getEventRows(member.events || []);
         const timelineHeight = getTimelineHeight(member);
         const isInactive = !member.active;
         const isLoggedInUser = member.id === user.data.id;
@@ -637,6 +1073,7 @@ export function TeamMembers({
                           ? 'Admin - Click to set ring color'
                           : 'Click to set ring color'
                       }
+
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -648,7 +1085,12 @@ export function TeamMembers({
                 <h3 className={`font-medium transition-colors text-sm truncate ${isInactive ? 'text-muted-foreground' : 'text-foreground'
                   }`}>
                   {member.name}
-                  {isInactive && (
+                  {/* {isLoggedInUser && (
+                    <span className="ml-2 text-xs text-studio-gold bg-studio-gold/10 px-1.5 py-0.5 rounded">
+                      You
+                    </span>
+                  )} */}
+                  {isInactive && !isLoggedInUser && (
                     <span className="ml-2 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       Inactive
                     </span>
@@ -709,6 +1151,10 @@ export function TeamMembers({
               selectedWeek={selectedWeek}
               setSelectedWeek={setSelectedWeek}
               setSelectedProject={setSelectedProject}
+              setSelectedEvent={setSelectedEvent}
+            // lockedDates={lockedDates}
+            // onToggleDateLock={handleToggleDateLock}
+            // lockProcessing={lockProcessing}
             />
           </div>
         </div>
@@ -741,7 +1187,7 @@ export function TeamMembers({
           <div className="min-w-max">
             {/* Calendar Headers */}
             <div
-              className="grid mb-4"
+              className="grid mb-1"
               style={{
                 gridTemplateColumns: `repeat(${periods.length}, minmax(${minColumnWidth}, 1fr))`
               }}
@@ -751,11 +1197,15 @@ export function TeamMembers({
                 const dayNumber = day.getDate();
                 const isSelected = isDaySelected(day);
                 const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const locked = isDateLocked(day);
+                const processing = lockProcessing[dateStr];
 
                 return (
                   <div key={index} className="text-center">
+                    {/* Date Header */}
                     <div
-                      className={`text-[10px] p-1 rounded border transition-colors cursor-pointer ${isSelected
+                      className={`text-[10px] p-1 rounded-t border-t border-x transition-colors cursor-pointer ${isSelected
                         ? 'bg-studio-gold text-studio-dark border-studio-gold font-bold'
                         : isToday
                           ? 'border-studio-gold bg-muted/30 text-studio-gold'
@@ -765,6 +1215,29 @@ export function TeamMembers({
                     >
                       <div className="font-medium">{dayOfWeek}</div>
                       <div className="font-semibold text-xs">{dayNumber}</div>
+                    </div>
+
+                    <div
+                      className={`p-1 rounded-b transition-all cursor-pointer flex items-center justify-center h-8 ${locked
+                        ? 'text-studio-gold'
+                        : ''
+                        }`}
+                      onClick={(e) => !loading && handleToggleDateLock(day, e)}
+                      title={locked ? `Click to unlock ${format(day, 'MMM dd, yyyy')}` : `Click to lock ${format(day, 'MMM dd, yyyy')}`}
+                    >
+                      {processing || loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : locked ? (
+                        <>
+                          <Lock className="w-3 h-3 mr-1" />
+                          {/* <span className="text-[10px] font-medium">Locked</span> */}
+                        </>
+                      ) : (
+                        <>
+                          <Unlock className="w-3 h-3 mr-1" />
+                          {/* <span className="text-[10px] font-medium">Open</span> */}
+                        </>
+                      )}
                     </div>
                   </div>
                 );
@@ -796,9 +1269,10 @@ export function TeamMembers({
                 </>
               ) : (
                 sortedTeamMembers.map(member => {
-                  const eventRows = getEventRows(member.events || []);
+                  const eventRows = getEventRows(member);
                   const timelineHeight = getTimelineHeight(member);
                   const isInactive = !member.active;
+                  const isLoggedInUser = member.id === user?.data?.id;
 
                   return (
                     <div key={member.id} className={`relative ${timelineHeight}`}>
@@ -828,149 +1302,53 @@ export function TeamMembers({
                                 top: `${rowIndex * 2.5}rem`,
                               }}>
                                 {row.map((event) => {
-                                  const { startPercent, widthPercent } = getEventPosition(event, periods.length);
-                                  const isOtherEvent = event.isOther;
+                                  // Check if it's a Google Calendar event
+                                  const isGoogleEvent = 'isGoogleCalendarEvent' in event && event.isGoogleCalendarEvent;
+                                  const position = getEventPosition(event, periods.length);
+                                  if (!position) return null;
 
-                                  // For other company events
-                                  if (isOtherEvent) {
+                                  const { startPercent, widthPercent } = position;
+
+
+                                  if (isGoogleEvent) {
                                     return (
-                                      <TooltipProvider key={event.eventId}>
-                                        <Tooltip delayDuration={0}>
-                                          <TooltipTrigger asChild>
-                                            <div
-                                              className={`absolute my-2 h-10 rounded-md flex items-center justify-center px-2 text-gray-400 font-medium text-[0.7rem] cursor-default
-                        border border-dashed border-gray-500/50 bg-gray-800/30 transition-all duration-500 ease-out opacity-0 translate-x-[-10px] animate-fadeInSlideIn
-                      `}
-                                              style={{
-                                                left: `${startPercent}%`,
-                                                width: `${widthPercent}%`,
-                                              }}
-                                            >
-                                              <span className="opacity-90">Private</span>
-                                            </div>
-                                          </TooltipTrigger>
-                                          <TooltipContent
-                                            className="bg-[#101319] text-white text-sm rounded-md shadow-lg px-4 py-3 max-w-xs border border-white/20"
-                                            side="top"
-                                            sideOffset={8}
-                                          >
-                                            <div className="space-y-2">
-
-                                              {/* Date - Clear */}
-                                              <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <Calendar className="w-4 h-4" />
-                                                <span>
-                                                  {format(new Date(event.date), "do MMM, yyyy")}
-                                                </span>
-                                              </div>
-
-                                              {/* Event Time - Clear */}
-                                              <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <Clock className="w-4 h-4" />
-                                                <span>
-                                                  Time: {event.startHour}:00 – {event.endHour}:00
-                                                </span>
-                                              </div>
-
-
-
-                                              <div className="pt-2 border-t border-white/10">
-                                                <p className="text-xs text-gray-400 flex items-center">
-                                                  <Info className="w-3 h-3 mr-1" />
-                                                  Details are hidden for privacy reasons.
-                                                </p>
-                                              </div>
-                                            </div>
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
+                                      <GoogleCalendarEvent
+                                        key={event.id}
+                                        event={event}
+                                        startPercent={startPercent}
+                                        widthPercent={widthPercent}
+                                        isLoggedInUser={isLoggedInUser}
+                                        formatTime={formatTime}
+                                      />
                                     );
                                   }
+                                  // For regular project events (TeamMemberEvent)
+                                  const projectEvent = event as TeamMemberEvent;
+                                  const isOtherEvent = projectEvent.isOther;
 
-                                  // For regular events (same company)
+                                  // For isOther events (should be visible to everyone EXCEPT the logged-in user themselves)
+                                  if (isOtherEvent) {
+                                    return (
+                                      <OtherEvent
+                                        key={projectEvent.eventId}
+                                        event={projectEvent}
+                                        startPercent={startPercent}
+                                        widthPercent={widthPercent}
+                                        formatTime={formatTime}
+                                      />
+                                    );
+                                  }
+                                  // For regular events (same company) - not isOther
                                   return (
-                                    <TooltipProvider key={event.eventId}>
-                                      <Tooltip delayDuration={0}>
-                                        <TooltipTrigger asChild>
-                                          <div
-                                            className={`absolute my-2 h-10 rounded-md flex items-center px-2 text-white font-medium text-xs shadow hover:shadow-lg cursor-pointer
-                      transition-all duration-500 ease-out opacity-0 translate-x-[-10px] animate-fadeInSlideIn
-                    `}
-                                            style={{
-                                              left: `${startPercent}%`,
-                                              width: `${widthPercent}%`,
-                                              animationFillMode: 'forwards',
-                                              animationDuration: '0.5s',
-                                              backgroundColor: isInactive
-                                                ? `${event.project.color}80`
-                                                : event.project.color,
-                                              color: getTextColorBasedOnBackground(event.project.color)
-                                            }}
-                                            onClick={() => { setSelectedProject(event.project.id); setSelectedEvent(event.eventId); setIsProjectClick(true); }}
-                                          >
-                                            <span className="truncate">{event.project.name}</span>
-                                          </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent
-                                          className="bg-[#101319] text-white text-sm rounded-md shadow-lg px-4 py-3 max-w-xs border border-white/20"
-                                          side="top"
-                                          sideOffset={8}
-                                        >
-                                          <div className="space-y-2">
-                                            {/* Combined title */}
-                                            <div className="font-semibold text-base">
-                                              {event.project.name}
-                                              {event.name && (
-                                                <span className="font-normal text-gray-300 ml-1">• {event.name}</span>
-                                              )}
-                                            </div>
-
-                                            {/* Rest of the content remains the same */}
-                                            <div className="flex items-center gap-3 text-xs text-gray-300">
-                                              <Calendar className="w-4 h-4 flex-shrink-0" />
-                                              <span>{format(new Date(event.date), "do MMM, yyyy")}</span>
-                                            </div>
-
-                                            <div className="flex items-center gap-3 text-xs text-gray-300">
-                                              <Clock className="w-4 h-4 flex-shrink-0" />
-                                              <span>{event.startHour}:00 – {event.endHour}:00</span>
-                                            </div>
-
-                                            {/* Role Information */}
-                                            {event.assignment.role && (
-                                              <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <User className="w-4 h-4" />
-                                                <span>Role: {event.assignment.role}</span>
-                                              </div>
-                                            )}
-
-                                            {/* Instructions */}
-                                            {event.assignment.instructions && (
-                                              <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <Info className="w-4 h-4" />
-                                                <span>Instructions: {event.assignment.instructions}</span>
-                                              </div>
-                                            )}
-
-                                            {/* Location */}
-                                            {event.location && (
-                                              <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <MapPin className="w-4 h-4" />
-                                                <span> {event.location}</span>
-                                              </div>
-                                            )}
-
-                                            {/* Client Information */}
-                                            {event.project.client && (
-                                              <div className="flex items-center gap-3 text-xs text-gray-300">
-                                                <User className="w-4 h-4" />
-                                                <span>Client: {event.project.client.name || event.project.client}</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </TooltipProvider>
+                                    <ProjectEvent
+                                      key={projectEvent.eventId}
+                                      event={projectEvent}
+                                      startPercent={startPercent}
+                                      widthPercent={widthPercent}
+                                      isInactive={isInactive}
+                                      handleEventClick={handleEventClick}
+                                      formatTime={formatTime}
+                                    />
                                   );
                                 })}
                               </div>

@@ -8,7 +8,8 @@ import { ProjectDetails } from "./ProjectDetails";
 import { TimeView } from "./GanttChart";
 import { TeamMember } from "./TeamMembers";
 import { monthNames } from "@/constant/constant";
-import { getFallback } from "@/helper/helper";
+import { formatTime, getFallback } from "@/helper/helper";
+import { useAuth } from "@/context/AuthContext";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -23,12 +24,13 @@ interface ScheduleHourlyProps {
   setSelectedWeek: (week: number) => void;
   timeView: TimeView;
   teamMembers: TeamMember[];
+  googleCalendarEvents?: any[];
   selectedProject: string | null;
   selectedEvent: string | null;
   isProjectClick: boolean;
-  isEventClick:boolean;
-  setIsProjectClick: (bool:boolean) => void;
-  setIsEventClick: (bool:boolean) => void;
+  isEventClick: boolean;
+  setIsProjectClick: (bool: boolean) => void;
+  setIsEventClick: (bool: boolean) => void;
   setSelectedProject: (projectId: string | null) => void;
   getWorkersForDay: (day: number, month: number, year: number) => any[]; // Keep original signature
   getAvailableForDay: (day: number, month: number, year: number) => any[];
@@ -62,6 +64,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     setSelectedWeek,
     timeView,
     teamMembers,
+    googleCalendarEvents = [],
     selectedProject,
     setSelectedProject,
     getWorkersForDay,
@@ -82,11 +85,12 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     setIsEventClick
   }, ref) {
     const [showAvailable, setShowAvailable] = useState(false);
-
+    const [searchQuery, setSearchQuery] = useState("");
     // Create refs for scrolling
     const dayCalendarRef = useRef<HTMLDivElement>(null);
     const projectDetailsRef = useRef<HTMLDivElement>(null);
     const EventDetailsRef = useRef<HTMLDivElement>(null);
+    const { user } = useAuth();
 
     // Auto-scroll to project details when selectedProject changes
     useEffect(() => {
@@ -98,21 +102,18 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     }, [selectedProject, isProjectClick]);
 
     useEffect(() => {
-      if (selectedEvent) {
-        // Wait for next render cycle to ensure ProjectDetails is mounted
-        const scrollTimer = setTimeout(() => {
-          if (EventDetailsRef?.current) {
-            EventDetailsRef.current.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          } else {
-            console.log("EventDetailsRef still null, component may not be mounted yet");
-          }
-        }, 600);
-
-        return () => clearTimeout(scrollTimer);
-      }
+      const scrollTimer = setTimeout(() => {
+        if (EventDetailsRef?.current) {
+          EventDetailsRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
+          });
+        } else {
+          console.log("EventDetailsRef still null, component may not be mounted yet");
+        }
+      }, 600);
+      setIsEventClick(false);
+      return () => clearTimeout(scrollTimer);
     }, [selectedEvent, isProjectClick, isEventClick]);
 
     // Scroll functions
@@ -152,6 +153,123 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
       scrollToProjectDetails,
       scrollToEventDetails
     }));
+    const getCombinedWorkersToday = () => {
+      if (!googleCalendarEvents || googleCalendarEvents.length === 0) {
+        return workersToday;
+      }
+
+      // Create a map to combine workers
+      const workerMap = new Map();
+
+      // Add regular workers
+      workersToday.forEach(worker => {
+        workerMap.set(worker.id, {
+          ...worker,
+          activeProjects: [...(worker.activeProjects || [])]
+        });
+      });
+
+      // Add Google Calendar events as separate "workers"
+      googleCalendarEvents.forEach(googleEvent => {
+        const googleWorkerId = `google-${googleEvent.id}`;
+
+        if (workerMap.has(googleWorkerId)) {
+          // If already exists, add the Google event to activeProjects
+          const existingWorker = workerMap.get(googleWorkerId);
+          existingWorker.activeProjects.push({
+            id: googleEvent.id,
+            name: 'Google Calendar',
+            color: '#4285F4',
+            eventName: googleEvent.name || 'Google Event',
+            time: googleEvent.allDay ? 'All Day' :
+              (googleEvent.startHour !== null && googleEvent.endHour !== null ?
+                `${googleEvent.startHour}:00 - ${googleEvent.endHour}:00` : ''),
+            eventId: googleEvent.id,
+            startHour: googleEvent.startHour,
+            endHour: googleEvent.endHour,
+            location: googleEvent.location || '',
+            role: 'Busy',
+            isOther: true,
+            isGoogleCalendarEvent: true,
+            allDay: googleEvent.allDay,
+            multiDay: googleEvent.multiDay
+          });
+        } else {
+          // Create new entry for Google Calendar "worker"
+          workerMap.set(googleWorkerId, {
+            id: googleWorkerId,
+            name: googleEvent.organizer || 'Google Calendar',
+            profilePhoto: '', // No photo for Google events
+            role: 'Google Calendar Event',
+            activeProjects: [{
+              id: googleEvent.id,
+              name: 'Google Calendar',
+              color: '#4285F4',
+              eventName: googleEvent.name || 'Google Event',
+              time: googleEvent.allDay ? 'All Day' :
+                (googleEvent.startHour !== null && googleEvent.endHour !== null ?
+                  `${googleEvent.startHour}:00 - ${googleEvent.endHour}:00` : ''),
+              eventId: googleEvent.id,
+              startHour: googleEvent.startHour,
+              endHour: googleEvent.endHour,
+              location: googleEvent.location || '',
+              role: 'Busy',
+              isOther: true,
+              isGoogleCalendarEvent: true,
+              allDay: googleEvent.allDay,
+              multiDay: googleEvent.multiDay
+            }],
+            isGoogleEvent: true
+          });
+        }
+      });
+
+      return Array.from(workerMap.values());
+    };
+
+    // Combine availableToday, filtering out Google events
+    const getCombinedAvailableToday = () => {
+      return availableToday;
+    };
+
+    const combinedWorkersToday = getCombinedWorkersToday();
+    const combinedAvailableToday = getCombinedAvailableToday();
+
+    // Filter members based on current view and search query
+    const getFilteredMembers = () => {
+      const currentMembers = showAvailable ? combinedAvailableToday : combinedWorkersToday;
+
+      if (!searchQuery.trim()) {
+        return currentMembers;
+      }
+
+      const query = searchQuery.toLowerCase().trim();
+      return currentMembers.filter(member =>
+        member.name.toLowerCase().includes(query) ||
+        (member.role && member.role.toLowerCase().includes(query)) ||
+        (member.email && member.email.toLowerCase().includes(query))
+      );
+    };
+
+    if (!selectedDay) {
+      return null;
+    }
+
+    // Get workers for the current day using the original function signature
+    const workers = combinedWorkersToday.length > 0 ? combinedWorkersToday : getWorkersForDay(selectedDay, currentMonth, currentYear);
+
+    const projects = workers.flatMap(worker => worker.activeProjects || []);
+    const uniqueProjectsMap = new Map();
+    projects.forEach(project => {
+      if (!project.isOther && !uniqueProjectsMap.has(project.id)) {
+        uniqueProjectsMap.set(project.id, project);
+      }
+    });
+    const uniqueProjects = Array.from(uniqueProjectsMap.values());
+
+    // Get filtered members for display
+    const filteredMembers = getFilteredMembers();
+
 
     // Function to handle project click
     const handleProjectClick = (projectId: string) => {
@@ -165,16 +283,16 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
     }
 
     // Get workers for the current day using the original function signature
-    const workers = workersToday.length > 0 ? workersToday : getWorkersForDay(selectedDay, currentMonth, currentYear);
+    // const workers = workersToday.length > 0 ? workersToday : getWorkersForDay(selectedDay, currentMonth, currentYear);
 
-    const projects = workers.flatMap(worker => worker.activeProjects || []);
-    const uniqueProjectsMap = new Map();
-    projects.forEach(project => {
-      if (!project.isOther && !uniqueProjectsMap.has(project.id)) {
-        uniqueProjectsMap.set(project.id, project);
-      }
-    });
-    const uniqueProjects = Array.from(uniqueProjectsMap.values());
+    // const projects = workers.flatMap(worker => worker.activeProjects || []);
+    // const uniqueProjectsMap = new Map();
+    // projects.forEach(project => {
+    //   if (!project.isOther && !uniqueProjectsMap.has(project.id)) {
+    //     uniqueProjectsMap.set(project.id, project);
+    //   }
+    // });
+    // const uniqueProjects = Array.from(uniqueProjectsMap.values());
 
     return (
       <div className="mt-4 sm:mt-6 lg:mt-8 space-y-4 sm:space-y-6">
@@ -184,6 +302,7 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-foreground text-center sm:text-left w-full sm:w-auto">
                 {selectedDay} {monthNames[currentMonth - 1]} {currentYear} - {showAvailable ? "Who's Available" : "Who's Working"}
+                {searchQuery && ` (${filteredMembers.length} found)`}
               </h3>
               {/* Toggle Switch */}
               <div className="flex justify-center sm:justify-end w-full sm:w-auto">
@@ -198,7 +317,10 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                   {['working', 'available'].map((view) => (
                     <Button
                       key={view}
-                      onClick={() => setShowAvailable(view === 'available')}
+                      onClick={() => {
+                        setShowAvailable(view === 'available');
+                        setSearchQuery(""); // Clear search when switching views
+                      }}
                       size="sm"
                       className={`bg-studio-gold
                         relative capitalize px-3 sm:px-4 py-1.5 text-xs sm:text-sm rounded-full transition-all duration-300
@@ -223,9 +345,21 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Search team members..."
+                  placeholder={`Search ${showAvailable ? 'available' : 'working'} team members...`}
                   className="pl-10 w-full text-sm sm:text-base"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs h-6 px-2"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    Clear
+                  </Button>
+                )}
               </div>
 
               {/* Project Filter Buttons */}
@@ -261,36 +395,46 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
           </div>
 
           {/* Team Members Grid */}
-          {(showAvailable ? availableToday : workersToday).length > 0 ? (
+          {filteredMembers.length > 0 ? (
             <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
-              {(showAvailable ? availableToday : workersToday).map(worker => (
+              {filteredMembers.map(worker => (
                 <div
                   key={worker.id}
                   className="bg-background rounded-lg p-3 sm:p-4 border border-border/20 hover:border-border/40 transition-colors"
                 >
                   <div
                     className="flex items-center gap-3 mb-3 cursor-pointer"
-                    onClick={() => setSelectedMember(worker)}
+                    onClick={() => !worker.isGoogleEvent && setSelectedMember(worker)}
                   >
-                    <Avatar
-                      className="w-8 h-8 sm:w-10 sm:h-10 ring-1 ring-green-500 flex-shrink-0"
-                      style={{
-                        borderColor: worker.ringColor || 'hsl(var(--muted))',
-                        boxShadow: `0 0 0 2px ${worker.ringColor || 'hsl(var(--muted))'}`
-                      }}
-                    >
-                      <AvatarImage
-                        src={`${S3_URL}/${worker.profilePhoto}`}
-                        alt={worker.name}
-                        className="object-cover"
-                      />
-                      <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-xs">
-                        {getFallback(worker.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    {!worker.isGoogleEvent ? (
+                      <Avatar
+                        className="w-8 h-8 sm:w-10 sm:h-10 ring-1 ring-green-500 flex-shrink-0"
+                        style={{
+                          borderColor: worker.ringColor || 'hsl(var(--muted))',
+                          boxShadow: `0 0 0 2px ${worker.ringColor || 'hsl(var(--muted))'}`
+                        }}
+                      >
+                        <AvatarImage
+                          src={`${S3_URL}/${worker.profilePhoto}`}
+                          alt={worker.name}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-studio-gold text-studio-dark font-semibold text-xs">
+                          {getFallback(worker.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12.5 12.5L20 20" stroke="currentColor" strokeWidth="2" />
+                          <path d="M4 8a4 4 0 1 1 8 0 4 4 0 0 1-8 0z" fill="none" stroke="currentColor" strokeWidth="2" />
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-foreground text-sm sm:text-base truncate">
                         {worker.name}
+                        {worker.isGoogleEvent && <span className="ml-2 text-xs text-blue-500">(Google)</span>}
                       </h4>
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">
                         {worker.role}
@@ -305,22 +449,51 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       </h5>
                       <div className="space-y-1">
                         {(worker as any).activeProjects.map((project: any) => {
+                          console.log(project);
+                          
                           const isOtherEvent = project.isOther;
+                          const isGoogleEvent = project.isGoogleCalendarEvent;
+
+                          // Check if Google event belongs to current user
+                          const isCurrentUsersEvent = isGoogleEvent && project.userId === user?.data?.id;
 
                           return (
                             <div key={project.id} className="flex items-center gap-2 text-xs sm:text-sm">
                               <div
                                 className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={isOtherEvent ? {
-                                  background: 'radial-gradient(circle at 30% 30%, #ffffff 0%, #9ca3af 50%, #4b5563 100%)'
+                                style={isOtherEvent || isGoogleEvent ? {
+                                  background: isGoogleEvent ?
+                                    (isCurrentUsersEvent ?
+                                      'radial-gradient(circle at 30% 30%, #ffffff 0%, #4285F4 50%, #4285F4 100%)' : // Blue for user's own Google events
+                                      'radial-gradient(circle at 30% 30%, #ffffff 0%, #9ca3af 50%, #4b5563 100%)'  // Gray for others
+                                    ) :
+                                    'radial-gradient(circle at 30% 30%, #ffffff 0%, #9ca3af 50%, #4b5563 100%)'
                                 } : { backgroundColor: project.color }}
                               />
-                              <span className={`truncate flex-1 ${isOtherEvent ? 'text-gray-500' : 'text-foreground'}`}>
-                                {isOtherEvent ? 'Private Event' : project.name}
+                              <span className={`truncate flex-1 ${isOtherEvent || isGoogleEvent ? 'text-gray-500' : 'text-foreground'}`}>
+                                {isGoogleEvent ? (
+                                  isCurrentUsersEvent ? (
+                                    <>
+                                      <span className="text-blue-500">Google: </span>
+                                      {project.eventName}
+                                    </>
+                                  ) : (
+                                    'Busy' // Show as "Busy" for other users' Google events
+                                  )
+                                ) : isOtherEvent ? (
+                                  'Busy'
+                                ) : (
+                                  <>
+                                    {project.name}
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {project.eventName}
+                                    </span>
+                                  </>
+                                )}
                               </span>
                               {project.time && (
-                                <span className={`text-xs whitespace-nowrap ml-2 ${isOtherEvent ? 'text-gray-400' : 'text-muted-foreground'}`}>
-                                  {project.time}
+                                <span className={`text-xs whitespace-nowrap ml-2 ${isOtherEvent || isGoogleEvent ? 'text-gray-400' : 'text-muted-foreground'}`}>
+                                  {isGoogleEvent && project.allDay ? 'All Day' : project.time}
                                 </span>
                               )}
                             </div>
@@ -340,7 +513,10 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
             </div>
           ) : (
             <div className="text-center py-6 sm:py-8 text-muted-foreground text-sm sm:text-base">
-              No {showAvailable ? 'available' : 'working'} team members for this day
+              {searchQuery
+                ? `No ${showAvailable ? 'available' : 'working'} team members found matching "${searchQuery}"`
+                : `No ${showAvailable ? 'available' : 'working'} team members for this day`
+              }
             </div>
           )}
 
@@ -361,23 +537,6 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
               />
             </div>
           )}
-
-          {/* Day Calendar Section */}
-          {/* <div ref={dayCalendarRef} className="mt-6 sm:mt-8">
-            <DayCalendar
-              date={`${monthNames[currentMonth - 1]} ${selectedDay}, ${currentYear}`}
-              day={selectedDay}
-              setSelectedDay={setSelectedDay}
-              selectedMonth={selectedMonth}
-              setSelectedMonth={setSelectedMonth}
-              selectedYear={selectedYear}
-              setSelectedYear={setSelectedYear}
-              teamMembers={teamMembers}
-              selectedWeek={selectedWeek}
-              setSelectedWeek={setSelectedWeek}
-              setSelectedProject={setSelectedProject}
-            />
-          </div> */}
         </div>
       </div>
     );

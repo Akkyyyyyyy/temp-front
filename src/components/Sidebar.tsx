@@ -64,7 +64,7 @@ export function Sidebar({
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const { logout, user, updateUser } = useAuth();
-  const { isAuthorized, isSyncing, handleConnect, handleSyncAllEvents, handleDisconnect } = useGoogleCalendar();
+  const { isAuthorized, isSyncing, handleConnect, handleSyncAllEvents, handleDisconnect } = useGoogleCalendar(refreshMembers);
   const [showCropModal, setShowCropModal] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);

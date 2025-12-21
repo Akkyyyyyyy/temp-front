@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react'
+// src/components/PublicRoute.tsx
+import React, { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -9,17 +10,15 @@ interface PublicRouteProps {
 export const PublicRoute: React.FC<PublicRouteProps> = ({ children }) => {
     const { user } = useAuth()
     const navigate = useNavigate()
-    const [isChecking, setIsChecking] = useState(true)
 
     useEffect(() => {
         if (user && user.token) {
-            navigate('/')
-        } else {
-            setIsChecking(false)
+            navigate('/', { replace: true })
         }
     }, [navigate, user])
 
-    if (isChecking) {
+    // Don't render anything if user is authenticated
+    if (user && user.token) {
         return null
     }
 

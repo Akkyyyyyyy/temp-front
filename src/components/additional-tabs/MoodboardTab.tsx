@@ -326,12 +326,7 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
             }
 
             {/* Folder Display Grid */}
-            {folders.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground border border-dashed rounded-lg">
-                    <Folder className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg ">No folders yet — start by adding one</p>
-                </div>
-            ) : (
+            {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {folders.map(folder => (
                         <Card
@@ -397,7 +392,7 @@ export function MoodboardTab({ projectId }: MoodboardTabProps) {
                         </Card>
                     ))}
                 </div>
-            )}
+            }
 
             {/* Add Folder Dialog */}
             <Dialog open={isAddFolderDialogOpen} onOpenChange={setIsAddFolderDialogOpen}>

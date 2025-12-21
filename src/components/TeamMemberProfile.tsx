@@ -40,7 +40,7 @@ interface TeamMemberProfileProps {
   setSelectedProject: (project: any) => void;
   setIsProjectClick: (projectClick: boolean) => void;
   setSelectedEvent: (event: any) => void;
-  setIsEventClick:(eventClick: boolean) => void
+  setIsEventClick: (eventClick: boolean) => void
 }
 
 // Yup validation schemas
@@ -605,6 +605,26 @@ export function TeamMemberProfile({
     if (!s3Key) return '';
     return `${import.meta.env.NEXT_PUBLIC_S3_BASE_URL}/${s3Key}`;
   };
+  const handleRemoveFromEvent = async (projectId: string, memberId: string, eventId: string) => {
+    try {
+      // Note: You might need to update this API to handle event-based assignments
+      const response = await removeMemberFromProject({
+        projectId,
+        memberId,
+        eventId // Pass eventId to remove from specific event
+      });
+
+      if (response.success) {
+        refreshMembers();
+        onClose();
+      } else {
+        console.error(response.message || "Failed to remove member");
+      }
+    } catch (error) {
+      console.error('Error removing member from event:', error);
+      toast.error("Failed to remove member from event");
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -673,119 +693,98 @@ export function TeamMemberProfile({
                     const isOtherEvent = event.isOther;
                     const project = event.project;
 
-                    return (
+                    return isOtherEvent ? null : (
                       <div
                         key={event.eventId}
-                        className={`border rounded-lg p-4 ${isOtherEvent ? 'border-dashed border-gray-500/50 bg-gray-800/30' : ''}`}
+                        className={`border rounded-lg p-4`}
                       >
-                        {isOtherEvent ? (
-                          // Private Event View
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="w-3 h-3 rounded-full bg-gradient-to-br from-gray-400 to-gray-600"></div>
-                                <h4 className="font-medium text-gray-500">Private Event</h4>
-                              </div>
-                              <div className="space-y-1 text-sm text-gray-500">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-3 h-3" />
-                                  {format(new Date(event.date), 'do MMM yyyy')}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-3 h-3" />
-                                  {formatHour12(event.startHour)} - {formatHour12(event.endHour)}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          // Regular Event View
-                          <div className="flex items-start justify-between">
-                            <div
-                              className="flex-1 cursor-pointer"
-                              onClick={() => handleProjectClick(project.id, event.eventId)}
-                            >
-                              <div className="flex items-center gap-3 mb-2">
-                                <div
-                                  className="w-3 h-3 rounded-full"
-                                  style={{ backgroundColor: project.color }}
-                                ></div>
-                                <div>
-                                  <h4 className="font-medium">{project.name}</h4>
-                                  {event.name && (
-                                    <p className="text-sm text-muted-foreground mt-0.5">{event.name}</p>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="space-y-1 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-3 h-3" />
-                                  {format(new Date(event.date), 'do MMM yyyy')}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <Clock className="w-3 h-3" />
-                                  {formatHour12(event.startHour)} - {formatHour12(event.endHour)}
-                                </div>
-                                {event.location && (
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="w-3 h-3" />
-                                    {event.location}
-                                  </div>
-                                )}
-                                {event.assignment?.role && (
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-3 h-3" />
-                                    Role: {event.assignment.role}
-                                  </div>
+                        {/* Regular Event View */}
+                        <div className="flex items-start justify-between">
+                          <div
+                            className="flex-1 cursor-pointer"
+                            onClick={() => handleProjectClick(project.id, event.eventId)}
+                          >
+                            <div className="flex items-center gap-3 mb-2">
+                              <div
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: project.color }}
+                              ></div>
+                              <div className="flex gap-1">
+                                <h4 className="font-medium">{project.name} •</h4>
+                                {event.name && (
+                                  <p className="text-sm text-muted-foreground mt-0.5">{event.name}</p>
                                 )}
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              <Dialog open={removeDialog.open} onOpenChange={(open) => setRemoveDialog(prev => ({ ...prev, open }))}>
-                                <DialogTrigger asChild>
-                                  {user.data.isAdmin == true && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setRemoveDialog({
-                                        open: true,
-                                        memberId: member.id,
-                                        eventId: event.eventId,
-                                        eventName:event.eventId
-                                      })}
-                                    >
-                                      <LogOut className="w-4 h-4" /> Remove
-                                    </Button>
-                                  )}
-                                </DialogTrigger>
-                                <DialogContent>
-                                  <DialogHeader>
-                                    <DialogTitle>Remove from Event</DialogTitle>
-                                    <DialogDescription>
-                                      Are you sure you want to remove {member?.name} from the event "{removeDialog.eventName}"?
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <DialogFooter>
-                                    <Button variant="outline" onClick={() => setRemoveDialog(prev => ({ ...prev, open: false }))}>
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      variant="destructive"
-                                      onClick={() => {
-                                        // handleRemoveEvent(removeDialog.memberId, removeDialog.eventId);
-                                        // setRemoveDialog(prev => ({ ...prev, open: false }));
-                                      }}
-                                    >
-                                      Remove from Event
-                                    </Button>
-                                  </DialogFooter>
-                                </DialogContent>
-                              </Dialog>
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3 h-3" />
+                                {format(new Date(event.date), 'do MMM yyyy')}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Clock className="w-3 h-3" />
+                                {formatHour12(event.startHour)} - {formatHour12(event.endHour)}
+                              </div>
+                              {event.location && (
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3 h-3" />
+                                  {event.location}
+                                </div>
+                              )}
+                              {event.assignment?.role && (
+                                <div className="flex items-center gap-2">
+                                  <User className="w-3 h-3" />
+                                  Role: {event.assignment.role}
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
+                          <div className="flex gap-2">
+                            <Dialog open={removeDialog.open} onOpenChange={(open) => setRemoveDialog(prev => ({ ...prev, open }))}>
+                              <DialogTrigger asChild>
+                                {user.data.isAdmin == true && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setRemoveDialog({
+                                      open: true,
+                                      memberId: member.id,
+                                      eventId: event.eventId,
+                                      eventName: event.name
+                                    })}
+                                  >
+                                    <LogOut className="w-4 h-4" /> Remove
+                                  </Button>
+                                )}
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Remove from Event</DialogTitle>
+                                  <DialogDescription>
+                                    Are you sure you want to remove {member?.name} from the event "{removeDialog.eventName}"?
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                  <Button variant="outline" onClick={() => setRemoveDialog(prev => ({ ...prev, open: false }))}>
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    onClick={() => {
+                                      handleRemoveFromEvent(project.id, removeDialog.memberId, removeDialog.eventId);
+                                      setRemoveDialog(prev => ({ ...prev, open: false }));
+                                    }}
+                                  >
+                                    Remove from Event
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
                       </div>
-                    );})}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-8">No current events assigned</p>
