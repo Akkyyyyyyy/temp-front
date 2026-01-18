@@ -87,12 +87,12 @@ const ProjectEventTooltipContent = ({ event, formatTime }: { event: TeamMemberEv
       )}
 
       {/* Instructions */}
-      {event.assignment.instructions && (
+      {/* {event.assignment.instructions && (
         <div className="flex items-center gap-3 text-xs text-gray-300">
           <Info className="w-4 h-4" />
           <span>Instructions: {event.assignment.instructions}</span>
         </div>
-      )}
+      )} */}
 
       {/* Location */}
       {event.location && (

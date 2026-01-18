@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { Plus, ChevronDown, Check } from 'lucide-react';
+import { Plus, ChevronDown, Check, Loader2 } from 'lucide-react';
 import { useTeamMembers } from '@/hooks/useTeamMembers';
 
 interface CompanyDropdownProps {
@@ -21,7 +21,8 @@ interface CompanyDropdownProps {
 export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth, selectedWeek, selectedYear, timeView }: CompanyDropdownProps) {
   const { user, login } = useAuth();
   const {
-    refresh
+    refresh,
+    setLoading
   } = useTeamMembers({
     selectedMonth,
     selectedYear,
@@ -33,6 +34,7 @@ export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth
   const [isCreatingCompany, setIsCreatingCompany] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [companyLoading, setCompanyLoading] = useState(false);
 
   // ✅ Check if user's email matches any existing company email
   const canAddOwnCompany = !user?.data?.associatedCompanies?.some(
@@ -60,6 +62,7 @@ export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth
   // 🔄 Handle company change
   const handleCompanyChange = async (companyId: string) => {
     if (!companyId || !user?.data?.id) return;
+    setCompanyLoading(true);
 
     try {
       const result = await changeCompany({
@@ -84,6 +87,9 @@ export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth
     } catch (error: any) {
       console.error("Error switching company:", error);
       toast.error("Error switching company");
+    }
+    finally{
+      setCompanyLoading(false);
     }
   };
 
@@ -195,6 +201,8 @@ export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth
         )
       }
 
+      <FullScreenLoader show={companyLoading} />
+
       <Dialog open={isCreateCompanyDialogOpen} onOpenChange={setIsCreateCompanyDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -235,3 +243,16 @@ export function CompanyDropdown({ setSelectedProject, selectedDay, selectedMonth
     </>
   );
 }
+
+export const FullScreenLoader = ({ show }: { show: boolean }) => {
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-black/40 backdrop-blur-[1px] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+        <span className="text-white text-sm">Switching company…</span>
+      </div>
+    </div>
+  );
+};

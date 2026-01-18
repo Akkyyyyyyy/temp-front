@@ -14,6 +14,8 @@ interface TimeViewToggleProps {
   setSelectedMonth: (month: any) => void;
   selectedYear: any;
   setSelectedYear: (year: any) => void;
+  selectedWeek: any;
+  handleJumpToToday: () => void;
 }
 
 export const TimeViewToggle: React.FC<TimeViewToggleProps> = ({
@@ -26,25 +28,32 @@ export const TimeViewToggle: React.FC<TimeViewToggleProps> = ({
   selectedMonth,
   setSelectedMonth,
   selectedYear,
-  setSelectedYear
+  setSelectedYear,
+  selectedWeek,
+  handleJumpToToday
 }) => {
   const handleTimeViewChange = (view: TimeView) => {
-  if (view === 'day') {
-    // If switching to day view and any date parameter is missing, set current date
-    if (!selectedDay || !selectedMonth || !selectedYear) {
-      const currentDate = new Date();
-      setSelectedDay(currentDate.getDate());
-      setSelectedMonth(currentDate.getMonth() + 1);
-      setSelectedYear(currentDate.getFullYear());
-    } else {
-      setSelectedDay(selectedDay);
-      setSelectedMonth(selectedMonth);
-      setSelectedYear(selectedYear);
+    if (view === 'day') {
+      // If switching to day view and any date parameter is missing, set current date
+      if (!selectedDay || !selectedMonth || !selectedYear) {
+        const currentDate = new Date();
+        setSelectedDay(currentDate.getDate());
+        setSelectedMonth(currentDate.getMonth() + 1);
+        setSelectedYear(currentDate.getFullYear());
+      } else {
+        setSelectedDay(selectedDay);
+        setSelectedMonth(selectedMonth);
+        setSelectedYear(selectedYear);
+      }
     }
-  } 
-
-  setTimeView(view);
-};
+    setTimeView(view);
+    if (selectedMonth === 12 && selectedWeek === 1 && view == "month") {
+      setSelectedYear((y) => y - 1);
+    }
+    if (selectedMonth === 12 && selectedWeek === 1 && view == "week") {
+      setSelectedYear((y) => y + 1);
+    }
+  };
 
   const getSliderPosition = () => {
     const index = views.indexOf(timeView);
@@ -79,6 +88,7 @@ export const TimeViewToggle: React.FC<TimeViewToggleProps> = ({
                 : 'bg-transparent text-muted-foreground hover:text-foreground'
               }
             `}
+            disabled={timeView === view}
           >
             {view}
           </button>

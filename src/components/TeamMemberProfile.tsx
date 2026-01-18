@@ -519,18 +519,7 @@ export function TeamMemberProfile({
     setNewProjectErrors({});
   };
 
-  const handleRemoveProject = (memberId: string, projectId: string) => {
-    removeMemberFromProject({ memberId, projectId })
-      .then(result => {
-        if (result.success) {
-          onDeleteProject(memberId, projectId);
-          onClose();
-        }
-      })
-      .catch(error => {
-        console.error("Error in handleRemoveProject:", error);
-      });
-  };
+
 
   const handleAddSkill = () => {
     if (newSkill.trim()) {
@@ -611,9 +600,9 @@ export function TeamMemberProfile({
       const response = await removeMemberFromProject({
         projectId,
         memberId,
-        eventId // Pass eventId to remove from specific event
+        eventId
       });
-
+      
       if (response.success) {
         refreshMembers();
         onClose();
@@ -742,7 +731,7 @@ export function TeamMemberProfile({
                           <div className="flex gap-2">
                             <Dialog open={removeDialog.open} onOpenChange={(open) => setRemoveDialog(prev => ({ ...prev, open }))}>
                               <DialogTrigger asChild>
-                                {user.data.isAdmin == true && (
+                                {/* {user.data.isAdmin == true && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -755,7 +744,7 @@ export function TeamMemberProfile({
                                   >
                                     <LogOut className="w-4 h-4" /> Remove
                                   </Button>
-                                )}
+                                )} */}
                               </DialogTrigger>
                               <DialogContent>
                                 <DialogHeader>

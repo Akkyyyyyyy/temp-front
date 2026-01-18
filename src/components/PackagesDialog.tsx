@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Plus, LayoutGrid, List, X, Loader2, Edit, Trash2, Pencil, Pen } from "lucide-react";
+import { Plus, LayoutGrid, List, X, Loader2, Edit, Trash2 } from "lucide-react";
 import { PackageCard } from "@/components/PackageCard";
 import { PackageListItem } from "@/components/PackageListItem";
 import { EditPackageDrawer } from "@/components/EditPackageDrawer";
@@ -59,6 +59,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [pricingMode, setPricingMode] = useState<"none" | "packages" | "startingPrice">("none");
 
   // Starting price modal state
   const [isStartingPriceModalOpen, setIsStartingPriceModalOpen] = useState(false);
@@ -102,11 +103,22 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
         }));
         setPackages(transformedPackages);
         setStartingPrice(result.data.companyPrice);
+
+        // Determine pricing mode based on fetched data
+        if (result.data.companyPrice !== null) {
+          setPricingMode("startingPrice");
+        } else if (transformedPackages.length > 0) {
+          setPricingMode("packages");
+        } else {
+          setPricingMode("none");
+        }
       } else {
         toast.error(result.message || "Failed to fetch packages");
+        setPricingMode("none");
       }
     } catch (error) {
       toast.error("Failed to fetch packages");
+      setPricingMode("none");
     } finally {
       setLoading(false);
     }
@@ -132,6 +144,7 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
 
       if (result.success) {
         setStartingPrice(price);
+        setPricingMode("startingPrice");
         setIsStartingPriceModalOpen(false);
         setStartingPriceInput("");
         toast.success(startingPrice === null ? "Starting price set successfully" : "Starting price updated successfully");
@@ -156,6 +169,14 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
       const result = await removeCompanyPrice(companyId);
       if (result.success) {
         setStartingPrice(null);
+
+        // Check if we have packages to switch to, otherwise go to none
+        if (packages.length > 0) {
+          setPricingMode("packages");
+        } else {
+          setPricingMode("none");
+        }
+
         toast.success("Starting price removed successfully");
       } else {
         toast.error(result.message || "Failed to remove starting price");
@@ -246,7 +267,10 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
         };
 
         const result = await updatePackage(updatedPackage.id, updatePayload);
+        console.log(result, "RESULT");
+
         if (result.success) {
+          setPricingMode("packages");
           await fetchPackages();
           toast.success("Package updated successfully");
         } else {
@@ -272,6 +296,18 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
         const result = await createPackage(createPayload);
         if (result.success) {
           await fetchPackages();
+
+          // Switch to packages mode if this is the first package
+          if (pricingMode === "startingPrice" && hasStartingPrice) {
+            try {
+              setPricingMode("packages");
+              await removeCompanyPrice(companyId);
+              setStartingPrice(null);
+            } catch (error) {
+              console.error("Failed to delete starting price:", error);
+            }
+          }
+
           toast.success("Package created successfully");
         } else {
           toast.error(result.message || "Failed to create package");
@@ -292,14 +328,37 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
     try {
       const result = await deletePackage(id);
       if (result.success) {
-        setPackages(prev => prev.filter(p => p.id !== id));
-        toast.success("Package deleted successfully");
         await fetchPackages();
+        toast.success("Package deleted successfully");
+
+        // If no packages left and we're in packages mode, switch to none
+        if (packages.length === 1 && pricingMode === "packages") {
+          setPricingMode("none");
+        }
       } else {
         toast.error(result.message || "Failed to delete package");
       }
     } catch (error) {
       toast.error("Failed to delete package");
+    }
+  };
+
+  const switchPricingMode = async () => {
+    if (!companyId) return;
+
+    // Switching FROM packages ➜ starting price
+    if (pricingMode === "packages") {
+      setIsStartingPriceModalOpen(true);
+      return;
+    }
+
+    // Switching FROM starting price ➜ packages
+    if (pricingMode === "startingPrice") {
+      if (packages.length > 0) {
+        setPricingMode("packages");
+      } else {
+        handleAddPackage();
+      }
     }
   };
 
@@ -312,122 +371,39 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[calc(100vw-1rem)] sm:w-full sm:max-w-7xl p-0 max-h-[90dvh] overflow-hidden">
           {/* Single Row Header */}
-          <div className="sticky top-0 z-10 bg-background border-b border-border px-4 sm:px-6 py-4 rounded-tl-lg rounded-tr-lg">
+          <div className="sticky top-0 z-10 bg-background b px-4 sm:px-6 py-4 rounded-tl-lg rounded-tr-lg">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               {/* Left Side: Title */}
               <div>
                 <DialogTitle className="text-2xl">Package Management</DialogTitle>
-                {/* <p className="text-sm text-muted-foreground mt-1">
-                  {hasPackages
-                    ? `${packages.length} package${packages.length !== 1 ? "s" : ""} available`
-                    : "Create and manage your photography packages"}
-                </p> */}
               </div>
 
               {/* Right Side: Actions & Starting Price */}
               <div className="flex items-center gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
-                {/* View Toggle - Only show when there are packages */}
-                {hasPackages && (
-                  <div className="hidden sm:flex items-center gap-1 bg-card border border-border rounded-lg p-1">
-                    <Button
-                      variant={viewMode === "card" ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("card")}
-                      className="h-8"
-                      title="Card View"
-                    >
-                      <LayoutGrid className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant={viewMode === "list" ? "secondary" : "ghost"}
-                      size="sm"
-                      onClick={() => setViewMode("list")}
-                      className="h-8"
-                      title="List View"
-                    >
-                      <List className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-                {/* Starting price pill - only show when price exists */}
-                {hasStartingPrice && (
-                  <div className="flex items-center gap-3 px-3 sm:px-4 py-1 bg-card border border-border rounded-full">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Starting from</span>
-                      <div className="flex items-center gap-1 font-semibold">
-                        <CurrencyIcon className="w-3.5 h-3.5" />
-                        <span>{startingPrice}</span>
-                      </div>
-                    </div>
 
-                    {/* Admin Actions */}
-                    {isAdmin && (
-                      <div className="flex items-center gap-2 pl-3 border-l border-border">
-                        {/* Edit Price */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                          onClick={() => {
-                            setStartingPriceInput(startingPrice.toString());
-                            setIsStartingPriceModalOpen(true);
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-
-                        {/* Delete Price */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                          onClick={handleDeleteStartingPrice}
-                          disabled={isDeletingStartingPrice || loading}
-                        >
-                          {isDeletingStartingPrice ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Set Starting Price Button - shows when no price but packages exist and user is admin */}
-                {!hasStartingPrice && isAdmin && hasPackages && (
-                  <Button
-                    onClick={() => setIsStartingPriceModalOpen(true)}
-                    variant="outline"
-                    className="h-10 px-3"
-                  >
-                    <CurrencyIcon className="w-3.5 h-3.5 mr-1.5" />
-                    Set Starting Price
+                {isAdmin && pricingMode === "packages" && hasPackages && (
+                  <Button onClick={handleAddPackage} variant="outline">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add New Package
                   </Button>
                 )}
 
-                {/* Add Package Button - clearly separated now */}
-                {isAdmin && hasPackages && (
-                  <Button
-                    onClick={handleAddPackage}
-                    className="h-10 px-3"
-                    disabled={!companyId || loading}
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1.5" />
-                    Add Package
+                {/* Switch Button — ONLY when admin & pricing mode exists */}
+                {isAdmin && (pricingMode === "packages" || pricingMode === "startingPrice") && (
+                  <Button variant="outline" onClick={switchPricingMode}>
+                    Switch to {pricingMode === "packages" ? "Starting Price" : "Packages"}
                   </Button>
                 )}
+
                 {/* Close Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
                   onClick={() => onOpenChange(false)}
                   className="h-8 w-8"
                 >
-                  <X className="w-4 h-4" />
-                </Button>
+                  <X className="w-6 h-6" />
+                </button>
               </div>
+
             </div>
           </div>
 
@@ -436,148 +412,180 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
             {loading ? (
               <div className="space-y-6">
                 {/* Skeleton Loading States */}
-                {hasPackages ? (
+                {pricingMode === "packages" ? (
                   viewMode === "card" ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {[...Array(3)].map((_, index) => (
-                        <div
-                          key={index}
-                          className="border border-border rounded-lg p-6"
-                        >
-                          <div className="flex justify-center items-center mb-4">
-                            <div className="space-y-2 flex flex-col justify-center items-center">
-                              <Skeleton className="h-10 w-56" />
-                              <Skeleton className="h-8 w-32" />
-                              <Skeleton className="h-4 w-16" />
-                            </div>
-                          </div>
-                          <Skeleton className="h-8 w-20 mb-4" />
-                          <div className="space-y-2 mb-6">
-                            {[...Array(3)].map((_, i) => (
-                              <div key={i} className="flex items-center gap-2">
-                                <Skeleton className="h-4 w-64" />
-                              </div>
-                            ))}
-                          </div>
-                          <div className="space-y-2 mb-6">
-                            <Skeleton className="h-6 w-32 mb-2" />
-                            {[...Array(2)].map((_, i) => (
-                              <div key={i} className="flex justify-between items-center">
-                                <Skeleton className="h-4 w-20" />
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <Skeleton className="h-9 flex-1" />
-                          </div>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="flex items-center justify-center py-8 w-full">
+                        <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                        <span className="ml-3 text-muted-foreground">Loading...</span>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {[...Array(3)].map((_, index) => (
-                        <div
-                          key={index}
-                          className="border border-border rounded-lg p-4"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4 flex-1">
-                              <Skeleton className="h-6 w-16" />
-                              <div className="space-y-2 flex-1">
-                                <Skeleton className="h-5 w-40" />
-                                <Skeleton className="h-4 w-24" />
-                              </div>
-                              <Skeleton className="h-6 w-20" />
-                            </div>
-                            <div className="flex gap-2 ml-4">
-                              <Skeleton className="h-8 w-8" />
-                              <Skeleton className="h-8 w-8" />
-                              <Skeleton className="h-8 w-8" />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                      <div className="grid grid-cols-1 gap-6">
+                      <div className="flex items-center justify-center py-8 w-full">
+                        <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                        <span className="ml-3 text-muted-foreground">Loading...</span>
+                      </div>
+                    </div>
                     </div>
                   )
                 ) : (
                   // Empty state skeleton
                   <div className="text-center py-16">
-                    <Skeleton className="w-16 h-16 rounded-full mx-auto mb-4" />
-                    <Skeleton className="h-6 w-48 mx-auto mb-2" />
-                    <Skeleton className="h-4 w-64 mx-auto mb-6" />
-                    <Skeleton className="h-10 w-48 mx-auto" />
+                     <div className="grid grid-cols-1 gap-6">
+                      <div className="flex items-center justify-center py-8 w-full">
+                        <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                        <span className="ml-3 text-muted-foreground">Loading...</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             ) : (
               <>
                 {/* Packages Display */}
-                {hasPackages ? (
-                  viewMode === "card" ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {packages.map(pkg => (
-                        <PackageCard
-                          key={pkg.id}
-                          package={pkg}
-                          onEdit={() => handleEditPackage(pkg)}
-                          onDuplicate={() => handleDuplicatePackage(pkg)}
-                          onDelete={() => handleDeletePackage(pkg.id)}
-                        />
-                      ))}
-                    </div>
+                {pricingMode === "packages" ? (
+                  hasPackages ? (
+                    viewMode === "card" ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {packages.map(pkg => (
+                          <PackageCard
+                            key={pkg.id}
+                            package={pkg}
+                            onEdit={() => handleEditPackage(pkg)}
+                            onDuplicate={() => handleDuplicatePackage(pkg)}
+                            onDelete={() => handleDeletePackage(pkg.id)}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {packages.map(pkg => (
+                          <PackageListItem
+                            key={pkg.id}
+                            package={pkg}
+                            onEdit={() => handleEditPackage(pkg)}
+                            onDuplicate={() => handleDuplicatePackage(pkg)}
+                            onDelete={() => handleDeletePackage(pkg.id)}
+                          />
+                        ))}
+                      </div>
+                    )
                   ) : (
-                    <div className="space-y-3">
-                      {packages.map(pkg => (
-                        <PackageListItem
-                          key={pkg.id}
-                          package={pkg}
-                          onEdit={() => handleEditPackage(pkg)}
-                          onDuplicate={() => handleDuplicatePackage(pkg)}
-                          onDelete={() => handleDeletePackage(pkg.id)}
-                        />
-                      ))}
+                    // No packages in packages mode - should show empty state
+                    <div className="text-center py-16">
+                      <h3 className="text-lg font-semibold mb-2">No Packages Yet</h3>
+                      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                        Create your first package to get started with package-based pricing.
+                      </p>
+                      {isAdmin && (
+                        <Button onClick={handleAddPackage}>
+                          Create First Package
+                        </Button>
+                      )}
                     </div>
                   )
-                ) : (
-                  /* Empty State - No packages */
-                  <div className="text-center py-16">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Plus className="w-8 h-8 text-muted-foreground" />
+                ) : pricingMode === "startingPrice" ? (
+                  // Starting Price Mode Content
+                  <div className="py-10">
+                    <div className="max-w-2xl mx-auto space-y-6">
+
+
+                      {/* PRICE CARD */}
+                      {hasStartingPrice && (
+                        <div className="relative rounded-xl p-6  shadow-sm flex flex-col items-center">
+
+                          {/* TITLE & DESCRIPTION */}
+                          <div className="mb-4 flex flex-col gap-2 items-center">
+                            <h3 className="text-lg font-semibold">Starting Price</h3>
+                            <p className="text-sm text-muted-foreground">
+                              This is the minimum price clients see.
+                            </p>
+                          </div>
+
+                          {/* PRICE DISPLAY */}
+                          <div className="flex items-center gap-2 text-3xl font-bold mb-4">
+                            {formatPrice(startingPrice, userCountry)}
+                          </div>
+
+                          {/* ADMIN BUTTONS - FIXED POSITIONING */}
+                          {isAdmin && (
+                            <div className="flex items-center gap-2 pt-4 ">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors border-red-800 hover:border-primary/30"
+                                onClick={() => {
+                                  setStartingPriceInput(startingPrice.toString());
+                                  setIsStartingPriceModalOpen(true);
+                                }}
+
+                              >
+                                <Edit className="w-4 h-4" />
+                                Edit
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors border-border/40 hover:border-destructive/30"
+                                onClick={handleDeleteStartingPrice}
+                                disabled={isDeletingStartingPrice}
+
+                              >
+                                {isDeletingStartingPrice ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Trash2 className="w-4 h-4" />
+                                    Delete
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+
+                        </div>
+                      )}
+
                     </div>
+                  </div>
+                ) : (
+                  /* Empty State - No pricing method selected yet */
+
+                  <div className="text-center py-16">
                     <h3 className="text-lg font-semibold mb-2">
-                      {hasStartingPrice
-                        ? "Create your first package"
-                        : "Get started with packages"}
+                      {isAdmin
+                        ? "How would you like to set your pricing?"
+                        : "Pricing has not been set yet"}
                     </h3>
+
                     <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                      Create packages to showcase your photography services.
-                      {!hasStartingPrice
-                        && " You can also set a starting price."}
+                      {isAdmin
+                        ? "You can either enter a single starting price or create detailed packages. You can switch at anytime."
+                        : "An admin will set up the pricing for this company. Please contact your admin if you need help."}
                     </p>
+
                     {isAdmin && (
-                      <div className="flex justify-center gap-3">
-                        {!hasStartingPrice && (
-                          <Button
-                            onClick={() => setIsStartingPriceModalOpen(true)}
-                            variant="outline"
-                          >
-                            <CurrencyIcon className="w-4 h-4 mr-2" />
-                            Set Starting Price
-                          </Button>
-                        )}
+
+                      <div className="flex justify-center items-center gap-3">
                         <Button
-                          onClick={handleAddPackage}
-                          disabled={!companyId}
+                          onClick={() => setIsStartingPriceModalOpen(true)}
+                          variant="outline"
                         >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Package
+                          Add Starting Price
+                        </Button>
+
+                        <span className="text-sm text-muted-foreground">or</span>
+
+                        <Button onClick={handleAddPackage} variant="outline">
+                          Create Package
                         </Button>
                       </div>
-                    )}
-                    {!companyId && (
-                      <p className="text-sm text-destructive mt-2">
-                        You must be logged in to create packages
-                      </p>
                     )}
                   </div>
                 )}
@@ -603,12 +611,11 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
           <form onSubmit={(e) => {
             e.preventDefault();
             handleSaveStartingPrice();
-          }}>
+          }} autoComplete="off">
             <AlertDialogHeader>
               <AlertDialogTitle>
                 {hasStartingPrice ? "Edit Starting Price" : "Set Starting Price"}
               </AlertDialogTitle>
-
             </AlertDialogHeader>
 
             <div className="py-4">
@@ -636,7 +643,6 @@ export function PackagesDialog({ open, onOpenChange }: PackagesDialogProps) {
                   }}
                   className="pl-10"
                 />
-
               </div>
             </div>
 

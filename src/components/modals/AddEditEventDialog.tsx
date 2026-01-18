@@ -18,6 +18,7 @@ import { RoleDropdown } from '../dropdowns/RoleDropdown';
 import { Switch } from '../ui/switch';
 import { createEvent, updateEvent } from '@/api/event';
 import { formatTime } from '@/helper/helper';
+import { getFutureLockedDates } from '@/api/company';
 
 export interface EventDialogData {
     reminders: any;
@@ -67,6 +68,29 @@ export function AddEditEventDialog({
 }: AddEditEventDialogProps) {
     const { user } = useAuth();
     const { roles } = useRole();
+    const [lockedDates, setLockedDates] = useState<string[]>([]);
+    const [loadingLockedDates, setLoadingLockedDates] = useState(false);
+
+    // Fetch locked dates when dialog opens
+    useEffect(() => {
+        const fetchLockedDates = async () => {
+            if (isOpen && user?.data?.company?.id) {
+                setLoadingLockedDates(true);
+                try {
+                    const response = await getFutureLockedDates(user.data.company.id);
+                    if (response.success && response.data) {
+                        setLockedDates(response.data.lockedDates);
+                    }
+                } catch (error) {
+                    console.error('Error fetching locked dates:', error);
+                } finally {
+                    setLoadingLockedDates(false);
+                }
+            }
+        };
+
+        fetchLockedDates();
+    }, [isOpen, user?.data?.company?.id]);
 
     const [formData, setFormData] = useState<EventDialogData>({
         name: '',
@@ -192,6 +216,9 @@ export function AddEditEventDialog({
         if (!isEditMode && formData.assignments.length === 0) {
             newErrors.assignments = 'At least one team member is required';
         }
+        if (formData.date && lockedDates.includes(formData.date)) {
+            newErrors.date = 'This date is locked and cannot be booked';
+        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -199,6 +226,11 @@ export function AddEditEventDialog({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (formData.date && lockedDates.includes(formData.date)) {
+            toast.error('Cannot create/update event on a locked date');
+            return;
+        }
 
         if (!validateForm()) {
             return;
@@ -436,7 +468,16 @@ export function AddEditEventDialog({
                                                 selected={formData.date ? new Date(formData.date) : undefined}
                                                 onSelect={handleDateSelect}
                                                 initialFocus
-                                                disabled={(date) => date < new Date()}
+                                                disabled={(date) => {
+                                                    // Disable past dates
+                                                    const today = new Date();
+                                                    today.setHours(0, 0, 0, 0);
+                                                    if (date < today) return true;
+
+                                                    // Disable locked dates
+                                                    const dateStr = format(date, 'yyyy-MM-dd');
+                                                    return lockedDates.includes(dateStr);
+                                                }}
                                             />
                                         </div>
                                     </PopoverContent>

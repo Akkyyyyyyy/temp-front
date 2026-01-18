@@ -17,6 +17,8 @@ import { Calendar } from './ui/calendar';
 import { Calendar2 } from './ui/calendar2';
 import { Badge } from './ui/badge';
 import { formatTime } from '@/helper/helper';
+import { useAuth } from '@/context/AuthContext';
+import { getFutureLockedDates } from '@/api/company';
 
 export interface TeamAssignment {
   id: string;
@@ -80,7 +82,29 @@ export function ProjectStep2({
   const { roles } = useRole();
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const hours = Array.from({ length: 25 }, (_, i) => i);
+  const { user } = useAuth();
+  const [lockedDates, setLockedDates] = useState<string[]>([]);
+  const [loadingLockedDates, setLoadingLockedDates] = useState(false);
 
+  useEffect(() => {
+    const fetchLockedDates = async () => {
+      if (user?.data?.company?.id) {
+        setLoadingLockedDates(true);
+        try {
+          const response = await getFutureLockedDates(user.data.company.id);
+          if (response.success && response.data) {
+            setLockedDates(response.data.lockedDates);
+          }
+        } catch (error) {
+          console.error('Error fetching locked dates:', error);
+        } finally {
+          setLoadingLockedDates(false);
+        }
+      }
+    };
+
+    fetchLockedDates();
+  }, [user?.data?.company?.id]);
   const handleDateSelect = (date: Date | undefined) => {
 
     if (date) {
@@ -233,7 +257,16 @@ export function ProjectStep2({
                     selected={eventData.date ? new Date(eventData.date) : undefined}
                     onSelect={handleDateSelect}
                     initialFocus
-                    disabled={(date) => date < new Date()}
+                    disabled={(date) => {
+                      // Disable past dates
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      if (date < today) return true;
+
+                      // Disable locked dates
+                      const dateStr = format(date, 'yyyy-MM-dd');
+                      return lockedDates.includes(dateStr);
+                    }}
                   />
                 </div>
               </PopoverContent>
@@ -372,6 +405,7 @@ export function ProjectStep2({
               <div className="space-y-2">
                 <Label className="text-xs">Team Member</Label>
                 <Select
+                disabled={!eventData.date}
                   value={currentMember.memberId}
                   onValueChange={handleMemberChange}
                 >

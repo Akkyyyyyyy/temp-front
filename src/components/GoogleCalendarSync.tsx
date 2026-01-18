@@ -56,7 +56,6 @@ export function GoogleCalendarSync({
     try {
       await onDisconnect();
       setShowDisconnectPopover(false);
-      toast.success("Disconnected from Google Calendar");
     } catch (error) {
       console.error("Disconnect failed:", error);
       toast.error("Failed to disconnect");
@@ -187,9 +186,6 @@ export function GoogleCalendarSync({
                 <GoogleCalendarIcon />
                 Connect Google Calendar
               </DialogTitle>
-              <DialogDescription>
-                Connect once and your events will sync automatically.
-              </DialogDescription>
             </DialogHeader>
             <div className="flex flex-col gap-4 pt-4">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
@@ -201,7 +197,7 @@ export function GoogleCalendarSync({
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">✓</span>
-                    <span>Sync events automatically</span>
+                    <span>Sync events</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-green-500 mt-0.5">✓</span>

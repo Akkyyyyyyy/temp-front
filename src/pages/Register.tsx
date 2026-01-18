@@ -76,7 +76,7 @@ const Register = () => {
         const token = localStorage.getItem("auth-token");
 
         if (token) {
-            navigate("/");
+            navigate("/dashboard");
         } else {
             setIsChecking(false)
         }
@@ -224,12 +224,23 @@ const Register = () => {
                             {loading ? "Registering..." : "Register Company"}
                         </Button>
 
+                         <div className="text-center text-xs text-muted-foreground mt-2">
+                            By registering, you agree to our{" "}
+                            <Link to="/privacy-policies" className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">
+                                Privacy Policy
+                            </Link>
+                            .
+                        </div>
+
+
                         <div className="text-center text-sm text-muted-foreground mt-4">
                             Already have an account?{" "}
                             <Link to="/login" className="text-primary hover:underline">
                                 Login here
                             </Link>
                         </div>
+
+                       
                     </form>
                 </CardContent>
             </Card>

@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Lock, Unlock } from 'lucide-react';
 import { EditableTimeSlot } from '@/components/EditableTimeSlot';
 import { TeamMember } from './TeamMembers';
 import { useAuth } from '@/context/AuthContext';
+import { format } from 'date-fns';
+import { ConfirmDialog } from '@/components/modals/ConfirmDialog';
 
 interface DayCalendarProps {
   date: string;
@@ -18,6 +20,10 @@ interface DayCalendarProps {
   setSelectedWeek?: (week: number) => void;
   setSelectedProject: (projectId: string | null) => void;
   setSelectedEvent?: (eventId: string | null) => void;
+  lockedDates?: string[];
+  onToggleDateLock?: (date: Date, e?: MouseEvent) => void;
+  lockProcessing?: Record<string, boolean>;
+  loading?: boolean;
 }
 
 export function DayCalendar({
@@ -32,11 +38,26 @@ export function DayCalendar({
   selectedWeek,
   setSelectedWeek,
   setSelectedProject,
-  setSelectedEvent
+  setSelectedEvent,
+  lockedDates,
+  onToggleDateLock,
+  lockProcessing,
+  loading
 }: DayCalendarProps) {
   const hours = Array.from({ length: 24 }, (_, i) => i);
   const targetDate = new Date(selectedYear, selectedMonth - 1, day);
   const { user } = useAuth();
+  const [confirmLockDialogOpen, setConfirmLockDialogOpen] = useState(false);
+
+  const dateKey = format(targetDate, 'yyyy-MM-dd');
+  const isLocked = lockedDates ? lockedDates.includes(dateKey) : false;
+  const isLockProcessing = lockProcessing ? !!lockProcessing[dateKey] : false;
+  const canToggleLock = !!onToggleDateLock && user?.data?.isAdmin;
+
+  const requestToggleDateLock = (e?: MouseEvent) => {
+    if (e) e.stopPropagation();
+    setConfirmLockDialogOpen(true);
+  };
 
   // Build editableBookings from events and googleCalendarEvents
   const editableBookings: any[] = [];
@@ -284,6 +305,25 @@ export function DayCalendar({
 
   return (
     <div className="bg-background rounded-lg border border-border/20 p-4 sm:p-6">
+      <ConfirmDialog
+        open={confirmLockDialogOpen}
+        onOpenChange={setConfirmLockDialogOpen}
+        title={isLocked ? "Unlock date" : "Lock date"}
+        description={
+          isLocked
+            ? `Are you sure you want to unlock ${format(targetDate, 'MMM dd, yyyy')}?`
+            : `Are you sure you want to lock ${format(targetDate, 'MMM dd, yyyy')}?`
+        }
+        confirmText={isLocked ? "Unlock" : "Lock"}
+        confirmVariant={isLocked ? "default" : "default"}
+        isLoading={!!loading || isLockProcessing}
+        confirmDisabled={!canToggleLock || !!loading || isLockProcessing}
+        onConfirm={() => {
+          if (!onToggleDateLock) return;
+          onToggleDateLock(targetDate);
+          setConfirmLockDialogOpen(false);
+        }}
+      />
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4">
         <div className="flex items-center gap-2 text-base sm:text-lg font-bold w-full sm:w-auto justify-between sm:justify-start">
@@ -314,6 +354,25 @@ export function DayCalendar({
             </h4>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
+            {canToggleLock && (
+              <div
+                
+                onClick={(e) => requestToggleDateLock(e)}
+                className={`flex justify-center items-center h-7 sm:h-8 px-2 sm:px-3 cursor-pointer ${isLocked
+                        ? 'text-destructive'
+                        : ''
+                        }`}
+                title={isLocked ? `Click to unlock ${format(targetDate, 'do MMM, yyyy')}` : `Click to lock ${format(targetDate, 'do MMM, yyyy')}`}
+              >
+                {(!!loading || isLockProcessing) ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isLocked ? (
+                  <Lock className="w-4 h-4" />
+                ) : (
+                  <Unlock className="w-4 h-4" />
+                )}
+              </div>
+            )}
             <Button
               variant="outline"
               size="sm"

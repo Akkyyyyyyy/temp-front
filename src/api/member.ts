@@ -16,12 +16,12 @@ export interface Member {
   companyId: string;
   ringColor?: string;
   projects?: Project[];
-  active:boolean;
-  isAdmin:boolean;
-  roleId:string;
-  isInvited:boolean;
-  isOwner:boolean;
-  invitation:string;
+  active: boolean;
+  isAdmin: boolean;
+  roleId: string;
+  isInvited: boolean;
+  isOwner: boolean;
+  invitation: string;
 }
 
 export interface Project {
@@ -50,6 +50,7 @@ export interface GetMembersByCompanyRequest {
 }
 
 export interface GetMembersByCompanyResponse {
+  lockedDates: any;
   success: boolean;
   message: string;
   members: Member[];
@@ -132,7 +133,7 @@ interface AddMemberRequest {
   role?: string;
   roleId?: string;
   companyId: string;
-  phone?:string;
+  phone?: string;
   countryCode?: string;
   location?: string;
   bio?: string;
@@ -210,7 +211,7 @@ export interface ToggleAdminResponse {
 export interface SendInviteRequest {
   memberId: string;
   companyId: string;
-  adminName:string;
+  adminName: string;
 }
 
 export interface SendInviteResponse {
@@ -230,7 +231,7 @@ export interface SetupdateInvitationStatusResponse {
   success: boolean;
   message: string;
   token?: string;
-  user?:any;
+  user?: any;
 }
 
 export interface SetPasswordRequest {
@@ -243,7 +244,7 @@ export interface SetPasswordResponse {
   success: boolean;
   message: string;
   token?: string;
-  user?:any;
+  user?: any;
 }
 export interface RemoveMemberFromCompanyRequest {
   companyId: string;
@@ -257,11 +258,50 @@ export interface RemoveMemberFromCompanyResponse {
   companyId?: string;
 }
 
+export interface GetMeRequest {
+  companyId: string;
+}
+
+export interface GetMeResponse {
+  success: boolean;
+  message: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string | null;
+    roleId: string | null;
+    isAdmin: boolean;
+    location: string | null;
+    profilePhoto: string | null;
+    phone: string | null;
+    company: {
+      id: string;
+      logo: string | null;
+      name: string | null;
+      email: string | null;
+      country: string | null;
+    };
+    associatedCompanies: Array<{
+      id: string;
+      name: string;
+      email: string;
+      country: string;
+      isAdmin: boolean;
+      isEmailMatch: boolean;
+    }>;
+    companyMemberId: string;
+  };
+}
+export interface GetMeRequest {
+  companyId: string,
+  memberId: string
+}
 
 export async function addMember(request: AddMemberRequest): Promise<AddMemberResponse> {
   try {
     const token = localStorage.getItem("auth-token");
-    
+
     const response = await apiFetch(`${baseUrl}/member/add`, {
       method: "POST",
       headers: {
@@ -292,13 +332,13 @@ export async function addMember(request: AddMemberRequest): Promise<AddMemberRes
 
 // Get members by company ID with month/week view support
 export async function getMembersByCompanyId(
-companyId: string, params: {
+  companyId: string, params: {
     viewType: 'day' | 'month' | 'week';
     month?: number;
     year?: number;
     week?: number;
     memberId?: string;
-}): Promise<ApiResponse<GetMembersByCompanyResponse>> {
+  }): Promise<ApiResponse<GetMembersByCompanyResponse>> {
   try {
     const token = localStorage.getItem('auth-token');
 
@@ -457,7 +497,7 @@ export interface RemovePhotoResponse {
   member?: any;
 }
 export interface checkInviteRequest {
-  token:string;
+  token: string;
 }
 
 export async function updateMemberProfile(
@@ -772,7 +812,7 @@ export async function checkMemberInvite(
     return data;
   } catch (error: any) {
     console.error("Error checking invitation:", error);
-    return  {
+    return {
       success: false,
       message: error.message || "Failed to check invitation"
     };
@@ -885,3 +925,172 @@ export async function removeMemberFromCompany(
     };
   }
 }
+export interface GetMeRequest {
+  companyId: string;
+  memberId: string;
+}
+
+export interface GetMeResponse {
+  success: boolean;
+  message: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    role: string | null;
+    roleId: string | null;
+    isAdmin: boolean;
+    location: string | null;
+    profilePhoto: string | null;
+    phone: string | null;
+    company: {
+      id: string;
+      logo: string | null;
+      name: string | null;
+      email: string | null;
+      country: string | null;
+    };
+    associatedCompanies: Array<{
+      id: string;
+      name: string;
+      email: string;
+      country: string;
+      isAdmin: boolean;
+      isEmailMatch: boolean;
+    }>;
+    companyMemberId: string;
+  };
+}
+
+// POST API to get current user data
+export async function getMe(
+  companyId: string,
+  memberId: string
+): Promise<ApiResponse<GetMeResponse>> {
+  try {
+    const token = localStorage.getItem('auth-token');
+    
+    // POST request with companyId and memberId in body
+    const response = await apiFetch(`${baseUrl}/member/me`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ 
+        companyId, 
+        memberId 
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { 
+        success: false, 
+        message: data.message, 
+        errors: data.errors 
+      };
+    }
+
+    return { 
+      success: true, 
+      data: data 
+    };
+  } catch (error: any) {
+    return { 
+      success: false, 
+      message: error.message || "Network error" 
+    };
+  }
+} 
+export interface GetAvailableMembersByDateRangeRequest {
+  companyId: string;
+  startDate: string;
+  endDate?: string;
+  excludeEventId?: string;
+}
+
+export interface AvailableMemberByDate {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  roleId: string;
+  phone: string;
+  location: string;
+  bio: string;
+  skills: string[];
+  ringColor: string;
+  isAdmin: boolean;
+  companyMemberId: string;
+  availabilityStatus: "fully_available" | "unavailable";
+  conflicts: Array<{
+    projectId: string;
+    projectName: string;
+    eventDate: string;
+    startHour: number;
+    endHour: number;
+    conflictType: "date_and_time" | "date_only";
+    eventId: string;
+    eventName: string;
+    source: "project";
+  }>;
+  hasGoogleCalendar: boolean;
+  profilePhoto: string | null;
+}
+
+export interface GetAvailableMembersByDateRangeResponse {
+  success: boolean;
+  message: string;
+  data: {
+    availableMembers: AvailableMemberByDate[];
+    totalFullyAvailable: number;
+    totalUnavailable: number;
+    totalMembers: number;
+    dateRange: {
+      startDate: string;
+      endDate: string;
+    };
+  };
+}
+
+// Fixed function - add authorization token
+export const getAvailableMembersByDateRange = async (
+  request: GetAvailableMembersByDateRangeRequest
+): Promise<ApiResponse<GetAvailableMembersByDateRangeResponse>> => {
+  console.log("🚀 ~ getAvailableMembersByDateRange ~ request:", request);
+  
+  try {
+    const token = localStorage.getItem('auth-token');
+    const response = await apiFetch(`${baseUrl}/member/available-by-date`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(request),
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return { 
+        success: false, 
+        message: data.message, 
+        errors: data.errors 
+      };
+    }
+    
+    return { 
+      success: true, 
+      data: data 
+    };
+  } catch (error: any) {
+    console.error('Error fetching available members by date range:', error);
+    return { 
+      success: false, 
+      message: error.message || "Network error" 
+    };
+  }
+};

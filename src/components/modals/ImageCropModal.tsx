@@ -60,7 +60,7 @@ export function ImageCropModal({
                     imageElement,
                     croppedAreaPixels.x,
                     croppedAreaPixels.y,
-                    croppedAreaPixels.width + 5,
+                    croppedAreaPixels.width,
                     croppedAreaPixels.height,
                     0,
                     0,

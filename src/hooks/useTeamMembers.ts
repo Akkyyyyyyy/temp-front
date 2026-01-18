@@ -20,12 +20,8 @@ export function useTeamMembers({
     const [lockedDates, setLockedDates] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(true);
-    console.log(lockedDates);
-    
-    
 
     const refresh = useCallback(async () => {
-    console.log("refreshing");
         if (isRefreshing) setLoading(true);
         try {
             const companyId = user.data.company.id;
@@ -38,11 +34,10 @@ export function useTeamMembers({
                 year: selectedYear,
                 memberId
             });
-    console.log(response);
             const members = response.data.members;
-                    
-                setLockedDates(response.data.lockedDates);
-        
+
+            setLockedDates(response.data.lockedDates);
+
 
             const transformed = members.map((m: any) => ({
                 id: m.id,
@@ -77,5 +72,5 @@ export function useTeamMembers({
         }
     }, [user, selectedMonth, selectedYear, selectedWeek, timeView]);
 
-    return { teamMembers, loading, refresh, setTeamMembers, lockedDates };
+    return { teamMembers, loading, setLoading, refresh, setTeamMembers, lockedDates };
 }

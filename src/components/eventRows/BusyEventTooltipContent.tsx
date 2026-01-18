@@ -15,6 +15,7 @@ export const BusyEventTooltipContent = ({ event, formatTime, type }: BusyEventTo
         <Calendar className="w-4 h-4" />
         <span>
           {format(new Date(event.date), "do MMM, yyyy")}
+          {event.endDate && ` - ${format(new Date(event.endDate), "do MMM, yyyy")}`}
         </span>
       </div>
 

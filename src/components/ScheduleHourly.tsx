@@ -449,7 +449,6 @@ export const ScheduleHourly = forwardRef<ScheduleHourlyRef, ScheduleHourlyProps>
                       </h5>
                       <div className="space-y-1">
                         {(worker as any).activeProjects.map((project: any) => {
-                          console.log(project);
                           
                           const isOtherEvent = project.isOther;
                           const isGoogleEvent = project.isGoogleCalendarEvent;

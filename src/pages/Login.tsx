@@ -17,7 +17,7 @@ import { User2, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { loginMember } from "@/api/company";
 
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ForgotPasswordModal } from "@/components/ForgotPasswordModal";
 import { useAuth } from "@/context/AuthContext";
 
@@ -85,7 +85,7 @@ const Login = () => {
           return;
         }
         // toast.error(response.message || "Login failed");
-        setError("root",  { message: response.message })
+        setError("root", { message: response.message })
         return;
       }
 
@@ -104,7 +104,7 @@ const Login = () => {
         });
       }
 
-      navigate("/");
+      navigate("/dashboard");
     } catch (error: any) {
       toast.error(error.message || "Something went wrong");
     } finally {
@@ -141,11 +141,11 @@ const Login = () => {
           </CardHeader>
 
           <CardContent className="space-y-5 pt-2">
-            
+
             <form onSubmit={handleSubmit(onSubmit)} className="">
-               <p className="text-md text-red-500 min-h-[25px] text-center font-medium">
-                  {errors.root?.message || ""}
-                </p>
+              <p className="text-md text-red-500 min-h-[25px] text-center font-medium">
+                {errors.root?.message || ""}
+              </p>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">Email</Label>
                 <Input
@@ -233,12 +233,24 @@ const Login = () => {
               <div className="pt-4 border-t border-muted/30">
                 <div className="text-center text-sm text-muted-foreground">
                   Don't have an account?{" "}
-                  <a
-                    href="/register"
+                  <Link
+                    to="/register"
                     className="font-semibold text-primary hover:text-primary/80 transition-colors hover:underline"
                   >
                     Register your company
-                  </a>
+                  </Link>
+                </div>
+
+                <div className="text-center text-xs text-muted-foreground mt-2">
+                  <Link
+                    to="/privacy-policies"
+                    className="text-primary hover:underline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Privacy Policy
+                  </Link>
+                  .
                 </div>
               </div>
             </form>

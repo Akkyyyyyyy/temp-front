@@ -54,7 +54,7 @@ export function PackageCard({
             <div className="flex items-center justify-center gap-1 text-3xl font-bold text-primary mb-1">
               {formatPrice(pkg.price, userCountry)}
             </div>
-            <p className="text-sm text-muted-foreground">{pkg.duration || "No duration set"}</p>
+            <p className="text-sm text-muted-foreground">{pkg?.duration }</p>
           </div>
 
           {!isPreview && (
@@ -120,15 +120,7 @@ export function PackageCard({
         )}
       </CardContent>
 
-      {!isPreview && (
-        user.data.isAdmin &&
-        <CardFooter>
-          <Button variant="outline" className="w-full" onClick={onEdit}>
-            <Pencil className="w-4 h-4 mr-2" />
-            Edit Package
-          </Button>
-        </CardFooter>
-      )}
+      
     </Card>
   );
 }

@@ -79,9 +79,7 @@ const packageSchema = yup.object({
       return !isNaN(num) && num >= 0;
     }),
   duration: yup
-    .string()
-    .required("Duration is required")
-    .min(1, "Duration is required"),
+    .string(),
   popular: yup.boolean().required(),
   features: yup
     .array()
@@ -352,7 +350,8 @@ export function EditPackageDrawer({ open, onOpenChange, package: initialPackage,
                     id="name"
                     value={editedPackage.name}
                     onChange={(e) => handleFieldChange("name", e.target.value)}
-                    placeholder="e.g., Premium Wedding Package"
+                    placeholder="e.g. Premium Wedding Package"
+                    autoComplete="off"
                   />
                   {hasError("name") && (
                     <p className="text-sm text-destructive">{errors.name}</p>
@@ -386,7 +385,7 @@ export function EditPackageDrawer({ open, onOpenChange, package: initialPackage,
                       id="duration"
                       value={editedPackage.duration}
                       onChange={(e) => handleFieldChange("duration", e.target.value)}
-                      placeholder="e.g., 8 hours"
+                      placeholder="e.g. 8 hours"
                     />
                     {hasError("duration") && (
                       <p className="text-sm text-destructive">{errors.duration}</p>

@@ -14,7 +14,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { addMember, getMembersByCompanyId, Member } from "@/api/member";
 
 import { toast } from "sonner";
-import { getISOWeek, isWithinInterval, parseISO } from "date-fns";
+import { getISOWeek, isWithinInterval, parseISO, getISOWeekYear } from "date-fns";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useAuth } from "@/context/AuthContext";
 import { useRole } from "@/hooks/useRole";
@@ -22,21 +22,24 @@ import { PackagesDialog } from "./PackagesDialog";
 import { ScheduleHourlyRef } from "./ScheduleHourly";
 import { HeaderWithClock } from "./HeaderWithClock";
 import { preloadCountries } from "@/helper/countryHelpers";
+import { isTokenExpired } from "@/helper/helper";
+import { SessionExpiredDialog } from "./modals/SessionExpiredDialog";
 
 export type TimeView = 'Day' | 'week' | 'month';
 
 export function GanttChart() {
   const today = new Date();
   const { roles } = useRole();
-  const [timeView, setTimeView] = useState<TimeView>('week');
-  const [selectedDay, setSelectedDay] = useState<number | null>(today.getDate());
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(today.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState<number | null>(today.getFullYear());
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(getISOWeek(today));
+  const [timeView, setTimeView] = useState<TimeView>('month');
+  const [selectedDay, setSelectedDay] = useState(today.getDate());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
+  const [selectedWeek, setSelectedWeek] = useState(getISOWeek(today));
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [colorUpdate, setColorUpdate] = useState(false);
   const hasMounted = useRef(false);
   const [dialogCloseTrigger, setDialogCloseTrigger] = useState(0);
   const scheduleHourlyRef = useRef<ScheduleHourlyRef>(null);
+  const [showSessionExpiredDialog, setShowSessionExpiredDialog] = useState(false);
 
   const handleOpenChange = (isOpen: boolean) => {
     setShowAddTeamMember(isOpen);
@@ -85,7 +88,7 @@ export function GanttChart() {
     }
   }, [selectedEvent, setIsEventClick]);
 
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const baseUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
 
@@ -101,7 +104,19 @@ export function GanttChart() {
     fetchMembers();
   }, [selectedMonth, selectedYear, selectedWeek, timeView, colorUpdate, setColorUpdate, user]);
 
-  
+  useEffect(() => {
+    const token = localStorage.getItem("auth-token");
+
+    if (!token || isTokenExpired(token)) {
+      setShowSessionExpiredDialog(true);
+    }
+  }, []);
+  const handleLoginAgain = () => {
+    localStorage.removeItem("auth-token");
+    setUser(null);
+    setShowSessionExpiredDialog(false);
+    navigate("/login");
+  };
 
   const handleJumpToToday = () => {
     const today = new Date();
@@ -109,7 +124,11 @@ export function GanttChart() {
     if (timeView === 'week') {
       setSelectedDay(today.getDate());
       setSelectedWeek(getISOWeek(today));
-      setSelectedYear(today.getFullYear());
+      setSelectedYear(getISOWeekYear(today));
+    } else if (timeView === 'Day') {
+      setSelectedDay(today.getDate());
+      setSelectedMonth(today.getMonth() + 1);
+      setSelectedYear(getISOWeekYear(today));
     } else {
       setSelectedDay(today.getDate());
       setSelectedMonth(today.getMonth() + 1);
@@ -118,93 +137,123 @@ export function GanttChart() {
     setIsDayClick(true);
   };
 
-// Get workers for a specific day based on events (both regular and Google Calendar)
-const getWorkersForDay = (day: number, month: number, year: number) => {
-  const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+  // Get workers for a specific day based on events (both regular and Google Calendar)
+  const getWorkersForDay = (day: number, month: number, year: number) => {
+    const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
-  return teamMembers
-    .filter(member => {
-      // Check if member has any events on this day
-      const hasRegularEvents = member.events?.some(event =>
-        event.date === targetDateString
-      );
+    return teamMembers
+      .filter(member => {
+        // Check if member has any events on this day
+        const hasRegularEvents = member.events?.some(event =>
+          event.date === targetDateString
+        );
 
-      const hasGoogleEvents = member.googleCalendarEvents?.some(event => {
-        // For single-day events
-        if (!event.multiDay) {
-          return event.date === targetDateString;
-        }
-        
-        // For multi-day events
-        if (event.multiDay && event.endDate) {
-          const startDate = new Date(event.date);
-          const endDate = new Date(event.endDate);
-          const targetDate = new Date(targetDateString);
-          
-          // For Google Calendar all-day events, end date is exclusive
-          // So we need to subtract 1 day for comparison
-          const adjustedEndDate = new Date(endDate);
-          if (event.allDay) {
-            adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+        const hasGoogleEvents = member.googleCalendarEvents?.some(event => {
+          // For single-day events
+          if (!event.multiDay) {
+            return event.date === targetDateString;
           }
-          
-          // Check if target date is between start and end dates (inclusive)
-          return targetDate >= startDate && targetDate <= adjustedEndDate;
-        }
-        
-        return false;
-      });
 
-      return hasRegularEvents || hasGoogleEvents;
-    })
-    .map(member => {
-      const dayRegularEvents = member.events?.filter(event =>
-        event.date === targetDateString
-      ) || [];
+          // For multi-day events
+          if (event.multiDay && event.endDate) {
+            const startDate = new Date(event.date);
+            const endDate = new Date(event.endDate);
+            const targetDate = new Date(targetDateString);
 
-      const dayGoogleEvents = member.googleCalendarEvents?.filter(event => {
-        if (!event.multiDay) {
-          return event.date === targetDateString;
-        }
-        
-        if (event.multiDay && event.endDate) {
-          const startDate = new Date(event.date);
-          const endDate = new Date(event.endDate);
-          const targetDate = new Date(targetDateString);
-          
-          // For Google Calendar all-day events, end date is exclusive
-          // So we need to subtract 1 day for comparison
-          const adjustedEndDate = new Date(endDate);
-          if (event.allDay) {
-            adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+            // For Google Calendar all-day events, end date is exclusive
+            // So we need to subtract 1 day for comparison
+            const adjustedEndDate = new Date(endDate);
+            if (event.allDay) {
+              adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+            }
+
+            // Check if target date is between start and end dates (inclusive)
+            return targetDate >= startDate && targetDate <= adjustedEndDate;
           }
-          
-          return targetDate >= startDate && targetDate <= adjustedEndDate;
-        }
-        
-        return false;
-      }) || [];
 
-      // Combine both types of events
-      const allDayEvents = [...dayRegularEvents, ...dayGoogleEvents];
+          return false;
+        });
 
-      const activeProjects = allDayEvents.map(event => {
-        // Check if it's a Google Calendar event
-        const isGoogleEvent = 'allDay' in event;
-        
-        if (isGoogleEvent) {
-          const googleEvent = event as any;
-          
-          // Handle all-day Google Calendar events
-          if (googleEvent.allDay) {
+        return hasRegularEvents || hasGoogleEvents;
+      })
+      .map(member => {
+        const dayRegularEvents = member.events?.filter(event =>
+          event.date === targetDateString
+        ) || [];
+
+        const dayGoogleEvents = member.googleCalendarEvents?.filter(event => {
+          if (!event.multiDay) {
+            return event.date === targetDateString;
+          }
+
+          if (event.multiDay && event.endDate) {
+            const startDate = new Date(event.date);
+            const endDate = new Date(event.endDate);
+            const targetDate = new Date(targetDateString);
+
+            // For Google Calendar all-day events, end date is exclusive
+            // So we need to subtract 1 day for comparison
+            const adjustedEndDate = new Date(endDate);
+            if (event.allDay) {
+              adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+            }
+
+            return targetDate >= startDate && targetDate <= adjustedEndDate;
+          }
+
+          return false;
+        }) || [];
+
+        // Combine both types of events
+        const allDayEvents = [...dayRegularEvents, ...dayGoogleEvents];
+
+        const activeProjects = allDayEvents.map(event => {
+          // Check if it's a Google Calendar event
+          const isGoogleEvent = 'allDay' in event;
+
+          if (isGoogleEvent) {
+            const googleEvent = event as any;
+
+            // Handle all-day Google Calendar events
+            if (googleEvent.allDay) {
+              return {
+                id: `google-${Date.now()}-${Math.random()}`,
+                name: 'Google Calendar',
+                color: '#4285F4', // Google blue
+                eventName: googleEvent.name || 'Google Event',
+                time: googleEvent.allDay ? 'All Day' :
+                  (googleEvent.startHour !== null && googleEvent.endHour !== null ?
+                    `${googleEvent.startHour}:00 - ${googleEvent.endHour}:00` : ''),
+                eventId: googleEvent.id || `google-${Date.now()}`,
+                startHour: googleEvent.startHour,
+                endHour: googleEvent.endHour,
+                location: googleEvent.location || '',
+                role: 'Busy',
+                isOther: true,
+                isGoogleCalendarEvent: true,
+                allDay: googleEvent.allDay,
+                multiDay: googleEvent.multiDay,
+                userId: member.id,
+                // Add adjusted end date for display
+                displayEndDate: googleEvent.multiDay && googleEvent.endDate ?
+                  (() => {
+                    const end = new Date(googleEvent.endDate);
+                    if (googleEvent.allDay) {
+                      end.setDate(end.getDate() - 1);
+                    }
+                    return end.toISOString().split('T')[0];
+                  })() : null
+              };
+            }
+
+            // Handle timed Google Calendar events
             return {
               id: `google-${Date.now()}-${Math.random()}`,
               name: 'Google Calendar',
-              color: '#4285F4', // Google blue
+              color: '#4285F4',
               eventName: googleEvent.name || 'Google Event',
-              time: googleEvent.allDay ? 'All Day' : 
-                    (googleEvent.startHour !== null && googleEvent.endHour !== null ? 
-                     `${googleEvent.startHour}:00 - ${googleEvent.endHour}:00` : ''),
+              time: googleEvent.startHour !== null && googleEvent.endHour !== null ?
+                `${googleEvent.startHour}:00 - ${googleEvent.endHour}:00` : '',
               eventId: googleEvent.id || `google-${Date.now()}`,
               startHour: googleEvent.startHour,
               endHour: googleEvent.endHour,
@@ -212,202 +261,172 @@ const getWorkersForDay = (day: number, month: number, year: number) => {
               role: 'Busy',
               isOther: true,
               isGoogleCalendarEvent: true,
-              allDay: googleEvent.allDay,
+              allDay: false,
               multiDay: googleEvent.multiDay,
               userId: member.id,
-              // Add adjusted end date for display
-              displayEndDate: googleEvent.multiDay && googleEvent.endDate ? 
-                (() => {
-                  const end = new Date(googleEvent.endDate);
-                  if (googleEvent.allDay) {
-                    end.setDate(end.getDate() - 1);
-                  }
-                  return end.toISOString().split('T')[0];
-                })() : null
+              displayEndDate: googleEvent.multiDay && googleEvent.endDate ?
+                googleEvent.endDate : null
             };
           }
-          
-          // Handle timed Google Calendar events
+
+          // Regular event
           return {
-            id: `google-${Date.now()}-${Math.random()}`,
-            name: 'Google Calendar',
-            color: '#4285F4',
-            eventName: googleEvent.name || 'Google Event',
-            time: googleEvent.startHour !== null && googleEvent.endHour !== null ? 
-                  `${googleEvent.startHour}:00 - ${googleEvent.endHour}:00` : '',
-            eventId: googleEvent.id || `google-${Date.now()}`,
-            startHour: googleEvent.startHour,
-            endHour: googleEvent.endHour,
-            location: googleEvent.location || '',
-            role: 'Busy',
-            isOther: true,
-            isGoogleCalendarEvent: true,
+            id: event.project.id,
+            name: event.project.name,
+            color: event.project.color,
+            eventName: event.name,
+            time: `${event.startHour}:00 - ${event.endHour}:00`,
+            eventId: event.eventId,
+            startHour: event.startHour,
+            endHour: event.endHour,
+            location: event.location,
+            role: event.assignment.role,
+            isOther: event.isOther,
+            isGoogleCalendarEvent: false,
             allDay: false,
-            multiDay: googleEvent.multiDay,
-            userId: member.id,
-            displayEndDate: googleEvent.multiDay && googleEvent.endDate ? 
-              googleEvent.endDate : null
+            multiDay: false
           };
-        }
-        
-        // Regular event
+        });
+
         return {
-          id: event.project.id,
-          name: event.project.name,
-          color: event.project.color,
-          eventName: event.name,
-          time: `${event.startHour}:00 - ${event.endHour}:00`,
-          eventId: event.eventId,
-          startHour: event.startHour,
-          endHour: event.endHour,
-          location: event.location,
-          role: event.assignment.role,
-          isOther: event.isOther,
-          isGoogleCalendarEvent: false,
-          allDay: false,
-          multiDay: false
+          ...member,
+          activeProjects,
+          activeEvents: allDayEvents,
         };
       });
+  };
 
-      return {
-        ...member,
-        activeProjects,
-        activeEvents: allDayEvents,
-      };
-    });
-};
+  // Get available members for a specific day (no events on that day)
+  const getAvailableForDay = (day: number, month: number, year: number) => {
+    const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 
-// Get available members for a specific day (no events on that day)
-const getAvailableForDay = (day: number, month: number, year: number) => {
-  const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    return teamMembers.filter(member => {
+      const hasRegularEvents = member.events?.some(event =>
+        event.date === targetDateString
+      );
 
-  return teamMembers.filter(member => {
-    const hasRegularEvents = member.events?.some(event =>
-      event.date === targetDateString
-    );
-
-    const hasGoogleEvents = member.googleCalendarEvents?.some(event => {
-      if (!event.multiDay) {
-        return event.date === targetDateString;
-      }
-      
-      if (event.multiDay && event.endDate) {
-        const startDate = new Date(event.date);
-        const endDate = new Date(event.endDate);
-        const targetDate = new Date(targetDateString);
-        
-        // For Google Calendar all-day events, end date is exclusive
-        // So we need to subtract 1 day for comparison
-        const adjustedEndDate = new Date(endDate);
-        if (event.allDay) {
-          adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+      const hasGoogleEvents = member.googleCalendarEvents?.some(event => {
+        if (!event.multiDay) {
+          return event.date === targetDateString;
         }
-        
-        return targetDate >= startDate && targetDate <= adjustedEndDate;
-      }
-      
-      return false;
-    });
 
-    // Available if no events at all
-    return !hasRegularEvents && !hasGoogleEvents;
-  });
-};
+        if (event.multiDay && event.endDate) {
+          const startDate = new Date(event.date);
+          const endDate = new Date(event.endDate);
+          const targetDate = new Date(targetDateString);
 
-// Get hourly bookings for selected day based on events (both regular and Google Calendar)
-const getHourlyBookings = (day: number, month: number, year: number) => {
-  const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          // For Google Calendar all-day events, end date is exclusive
+          // So we need to subtract 1 day for comparison
+          const adjustedEndDate = new Date(endDate);
+          if (event.allDay) {
+            adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+          }
 
-  const bookings: Array<{
-    startHour: number;
-    endHour: number;
-    projectName: string;
-    memberName: string;
-    memberPhoto: string;
-    color: string;
-    memberRingColor: string;
-    eventId: string;
-    role: string;
-    instructions: string;
-    location: string;
-    isGoogleCalendarEvent: boolean;
-    allDay: boolean;
-    multiDay: boolean;
-  }> = [];
-
-  teamMembers?.forEach(member => {
-    // Process regular events
-    member?.events?.forEach(event => {
-      if (event.date === targetDateString) {
-        bookings.push({
-          startHour: event.startHour,
-          endHour: event.endHour,
-          projectName: event.project.name,
-          memberName: member.name,
-          memberPhoto: member.profilePhoto,
-          color: event.project.color,
-          memberRingColor: member.ringColor,
-          eventId: event.eventId,
-          role: event.assignment.role,
-          instructions: event.assignment.instructions || '',
-          location: event.location,
-          isGoogleCalendarEvent: false,
-          allDay: false,
-          multiDay: false
-        });
-      }
-    });
-
-    // Process Google Calendar events
-    member?.googleCalendarEvents?.forEach(googleEvent => {
-      let isOnTargetDate = false;
-      
-      if (!googleEvent.multiDay) {
-        isOnTargetDate = googleEvent.date === targetDateString;
-      } else if (googleEvent.multiDay && googleEvent.endDate) {
-        const startDate = new Date(googleEvent.date);
-        const endDate = new Date(googleEvent.endDate);
-        const targetDate = new Date(targetDateString);
-        
-        // For Google Calendar all-day events, end date is exclusive
-        // So we need to subtract 1 day for comparison
-        const adjustedEndDate = new Date(endDate);
-        if (googleEvent.allDay) {
-          adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+          return targetDate >= startDate && targetDate <= adjustedEndDate;
         }
-        
-        isOnTargetDate = targetDate >= startDate && targetDate <= adjustedEndDate;
-      }
-      
-      if (isOnTargetDate) {
-        // Skip all-day events for hourly booking display (they're handled differently)
-        if (googleEvent.allDay) return;
-        
-        // Only include timed events
-        if (googleEvent.startHour !== null && googleEvent.endHour !== null) {
+
+        return false;
+      });
+
+      // Available if no events at all
+      return !hasRegularEvents && !hasGoogleEvents;
+    });
+  };
+
+  // Get hourly bookings for selected day based on events (both regular and Google Calendar)
+  const getHourlyBookings = (day: number, month: number, year: number) => {
+    const targetDateString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+
+    const bookings: Array<{
+      startHour: number;
+      endHour: number;
+      projectName: string;
+      memberName: string;
+      memberPhoto: string;
+      color: string;
+      memberRingColor: string;
+      eventId: string;
+      role: string;
+      instructions: string;
+      location: string;
+      isGoogleCalendarEvent: boolean;
+      allDay: boolean;
+      multiDay: boolean;
+    }> = [];
+
+    teamMembers?.forEach(member => {
+      // Process regular events
+      member?.events?.forEach(event => {
+        if (event.date === targetDateString) {
           bookings.push({
-            startHour: googleEvent.startHour,
-            endHour: googleEvent.endHour,
-            projectName: 'Google Calendar',
+            startHour: event.startHour,
+            endHour: event.endHour,
+            projectName: event.project.name,
             memberName: member.name,
             memberPhoto: member.profilePhoto,
-            color: '#4285F4', // Google blue
+            color: event.project.color,
             memberRingColor: member.ringColor,
-            eventId: googleEvent.id || `google-${member.id}`,
-            role: 'Busy',
-            instructions: '',
-            location: googleEvent.location || '',
-            isGoogleCalendarEvent: true,
-            allDay: googleEvent.allDay,
-            multiDay: googleEvent.multiDay
+            eventId: event.eventId,
+            role: event.assignment.role,
+            instructions: event.assignment.instructions || '',
+            location: event.location,
+            isGoogleCalendarEvent: false,
+            allDay: false,
+            multiDay: false
           });
         }
-      }
-    });
-  });
+      });
 
-  return bookings.sort((a, b) => a.startHour - b.startHour);
-};
+      // Process Google Calendar events
+      member?.googleCalendarEvents?.forEach(googleEvent => {
+        let isOnTargetDate = false;
+
+        if (!googleEvent.multiDay) {
+          isOnTargetDate = googleEvent.date === targetDateString;
+        } else if (googleEvent.multiDay && googleEvent.endDate) {
+          const startDate = new Date(googleEvent.date);
+          const endDate = new Date(googleEvent.endDate);
+          const targetDate = new Date(targetDateString);
+
+          // For Google Calendar all-day events, end date is exclusive
+          // So we need to subtract 1 day for comparison
+          const adjustedEndDate = new Date(endDate);
+          if (googleEvent.allDay) {
+            adjustedEndDate.setDate(adjustedEndDate.getDate() - 1);
+          }
+
+          isOnTargetDate = targetDate >= startDate && targetDate <= adjustedEndDate;
+        }
+
+        if (isOnTargetDate) {
+          // Skip all-day events for hourly booking display (they're handled differently)
+          if (googleEvent.allDay) return;
+
+          // Only include timed events
+          if (googleEvent.startHour !== null && googleEvent.endHour !== null) {
+            bookings.push({
+              startHour: googleEvent.startHour,
+              endHour: googleEvent.endHour,
+              projectName: 'Google Calendar',
+              memberName: member.name,
+              memberPhoto: member.profilePhoto,
+              color: '#4285F4', // Google blue
+              memberRingColor: member.ringColor,
+              eventId: googleEvent.id || `google-${member.id}`,
+              role: 'Busy',
+              instructions: '',
+              location: googleEvent.location || '',
+              isGoogleCalendarEvent: true,
+              allDay: googleEvent.allDay,
+              multiDay: googleEvent.multiDay
+            });
+          }
+        }
+      });
+    });
+
+    return bookings.sort((a, b) => a.startHour - b.startHour);
+  };
 
   const addNewTeamMember = async (memberData: {
     invitation: string;
@@ -503,7 +522,10 @@ const getHourlyBookings = (day: number, month: number, year: number) => {
     member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     member.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
     member.events?.some(event =>
-      event.project.name.toLowerCase().includes(searchQuery.toLowerCase())
+      // Search in project name
+      event.project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      // ALSO search in event name (if it exists)
+      event.name?.toLowerCase().includes(searchQuery.toLowerCase())
     )
   );
 
@@ -543,7 +565,7 @@ const getHourlyBookings = (day: number, month: number, year: number) => {
       />
 
       {/* Main Content */}
-      <div className="mt-12 lg:mt-0 flex-1 py-6 px-3 lg:p-3 overflow-x-hidden">
+      <div className="mt-12 lg:mt-0 flex-1 py-1 px-3 overflow-x-hidden">
         {/* Header */}
         <HeaderWithClock
           timeView={timeView}
@@ -557,7 +579,7 @@ const getHourlyBookings = (day: number, month: number, year: number) => {
         />
 
         {/* Rest of your content */}
-        <div className="space-y-6">
+        <div className="space-y-6 overflow-x-hidden pt-5 lg:pt-1">
 
           {/* Team Members */}
           <TeamMembers
@@ -585,6 +607,7 @@ const getHourlyBookings = (day: number, month: number, year: number) => {
             setIsProjectClick={setIsProjectClick} //
             onRingColorUpdate={() => setColorUpdate(true)}
             setIsEventClick={setIsEventClick}
+            handleJumpToToday={handleJumpToToday}
           />
 
           <ScheduleHourly
@@ -703,6 +726,12 @@ const getHourlyBookings = (day: number, month: number, year: number) => {
           open={showAddTeamMember}
           onOpenChange={handleOpenChange}
           onAddMember={addNewTeamMember}
+        />
+        {/* Session Expired Dialog */}
+        <SessionExpiredDialog
+          open={showSessionExpiredDialog}
+          onOpenChange={setShowSessionExpiredDialog}
+          onLoginAgain={handleLoginAgain}
         />
       </div>
     </div>

@@ -57,6 +57,8 @@ export const fetchCountries = async (): Promise<Country[]> => {
         const numB = parseInt(b.code.replace('+', '')) || 0;
         return numA - numB;
       });
+
+    console.log("Unique country codes:", sortedCountries.map(c => c.code));
     
     // Cache the result
     countriesCache = sortedCountries;

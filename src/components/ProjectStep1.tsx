@@ -119,7 +119,7 @@ export function ProjectStep1({
 
             <div className="space-y-2">
                 <div className='flex items-center justify-between'>
-                    <Label htmlFor="description">Description <span className='text-red-500'>*</span></Label>
+                    <Label htmlFor="description">Description</Label>
                     <div className="h-6 flex items-center">
                         {errors.description && (
                             <p className="text-red-500 text-sm">{errors.description}</p>

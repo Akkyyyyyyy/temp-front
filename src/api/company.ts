@@ -360,3 +360,26 @@ export async function unlockDate(payload: UnlockDateRequest): Promise<ApiRespons
     return { success: false, message: error.message || "Network error" };
   }
 }
+export async function getFutureLockedDates(companyId: string): Promise<ApiResponse<LockedDatesResponse>> {
+  try {
+    const token = localStorage.getItem('auth-token');
+    const response = await apiFetch(`${baseUrl}/company/future-locked-dates/${companyId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        'Authorization': `Bearer ${token}`
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, message: data.message, errors: data.errors };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    console.error('Error getting future locked dates:', error);
+    return { success: false, message: error.message || "Network error" };
+  }
+}

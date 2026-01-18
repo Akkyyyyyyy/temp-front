@@ -1,4 +1,4 @@
-import { getMembersWithFutureProjects } from "@/api/member";
+import { getAvailableMembersByDateRange, getMembersWithFutureProjects } from "@/api/member";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Clock, Search, User, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { TeamMember } from "./TeamMembers";
+import { Calendar as CalendarIcon, Clock, Loader2, Search, User, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Calendar } from "./ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { getFallback } from "@/helper/helper";
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TeamMember } from "./TeamMembers";
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
 interface Event {
@@ -86,6 +86,23 @@ interface BookingEntry {
     googleEventId: any;
   };
 }
+interface AvailableMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  phone: string;
+  location: string;
+  bio: string;
+  skills: string[];
+  ringColor: string;
+  profilePhoto: string | null;
+  availabilityStatus: "fully_available" | "partially_available" | "unavailable";
+  conflicts: any[];
+  hasGoogleCalendar: boolean;
+  isAdmin: boolean;
+  companyMemberId: string;
+}
 
 const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDate: Date }, handleDateRange: (val: { startDate: Date; endDate: Date }) => void }) => {
   const [openDatePicker, setOpenDatePicker] = useState(false)
@@ -151,6 +168,12 @@ const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDat
               onSelect={(range) => { handleDateRange({ startDate: range.from ?? null, endDate: range.to ?? null }) }}
               initialFocus
               numberOfMonths={1}
+              disabled={(date) => {
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+
+                return date < today
+              }}
             />
           </div>
         </PopoverContent>
@@ -162,11 +185,16 @@ const DatePicker = ({ date, handleDateRange }: { date: { startDate: Date; endDat
 export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, setIsProjectClick, setSelectedEvent, setIsEventClick, setSelectedMember, team }: TeamAvailabilityTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [dateRange, setDateRange] = useState({ startDate: null, endDate: null })
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const companyId = user.data.company?.id;
+  const [activeTab, setActiveTab] = useState("upcoming");
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date(),
+    endDate: new Date(new Date().setDate(new Date().getDate() + 7)), // Default to 1 week range
+  });
+  const [availableMembers, setAvailableMembers] = useState<AvailableMember[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -316,7 +344,7 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
   }
 
   const handleEventClick = (eventId: string, memberId: string, projectId: string) => {
-    
+
     const member = teamMembers.find(m => m.id === memberId);
     if (member) {
       const event = member.events?.find(e => e.eventId === eventId);
@@ -346,9 +374,47 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
     }
   };
 
+  const fetchAvailableMembers = useCallback(async () => {
+    if (!user?.data.company?.id) return;
+    setIsLoading(true);
+
+    try {
+      const response = await getAvailableMembersByDateRange({
+        companyId: user.data.company.id,
+        startDate: dateRange.startDate
+          ? format(dateRange.startDate, 'yyyy-MM-dd')
+          : null,
+        endDate: dateRange.endDate
+          ? format(dateRange.endDate, 'yyyy-MM-dd')
+          : null,
+      });
+
+      if (response.success && response.data) {
+        setAvailableMembers(
+          response.data.data.availableMembers.filter(
+            m => m.availabilityStatus === 'fully_available'
+          )
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.data.company?.id, dateRange.startDate, dateRange.endDate]);
+
+
+  useEffect(() => {
+    if (activeTab !== "availability") return;
+    fetchAvailableMembers();
+  }, [activeTab, fetchAvailableMembers]);
+
+
+  const handleDateRangeChange = (newDateRange: { startDate: Date; endDate: Date }) => {
+    setDateRange(newDateRange);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-6xl mt-6 top-0 translate-y-0">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5" />
@@ -356,187 +422,274 @@ export function TeamAvailabilityTable({ isOpen, onClose, setSelectedProject, set
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col p-2">
-          {/* Search Bar */}
-          <div className="flex-shrink-0 mb-4">
-            <div className="relative">
-              <div className="flex w-full gap-3">
-                <div className="w-3/5">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Search team members, roles, events & projects"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 pr-10"
-                  />
-                </div>
-                <div className="w-2/5 relative">
-                  <DatePicker date={{
-                    startDate: dateRange.startDate,
-                    endDate: dateRange.endDate
-                  }}
-                    handleDateRange={(val) => setDateRange(val)}
-                  />
-                </div>
-              </div>
-              {searchQuery && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 p-1 h-auto"
-                  onClick={() => setSearchQuery("")}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search team members, roles, events & projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+            {searchQuery && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
-          {/* Loading and Error States */}
-          {isLoading && (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-muted-foreground">Loading team members...</p>
-            </div>
-          )}
+          <DatePicker
+            date={dateRange}
+            handleDateRange={(val) => setDateRange(val)}
+          />
+        </div>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2 bg-muted/40">
+            <TabsTrigger value="upcoming" className="data-[state=active]:bg-studio-gold data-[state=active]:text-black">Upcoming Projects</TabsTrigger>
+            <TabsTrigger value="availability" className="data-[state=active]:bg-studio-gold data-[state=active]:text-black">Availabile Members</TabsTrigger>
+          </TabsList>
 
-          {error && (
-            <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              <p className="text-destructive">Error: {error}</p>
-              <Button onClick={fetchTeamMembers} variant="outline">
-                Try Again
-              </Button>
-            </div>
-          )}
+          <TabsContent value="upcoming" className="mt-4 p-2 max-h-[60vh] overflow-y-auto scrollbar-hide">
+            <div className="space-y-4">
 
-          {!isLoading && !error && (
-            <>
-              {/* Results Summary */}
-              <div className="flex-shrink-0 mb-4 text-sm text-muted-foreground">
-                Showing {filteredBookings.length} of {bookingEntries.length} events
-              </div>
 
-              {/* Table */}
-              <div className="flex-1 overflow-auto">
-                <div className="min-w-[900px]">
-                  <Table>
-                    <TableHeader className="sticky top-0 bg-background z-10">
-                      <TableRow>
-                        <TableHead className="min-w-[150px]">Team Member</TableHead>
-                        <TableHead className="min-w-[150px]">Event Role</TableHead>
-                        <TableHead className="min-w-[150px]">Event</TableHead>
-                        <TableHead className="min-w-[150px]">Project</TableHead>
-                        <TableHead className="min-w-[120px]">Date</TableHead>
-                        <TableHead className="min-w-[120px]">Time Slot</TableHead>
-                        <TableHead className="min-w-[150px]">Location</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredBookings.length > 0 ? (
-                        filteredBookings.map((booking, index) => (
-                          <TableRow
-                            key={`${booking.eventId}-${index}`}
-                            className="group cursor-pointer hover:bg-muted/50 transition-colors"
-                          >
-                            <TableCell>
-                              <div
-                                className="flex items-center gap-3"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleMemberClick(booking.memberId);
-                                }}
-                              >
-                                <Avatar className="w-10 h-10 transition-transform"
-                                  style={{
-                                    borderColor: booking.memberColor || 'hsl(var(--muted))',
-                                    boxShadow: `0 0 0 2px ${booking.memberColor || 'hsl(var(--muted))'}`
-                                  }}>
-                                  <AvatarImage
-                                    src={`${S3_URL}/${booking.memberPhoto}`}
-                                    alt={booking.memberName}
-                                    className="object-cover"
-                                  />
-                                  <AvatarFallback className="bg-studio-gold text-studio-dark">
-                                    {getFallback(booking.memberName)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium truncate transition-colors">
-                                  {booking.memberName}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
-                                {booking.responsibility}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant="outline"
-                                className="border truncate hover:opacity-80 transition-opacity"
-                                style={{
-                                  backgroundColor: `${booking.projectColor}20`,
-                                  borderColor: booking.projectColor,
-                                  color: 'inherit'
-                                }}
-                                onClick={() => handleEventClick(booking.eventId, booking.memberId, booking.projectId)}
-                              >
-                                {booking.eventName}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <span
-                              >
-                                {booking.projectName}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1 text-sm truncate">
-                                <CalendarIcon className="w-3 h-3 text-muted-foreground" />
-                                {booking.dates}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1 text-sm truncate">
-                                <Clock className="w-3 h-3 text-muted-foreground" />
-                                {booking.timeSlot}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-sm truncate" title={booking.location}>
-                                {booking.location}
-                              </span>
-                            </TableCell>
+              {/* Loading and Error States */}
+              {isLoading && (
+
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                  <span className="ml-3 text-muted-foreground">Loading...</span>
+                </div>
+
+              )}
+
+              {error && (
+                <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                  <p className="text-destructive">Error: {error}</p>
+                  <Button onClick={fetchTeamMembers} variant="outline">
+                    Try Again
+                  </Button>
+                </div>
+              )}
+
+              {!isLoading && !error && (
+                <>
+
+                  {/* Table */}
+                  <div className="flex-1 overflow-auto scrollbar-hide">
+                    <div className="min-w-[900px] ">
+                      <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                          <TableRow>
+                            <TableHead className="min-w-[150px]">Team Member</TableHead>
+                            <TableHead className="min-w-[150px]">Event Role</TableHead>
+                            <TableHead className="min-w-[150px]">Event</TableHead>
+                            <TableHead className="min-w-[150px]">Project</TableHead>
+                            <TableHead className="min-w-[120px]">Date</TableHead>
+                            <TableHead className="min-w-[120px]">Time Slot</TableHead>
+                            <TableHead className="min-w-[150px]">Location</TableHead>
                           </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center py-8">
-                            <div className="flex flex-col items-center gap-2">
-                              <Search className="w-8 h-8 text-muted-foreground" />
-                              <p className="text-muted-foreground">
-                                {searchQuery || dateRange.startDate || dateRange.endDate
-                                  ? "No events found matching your search."
-                                  : "No events found."}
-                              </p>
-                              {(searchQuery || dateRange.startDate || dateRange.endDate) && (
-                                <Button variant="outline" size="sm" onClick={() => {
-                                  setSearchQuery("");
-                                  setDateRange({ startDate: null, endDate: null });
+                        </TableHeader>
+                        <TableBody>
+                          {filteredBookings.length > 0 ? (
+                            filteredBookings.map((booking, index) => (
+                              <TableRow
+                                key={`${booking.eventId}-${index}`}
+                                className="group cursor-pointer hover:bg-muted/50 transition-colors"
+                              >
+                                <TableCell>
+                                  <div
+                                    className="flex items-center gap-3"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMemberClick(booking.memberId);
+                                    }}
+                                  >
+                                    <Avatar className="w-10 h-10 transition-transform"
+                                      style={{
+                                        borderColor: booking.memberColor || 'hsl(var(--muted))',
+                                        boxShadow: `0 0 0 2px ${booking.memberColor || 'hsl(var(--muted))'}`
+                                      }}>
+                                      <AvatarImage
+                                        src={`${S3_URL}/${booking.memberPhoto}`}
+                                        alt={booking.memberName}
+                                        className="object-cover"
+                                      />
+                                      <AvatarFallback className="bg-studio-gold text-studio-dark">
+                                        {getFallback(booking.memberName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="font-medium truncate transition-colors">
+                                      {booking.memberName}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                                    {booking.responsibility}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant="outline"
+                                    className="border truncate hover:opacity-80 transition-opacity"
+                                    style={{
+                                      backgroundColor: `${booking.projectColor}20`,
+                                      borderColor: booking.projectColor,
+                                      color: 'inherit'
+                                    }}
+                                    onClick={() => handleEventClick(booking.eventId, booking.memberId, booking.projectId)}
+                                  >
+                                    {booking.eventName}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <span>
+                                    {booking.projectName}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1 text-sm truncate">
+                                    <CalendarIcon className="w-3 h-3 text-muted-foreground" />
+                                    {booking.dates}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-1 text-sm truncate">
+                                    <Clock className="w-3 h-3 text-muted-foreground" />
+                                    {booking.timeSlot}
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <span className="text-sm truncate" title={booking.location}>
+                                    {booking.location}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-8">
+                                <div className="flex flex-col items-center gap-2">
+                                  <Search className="w-8 h-8 text-muted-foreground" />
+                                  <p className="text-muted-foreground">
+                                    {searchQuery || dateRange.startDate || dateRange.endDate
+                                      ? "No events found matching your search."
+                                      : "No events found."}
+                                  </p>
+                                  {(searchQuery || dateRange.startDate || dateRange.endDate) && (
+                                    <Button variant="outline" size="sm" onClick={() => {
+                                      setSearchQuery("");
+                                      setDateRange({ startDate: null, endDate: null });
+                                    }}>
+                                      Clear filters
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="availability" className="mt-4 p-2 max-h-[60vh] overflow-y-auto scrollbar-hide">
+            <div className="space-y-4">
+
+              {isLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-studio-gold" />
+                  <span className="ml-3 text-muted-foreground">Loading...</span>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Member</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Email</TableHead>
+
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {availableMembers
+                      .filter(member =>
+                        searchQuery === '' ||
+                        member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        (member.role && member.role.toLowerCase().includes(searchQuery.toLowerCase()))
+                      )
+                      .map((member) => (
+                        <TableRow
+                          key={member.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleMemberClick(member.id)}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10 transition-transform"
+                                style={{
+                                  borderColor: member.ringColor || 'hsl(var(--muted))',
+                                  boxShadow: `0 0 0 2px ${member.ringColor || 'hsl(var(--muted))'}`
                                 }}>
-                                  Clear filters
-                                </Button>
-                              )}
+                                <AvatarImage
+                                  src={member.profilePhoto ? `${S3_URL}/${member.profilePhoto}` : undefined}
+                                  alt={member.name}
+                                  className="object-cover"
+                                />
+                                <AvatarFallback className="bg-studio-gold text-studio-dark">
+                                  {getFallback(member.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <div className="font-medium">{member.name}</div>
+                                </div>
+                              </div>
                             </div>
                           </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{member.role || 'No Role'}</div>
+
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {member.phone ? (
+                              <div className="text-sm">{member.phone}</div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No phone</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {member.email ? (
+                              <div className="text-sm">{member.email}</div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No email</span>
+                            )}
+                          </TableCell>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                      ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

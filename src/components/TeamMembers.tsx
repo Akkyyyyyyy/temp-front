@@ -20,6 +20,7 @@ import { GoogleCalendarEvent } from "./eventRows/GoogleCalendarEvent";
 import { OtherEvent } from "./eventRows/OtherEvent";
 import { ProjectEvent } from "./eventRows/ProjectEvent";
 import { lockDate, unlockDate } from "@/api/company";
+import { ConfirmDialog } from "./modals/ConfirmDialog";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL
 
@@ -136,6 +137,7 @@ interface TeamMembersProps {
   onRingColorUpdate?: (bool: boolean) => void;
   onDayChange?: (day: number, month: number, year: number) => void;
   setIsEventClick: (eventClick: boolean) => void;
+  handleJumpToToday: () => void;
 }
 
 export function TeamMembers({
@@ -165,13 +167,16 @@ export function TeamMembers({
   setIsProjectClick,
   onRingColorUpdate,
   onDayChange,
-  setIsEventClick
+  setIsEventClick,
+  handleJumpToToday
 }: TeamMembersProps) {
   const minColumnWidth = timeView === "week" ? "40px" : "8px";
 
   const [memberRingColors, setMemberRingColors] = useState<Record<string, string>>({});
   const [openPopover, setOpenPopover] = useState<string | null>(null);
   const [lockProcessing, setLockProcessing] = useState<Record<string, boolean>>({});
+  const [confirmLockDialogOpen, setConfirmLockDialogOpen] = useState(false);
+  const [pendingLockDate, setPendingLockDate] = useState<Date | null>(null);
   const {
     refresh
   } = useTeamMembers({
@@ -186,6 +191,18 @@ export function TeamMembers({
     const dateStr = format(date, 'yyyy-MM-dd');
     return lockedDates.includes(dateStr);
   }, [lockedDates]);
+
+  const requestToggleDateLock = (date: Date, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPendingLockDate(date);
+    if (user.data.isAdmin) {
+      setConfirmLockDialogOpen(true);
+    }
+  };
+
+  const pendingLockDateStr = pendingLockDate ? format(pendingLockDate, 'yyyy-MM-dd') : '';
+  const pendingIsLocked = pendingLockDate ? isDateLocked(pendingLockDate) : false;
+  const pendingIsProcessing = pendingLockDateStr ? !!lockProcessing[pendingLockDateStr] : false;
 
   const handleToggleDateLock = async (date: Date, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -891,9 +908,9 @@ export function TeamMembers({
   };
 
   const handleDayClick = (day: Date) => {
-    const clickedDate = day.getDate();
     setIsDayClick(true);
-    setSelectedDay(clickedDate);
+    setSelectedDay(day.getDate());
+    setSelectedMonth(day.getMonth() + 1);
     setSelectedProject(null);
     setSelectedEvent(null);
   };
@@ -968,6 +985,8 @@ export function TeamMembers({
           setSelectedMonth={setSelectedMonth}
           selectedYear={selectedYear}
           setSelectedYear={setSelectedYear}
+          selectedWeek={selectedWeek}
+          handleJumpToToday={handleJumpToToday}
         />
       </div>
     </div>
@@ -999,13 +1018,14 @@ export function TeamMembers({
         const isInactive = !member.active;
         const isLoggedInUser = member.id === user.data.id;
         const isAdmin = member.isAdmin === true;
+        const hasBadge = member.isOwner || isAdmin || isInactive;
 
         return (
           <div
             key={member.id}
             className={`${timelineHeight} ${isInactive ? 'opacity-50 grayscale' : ''}`}
           >
-            <div className={`flex gap-2 cursor-pointer p-2 rounded-sm transition-colors max-h-16 ${isInactive
+            <div className={`flex gap-2 cursor-pointer p-2 rounded-sm transition-colors relative max-h-16 ${isInactive
               ? 'bg-muted/30 hover:bg-muted/40 border border-dashed border-muted-foreground/30'
               : isLoggedInUser
                 ? 'border'
@@ -1044,23 +1064,11 @@ export function TeamMembers({
                           {getFallback(member.name)}
                         </AvatarFallback>
                       </Avatar>
-                      {member.isOwner && (
-                        <div className="absolute -bottom-1 -right-1 bg-studio-gold text-primary-foreground rounded-full p-0.5">
-                          <Laptop className="w-3 h-3" />
-                        </div>
-                      )}
 
                       {/* Inactive Badge */}
                       {isInactive && !member.isOwner && (
                         <div className="absolute -bottom-1 -right-1 bg-muted-foreground/70 text-white rounded-full p-0.5">
                           <Ban className="w-3 h-3" />
-                        </div>
-                      )}
-
-                      {/* Admin Badge */}
-                      {isAdmin && !isInactive && !member.isOwner && (
-                        <div className="absolute -bottom-1 -right-1 bg-studio-gold text-primary-foreground rounded-full p-0.5">
-                          <Laptop className="w-3 h-3" />
                         </div>
                       )}
                     </div>
@@ -1082,8 +1090,12 @@ export function TeamMembers({
                 className="min-w-0 flex-1"
                 onClick={() => setSelectedMember(member)}
               >
-                <h3 className={`font-medium transition-colors text-sm truncate ${isInactive ? 'text-muted-foreground' : 'text-foreground'
-                  }`}>
+                <h3
+                  className={`font-medium transition-colors text-sm truncate
+  ${hasBadge ? 'max-w-20' : ''}
+  ${isInactive ? 'text-muted-foreground' : 'text-foreground'}`}
+                >
+
                   {member.name}
                   {/* {isLoggedInUser && (
                     <span className="ml-2 text-xs text-studio-gold bg-studio-gold/10 px-1.5 py-0.5 rounded">
@@ -1095,6 +1107,39 @@ export function TeamMembers({
                       Inactive
                     </span>
                   )}
+                  {/* OWNER */}
+                  {member.isOwner && (
+                    <div className="absolute top-1 right-1">
+                      <span className="px-2 py-0.5 text-[8px] font-semibold rounded-md 
+      border border-studio-gold/50 bg-studio-gold/15 
+      text-studio-gold tracking-wide uppercase">
+                        Owner
+                      </span>
+                    </div>
+                  )}
+
+                  {/* ADMIN */}
+                  {isAdmin && !member.isOwner && !isInactive && (
+                    <div className="absolute top-1 right-1">
+                      <span className="px-2 py-0.5 text-[8px] font-semibold rounded-md 
+      border border-studio-gold/50 bg-studio-gold/15 
+      text-studio-gold tracking-wide uppercase">
+                        Admin
+                      </span>
+                    </div>
+                  )}
+
+                  {/* INACTIVE */}
+                  {isInactive && !member.isOwner && (
+                    <div className="absolute top-1 right-1">
+                      <span className="px-2 py-0.5 text-[8px] font-semibold rounded-md 
+      border border-muted-foreground/40 bg-muted/30 
+      text-muted-foreground tracking-wide uppercase">
+                        Inactive
+                      </span>
+                    </div>
+                  )}
+
                 </h3>
                 <p className={`text-xs truncate ${isInactive ? 'text-muted-foreground/70' : 'text-muted-foreground'
                   }`}>
@@ -1129,6 +1174,31 @@ export function TeamMembers({
   if (timeView === "day") {
     return (
       <div className="space-y-4">
+        <ConfirmDialog
+          open={confirmLockDialogOpen}
+          onOpenChange={(open) => {
+            setConfirmLockDialogOpen(open);
+            if (!open) setPendingLockDate(null);
+          }}
+          title={pendingIsLocked ? "Unlock date" : "Lock date"}
+          description={
+            pendingLockDate
+              ? pendingIsLocked
+                ? `Are you sure you want to unlock ${format(pendingLockDate, 'MMM dd, yyyy')}?`
+                : `Are you sure you want to lock ${format(pendingLockDate, 'MMM dd, yyyy')}?`
+              : undefined
+          }
+          confirmText={pendingIsLocked ? "Unlock" : "Lock"}
+          confirmVariant={pendingIsLocked ? "default" : "destructive"}
+          isLoading={pendingIsProcessing}
+          confirmDisabled={!pendingLockDate || !!loading}
+          onConfirm={() => {
+            if (!pendingLockDate) return;
+            handleToggleDateLock(pendingLockDate);
+            setConfirmLockDialogOpen(false);
+            setPendingLockDate(null);
+          }}
+        />
         {/* Period Navigation */}
         {periodNavigation}
 
@@ -1152,9 +1222,10 @@ export function TeamMembers({
               setSelectedWeek={setSelectedWeek}
               setSelectedProject={setSelectedProject}
               setSelectedEvent={setSelectedEvent}
-            // lockedDates={lockedDates}
-            // onToggleDateLock={handleToggleDateLock}
-            // lockProcessing={lockProcessing}
+              lockedDates={lockedDates}
+              onToggleDateLock={handleToggleDateLock}
+              lockProcessing={lockProcessing}
+              loading={loading}
             />
           </div>
         </div>
@@ -1174,6 +1245,31 @@ export function TeamMembers({
   // Render week/month view - show team member list with grids
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={confirmLockDialogOpen}
+        onOpenChange={(open) => {
+          setConfirmLockDialogOpen(open);
+          if (!open) setPendingLockDate(null);
+        }}
+        title={pendingIsLocked ? "Unlock date" : "Lock date"}
+        description={
+          pendingLockDate
+            ? pendingIsLocked
+              ? `Are you sure you want to unlock ${format(pendingLockDate, 'do MMM, yyyy')}?`
+              : `Are you sure you want to lock ${format(pendingLockDate, 'do MMM, yyyy')}?`
+            : undefined
+        }
+        confirmText={pendingIsLocked ? "Unlock" : "Lock"}
+        confirmVariant={pendingIsLocked ? "default" : "default"}
+        isLoading={pendingIsProcessing}
+        confirmDisabled={!pendingLockDate || !!loading}
+        onConfirm={() => {
+          if (!pendingLockDate) return;
+          handleToggleDateLock(pendingLockDate);
+          setConfirmLockDialogOpen(false);
+          setPendingLockDate(null);
+        }}
+      />
       {/* Period Navigation */}
       {periodNavigation}
 
@@ -1197,9 +1293,7 @@ export function TeamMembers({
                 const dayNumber = day.getDate();
                 const isSelected = isDaySelected(day);
                 const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-                const dateStr = format(day, 'yyyy-MM-dd');
                 const locked = isDateLocked(day);
-                const processing = lockProcessing[dateStr];
 
                 return (
                   <div key={index} className="text-center">
@@ -1219,15 +1313,14 @@ export function TeamMembers({
 
                     <div
                       className={`p-1 rounded-b transition-all cursor-pointer flex items-center justify-center h-8 ${locked
-                        ? 'text-studio-gold'
+                        ? 'text-destructive'
                         : ''
                         }`}
-                      onClick={(e) => !loading && handleToggleDateLock(day, e)}
+                      onClick={(e) => !loading && requestToggleDateLock(day, e)}
                       title={locked ? `Click to unlock ${format(day, 'MMM dd, yyyy')}` : `Click to lock ${format(day, 'MMM dd, yyyy')}`}
+                    // disabled={!user.data.isAdmin}
                     >
-                      {processing || loading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : locked ? (
+                      {locked ? (
                         <>
                           <Lock className="w-3 h-3 mr-1" />
                           {/* <span className="text-[10px] font-medium">Locked</span> */}
@@ -1319,6 +1412,7 @@ export function TeamMembers({
                                         widthPercent={widthPercent}
                                         isLoggedInUser={isLoggedInUser}
                                         formatTime={formatTime}
+                                        timeView={timeView}
                                       />
                                     );
                                   }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, Loader2, Plus, Trash2 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { ProjectStep1 } from './ProjectStep1';
 import { ProjectStep2, TeamAssignment } from './ProjectStep2';
+import { getFutureLockedDates } from '@/api/company';
 
 export interface AddProjectDialogProps {
   onAddBooking?: (booking: Omit<EditableBooking, 'id'>) => void;
@@ -63,6 +64,7 @@ export function AddProjectDialog({
   onAddTeamMember,
   onDialogCloseTrigger,
 }: AddProjectDialogProps) {
+  const MAX_EVENTS = 10;
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<ProjectFormData>({
     projectName: '',
@@ -80,7 +82,7 @@ export function AddProjectDialog({
     },
     events: [getDefaultEventData()] // Start with one default event
   });
-
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [currentEventIndex, setCurrentEventIndex] = useState(0); // Track which event we're editing
   const [currentMember, setCurrentMember] = useState({
@@ -99,6 +101,35 @@ export function AddProjectDialog({
   const [includeClient, setIncludeClient] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingNextStep, setIsLoadingNextStep] = useState(false);
+  const [lockedDates, setLockedDates] = useState<string[]>([]);
+  const [loadingLockedDates, setLoadingLockedDates] = useState(false);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [currentEventIndex]);
+
+  // Fetch locked dates when dialog opens
+  useEffect(() => {
+    const fetchLockedDates = async () => {
+      if (isOpen && user?.data?.company?.id) {
+        setLoadingLockedDates(true);
+        try {
+          const response = await getFutureLockedDates(user.data.company.id);
+          if (response.success && response.data) {
+            setLockedDates(response.data.lockedDates);
+          }
+        } catch (error) {
+          console.error('Error fetching locked dates:', error);
+        } finally {
+          setLoadingLockedDates(false);
+        }
+      }
+    };
+
+    fetchLockedDates();
+  }, [isOpen, user?.data?.company?.id]);
 
   // Helper function to create default event data
   function getDefaultEventData(): EventFormData {
@@ -129,9 +160,6 @@ export function AddProjectDialog({
       newErrors.projectName = 'Project name is required';
     }
 
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
 
     if (includeClient) {
       if (!formData.client.name?.trim()) {
@@ -174,6 +202,9 @@ export function AddProjectDialog({
       }
       if (event.assignments.length === 0) {
         newErrors[`event-${index}-assignments`] = 'At least one team member is required';
+      }
+      if (event.date && lockedDates.includes(event.date)) {
+        newErrors[`event-${index}-date`] = 'This date is locked and cannot be booked';
       }
     });
 
@@ -249,6 +280,10 @@ export function AddProjectDialog({
 
   // Event management functions
   const addEvent = () => {
+    if (formData.events.length >= MAX_EVENTS) {
+      toast.error(`Only ${MAX_EVENTS} events are allowed`);
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       events: [...prev.events, getDefaultEventData()]
@@ -406,6 +441,15 @@ export function AddProjectDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const hasLockedDates = formData.events.some(event =>
+      event.date && lockedDates.includes(event.date)
+    );
+
+    if (hasLockedDates) {
+      toast.error('Cannot create project with locked dates');
+      return;
+    }
+
     if (!validateStep2()) {
       return;
     }
@@ -467,17 +511,83 @@ export function AddProjectDialog({
       <DialogContent className="sm:max-w-[1000px]" onInteractOutside={e => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2">
               Add New Project - Step {currentStep} of 2
-              {(isLoadingNextStep || isSubmitting) && (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              )}
+              {
+                currentStep === 2 &&
+                <>
+                  {/* Events Header */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <h3 className="text-lg flex items-center gap-2">
+                      Events
+                      <div className="text-sm text-muted-foreground">
+                        {formData.events.length}/{MAX_EVENTS}
+                      </div>
+                    </h3>
+                  </div>
+
+                  {/* Event Tabs */}
+                  <div className="flex gap-2 overflow-x-auto pb-1 flex-wrap">
+                    {formData.events.map((event, index) => {
+                      // Check if this event has any errors
+                      const hasEventErrors = Object.keys(errors).some(key =>
+                        key.startsWith(`event-${index}-`)
+                      );
+
+                      return (
+                        <div
+                          key={event.id}
+                          className={`flex items-center px-3 py-2 rounded-md border cursor-pointer
+    flex-none max-w-2xl min-w-0 whitespace-nowrap truncate text-sm ${currentEventIndex === index
+                              ? "bg-studio-gold text-black"
+                              : "bg-transparent"
+                            } ${hasEventErrors ? "border-red-500 border-2" : ""
+                            }`}
+                          onClick={() => setCurrentEventIndex(index)}
+                        >
+                          <span className="truncate mr-2">
+                            {
+                              formData.events[index].name ? (formData.events[index].name) : (`Event ${index + 1}`)
+                            }
+                            {hasEventErrors && (
+                              <span className="ml-1 text-red-500">*</span>
+                            )}
+                          </span>
+
+                          {/* Delete icon */}
+                          {formData.events.length > 1 && (
+                            <Trash2
+                              className="w-3 h-3 hover:text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeEvent(index);
+                              }}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                    {formData.events.length < MAX_EVENTS && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addEvent}
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Event
+                      </Button>
+                    )}
+                  </div>
+                </>
+              }
             </div>
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-          <div className='max-h-[70vh] overflow-y-auto p-2'>
+        <form onSubmit={handleSubmit} className="space-y-6" noValidate autoComplete="off">
+          <div className='max-h-[52vh] overflow-y-auto p-2 scrollbar-hide' ref={scrollRef}>
             {currentStep === 1 ? (
               <ProjectStep1
                 formData={formData}
@@ -490,62 +600,6 @@ export function AddProjectDialog({
               />
             ) : (
               <div className="space-y-6">
-                {/* Events Header */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Events</h3>
-                </div>
-
-                {/* Event Tabs */}
-                <div className="flex gap-2 overflow-x-auto pb-2 flex-wrap">
-                  {formData.events.map((event, index) => {
-                    // Check if this event has any errors
-                    const hasEventErrors = Object.keys(errors).some(key =>
-                      key.startsWith(`event-${index}-`)
-                    );
-
-                    return (
-                      <div
-                        key={event.id}
-                        className={`flex items-center px-3 py-1 rounded-md border cursor-pointer ${currentEventIndex === index
-                            ? "bg-studio-gold text-black"
-                            : "bg-transparent"
-                          } ${hasEventErrors ? "border-red-500 border-2" : ""
-                          }`}
-                        onClick={() => setCurrentEventIndex(index)}
-                      >
-                        <span className="truncate mr-2">
-                          {
-                            formData.events[index].name ? (formData.events[index].name):(`Event ${index + 1}`)
-                          }
-                          {hasEventErrors && (
-                            <span className="ml-1 text-red-500">*</span>
-                          )}
-                        </span>
-
-                        {/* Delete icon */}
-                        {formData.events.length > 1 && (
-                          <Trash2
-                            className="w-3 h-3 hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeEvent(index);
-                            }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addEvent}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add Event
-                  </Button>
-                </div>
 
                 {/* Current Event Form */}
                 <ProjectStep2
@@ -574,7 +628,7 @@ export function AddProjectDialog({
           </div>
 
           {/* Footer Buttons */}
-          <div className="flex justify-between gap-2 pt-4 border-t">
+          <div className="flex justify-between gap-2 pt-4">
             {currentStep === 1 ? (
               <>
                 <Button type="button" variant="outline" onClick={handleCancel}>
@@ -598,40 +652,48 @@ export function AddProjectDialog({
                 </Button>
               </>
             ) : (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePreviousStep}
-                  disabled={isSubmitting}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back
-                </Button>
-                <div className="flex gap-2">
+              <div className='flex flex-col gap-4 w-full '>
+                <div className="flex gap-2 justify-end">
+
+
+
+                </div>
+
+                <div className="flex justify-between border-t pt-4">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={handleCancel}
+                    onClick={handlePreviousStep}
                     disabled={isSubmitting}
                   >
-                    Cancel
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Creating Project...
-                      </>
-                    ) : (
-                      'Create Project'
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCancel}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Creating Project...
+                        </>
+                      ) : (
+                        'Create Project'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </form>

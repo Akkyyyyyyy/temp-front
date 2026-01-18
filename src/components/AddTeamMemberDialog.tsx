@@ -221,7 +221,7 @@ export function AddTeamMemberDialog({ open, onOpenChange, onAddMember }: AddTeam
           {/* <DialogDescription className="ml-6">* are required</DialogDescription> */}
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 p-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 p-3" autoComplete="off">
           <div className="max-h-[60vh] overflow-y-auto scrollbar-hide p-2">
             {/* Photo Upload Section */}
             {/* <div className="flex items-start gap-6 p-6 bg-muted/20 rounded-lg border mb-6">

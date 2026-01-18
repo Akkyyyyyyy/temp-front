@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { getRolesByCompanyId } from "@/api/role";
+import { getMe } from "@/api/member";
 
 type UserType = "company" | "member";
 
@@ -13,12 +14,14 @@ interface AuthUser {
 
 interface AuthContextProps {
     user: any | null;
+    setUser: (any:any)=>void;
     login: (userType: UserType, data: any) => void;
     logout: () => void;
     isCompany: boolean;
     isMember: boolean;
     roles: any[];
     loadingRoles: boolean;
+    loadingUser: boolean;
     refreshRoles: () => Promise<void>;
     refreshUser: () => Promise<void>;
     updateUser: (updates: any) => void;
@@ -31,19 +34,96 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [roles, setRoles] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const navigate = useNavigate();
+    const [loadingUser, setLoadingUser] = useState(false);
 
     // Function to refresh user data from localStorage
-    const refreshUser = useCallback(async () => {
+    // Function to refresh user data from API or localStorage
+    const refreshUser = useCallback(async (forceCompanyId?: string) => {
         const token = localStorage.getItem("auth-token");
         const type = localStorage.getItem("user-type");
         const details = localStorage.getItem("user-details");
 
-        if (token && type && details) {
-            setUser({
-                token,
-                type: type as UserType,
-                data: JSON.parse(details),
-            });
+        if (!token || !type) {
+            setUser(null);
+            return;
+        }
+
+        try {
+            setLoadingUser(true);
+
+            if (type === "member" && details) {
+                const userData = JSON.parse(details);
+                const companyId = forceCompanyId || userData.company?.id;
+                const memberId = userData.id;
+                console.log("companyId", companyId);
+                console.log("memberId", memberId);
+
+
+                if (companyId && memberId) {
+                    try {
+
+                        const response = await getMe(companyId, memberId);
+
+                        if (response.success && response.data) {
+                            const freshUserData = response.data.user;
+
+                            // Update localStorage
+                            localStorage.setItem("user-details", JSON.stringify(freshUserData));
+
+                            // Update state
+                            setUser({
+                                token,
+                                type: type as UserType,
+                                data: freshUserData,
+                            });
+                        } else {
+                            // Fall back to localStorage
+                            setUser({
+                                token,
+                                type: type as UserType,
+                                data: userData,
+                            });
+                        }
+                    } catch (apiError) {
+                        console.error("API error refreshing user:", apiError);
+                        // Fall back to localStorage
+                        setUser({
+                            token,
+                            type: type as UserType,
+                            data: userData,
+                        });
+                    }
+                } else {
+                    // Missing companyId or memberId
+                    setUser({
+                        token,
+                        type: type as UserType,
+                        data: userData,
+                    });
+                }
+            } else {
+                // For company users or when no details
+                if (details) {
+                    setUser({
+                        token,
+                        type: type as UserType,
+                        data: JSON.parse(details),
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error in refreshUser:", error);
+            // Fallback to localStorage data
+            const details = localStorage.getItem("user-details");
+            if (token && type && details) {
+                setUser({
+                    token,
+                    type: type as UserType,
+                    data: JSON.parse(details),
+                });
+            }
+        } finally {
+            setLoadingUser(false);
         }
     }, []);
 
@@ -101,18 +181,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [user]);
 
     useEffect(() => {
-        const token = localStorage.getItem("auth-token");
-        const type = localStorage.getItem("user-type");
-        const details = localStorage.getItem("user-details");
+        const initializeAuth = async () => {
+            const token = localStorage.getItem("auth-token");
+            const type = localStorage.getItem("user-type");
+            const details = localStorage.getItem("user-details");
 
-        if (token && type && details) {
-            setUser({
-                token,
-                type: type as UserType,
-                data: JSON.parse(details),
-            });
-        }
-    }, []);
+            if (token && type && details) {
+                const userData = JSON.parse(details);
+
+                // Set initial state from localStorage
+                setUser({
+                    token,
+                    type: type as UserType,
+                    data: userData,
+                });
+
+                // If it's a member user with company and member IDs, fetch fresh data
+                if (userData.company?.id && userData.id) {
+                    try {
+                        const response = await getMe(userData.company.id, userData.id);
+
+                        if (response.success && response.data) {
+                            const freshUserData = response.data.user;
+
+                            // Update localStorage
+                            localStorage.setItem("user-details", JSON.stringify(freshUserData));
+
+                            // Update state with fresh data
+                            setUser({
+                                token,
+                                type: type as UserType,
+                                data: freshUserData,
+                            });
+                        }
+                    } catch (error) {
+                        console.error("Error fetching fresh user data on mount:", error);
+                        // Keep using localStorage data if API fails
+                    }
+                }
+            }
+        };
+
+        initializeAuth();
+    }, []); // Only run on mount
 
     // Load roles when user is set
     useEffect(() => {
@@ -153,12 +264,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         <AuthContext.Provider
             value={{
                 user,
+                setUser,
                 login,
                 logout,
                 isCompany: user?.type === "company",
                 isMember: user?.type === "member",
                 roles,
                 loadingRoles,
+                loadingUser,
                 refreshRoles: loadRoles,
                 refreshUser,
                 updateUser,

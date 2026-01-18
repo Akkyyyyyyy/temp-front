@@ -1,3 +1,4 @@
+import { jwtDecode } from "jwt-decode";
 import { DollarSign, Euro, IndianRupee, PoundSterling } from "lucide-react";
 
 export const getFallback = (name) => {
@@ -134,4 +135,14 @@ export function formatTime(hour) {
   if (hour === 12) return "12:00 PM";
   if (hour > 12) return `${hour - 12}:00 PM`;
   return `${hour}:00 AM`;
+}
+export function isTokenExpired(token: string, bufferMinutes: number = 24*60 ): boolean {
+  try {
+    const { exp } = jwtDecode<{ exp: number }>(token);
+    const currentTime = Date.now() / 1000;
+    const bufferSeconds = bufferMinutes * 60;
+    return exp - currentTime <= bufferSeconds;
+  } catch {
+    return true;
+  }
 }

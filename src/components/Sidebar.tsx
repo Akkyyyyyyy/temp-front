@@ -173,10 +173,10 @@ export function Sidebar({
       { icon: UserRoundPlus, label: "Add Members", active: false, action: "addTeamMember" },
       { icon: Plus, label: "Add Booking", active: false, action: "addBooking" },
       { icon: UserRoundCheck, label: "Bookings", active: false, action: "showTeamAvailability" },
-      { icon: CurrencyIcon, label: "Revenue", active: false, action: "showFinancialManagement" },
+      // { icon: CurrencyIcon, label: "Revenue", active: false, action: "showFinancialManagement" },
       { icon: BriefcaseBusiness, label: "Packages", active: false, action: "showPackages" },
       { icon: Settings, label: "Settings", active: false, action: "settings" },
-      { icon: HelpCircle, label: "Help", active: false, action: "help" },
+      // { icon: HelpCircle, label: "Help", active: false, action: "help" },
       { icon: LogOut, label: "Log Out", active: false, action: "logout" },
     ];
 
@@ -303,7 +303,7 @@ export function Sidebar({
               </div>
 
               {/* Navigation Items */}
-              <div className="flex-1 space-y-2 px-3">
+              <div className="flex flex-col flex-1 px-3 gap-2">
                 {mainItems.map((item, index) => (
                   <button
                     key={index}
@@ -319,7 +319,7 @@ export function Sidebar({
                 ))}
 
                 {/* Bottom Items */}
-                <div className="mt-8 pt-4 border-t border-border/20 flex-1 gap-3">
+                <div className="mt-auto pt-4 border-t border-border/20 space-y-2">
                   {bottomItems.map((item, index) => (
                     <button
                       key={index}
@@ -377,7 +377,7 @@ export function Sidebar({
 
   // Desktop Sidebar
   const DesktopSidebar = () => (
-    <div className="hidden lg:flex fixed left-0 top-0 h-full w-20 bg-studio-dark border-r border-border/20 flex-col items-center py-3 space-y-4 z-50">
+    <div className="hidden lg:flex fixed left-0 top-0 h-full w-20 bg-background border-r border-border/20 flex-col items-center py-3 space-y-4 z-50">
       {/* Logo - Fixed alignment */}
       <div className="group relative w-12 h-12 rounded-lg flex items-center justify-center border mx-auto">
         {logo ? (

@@ -132,7 +132,7 @@ const SetPassword = () => {
             });
 
             setPasswordSuccess(true);
-            navigate("/");
+            navigate("/dashboard");
 
         } catch (error: any) {
             console.error(error.message || "Something went wrong");
@@ -169,10 +169,10 @@ const SetPassword = () => {
                 });
 
                 setInvitationStatus('accepted');
-                navigate("/");
+                navigate("/dashboard");
             } else {
                 setInvitationStatus('rejected');
-                navigate("/");
+                navigate("/dashboard");
             }
 
         } catch (error: any) {
@@ -248,7 +248,7 @@ const SetPassword = () => {
                             Redirecting you to dashboard...
                         </p>
                         <Button
-                            onClick={() => navigate("/")}
+                            onClick={() => navigate("/dashboard")}
                             variant="outline"
                             className="w-full h-11 text-base font-medium"
                         >

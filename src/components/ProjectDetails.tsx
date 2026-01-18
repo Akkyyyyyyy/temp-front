@@ -16,6 +16,8 @@ import { AddMemberToProjectDialog } from "./AddMemberToProjectDialog";
 import { DeleteProjectDialog } from "./DeleteProjectDialog";
 import { toast } from "sonner";
 import { EditProjectDialog } from "./modals/EditProjectDialog";
+import { ConfirmRemoveMemberDialog } from "./modals/ConfirmRemoveMemberDialog";
+
 import {
     DocumentsTab,
     MoodboardTab,
@@ -33,6 +35,8 @@ import { Separator } from "./ui/separator";
 import { AddEditEventDialog } from "./modals/AddEditEventDialog";
 import { deleteEvent } from "@/api/event";
 import { ConfirmDeleteEventDialog } from "./modals/ConfirmDeleteEventDialog";
+import { CreativeBriefTab } from "./additional-tabs/CreativeBriefTab";
+import { LogisticsTab } from "./additional-tabs/LogisticsTab";
 
 const S3_URL = import.meta.env.VITE_S3_BASE_URL;
 
@@ -65,6 +69,8 @@ interface ProjectDetailsProps {
 
 // Single source of truth for additional tabs configuration
 const ADDITIONAL_TABS = {
+    creativeBrief: { label: "Creative Brief", component: CreativeBriefTab },
+    logistics: { label: "Logistics", component: LogisticsTab },
     documents: {
         label: "Documents",
         description: "Upload and manage project documents",
@@ -150,8 +156,8 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     const tabRefs = useRef({});
     const [projectDetails, setProjectDetails] = useState<any>(null);
     const [isLoadingProject, setIsLoadingProject] = useState(true);
-    const [activeMainTab, setActiveMainTab] = useState<"project-details" | "additional-tabs">("project-details");
-    const [activeAdditionalTab, setActiveAdditionalTab] = useState('documents');
+    const [activeMainTab, setActiveMainTab] = useState<"project-details" | "additional-tabs">("additional-tabs");
+    const [activeAdditionalTab, setActiveAdditionalTab] = useState('creativeBrief');
     const additionalTabRefs = useRef({});
     const { user } = useAuth();
     const [selectedEventId, setSelectedEventId] = useState<string>("");
@@ -164,9 +170,64 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
         name: string;
     } | null>(null);
     const [isDeletingEvent, setIsDeletingEvent] = useState(false);
+    const [isRemoveMemberDialogOpen, setIsRemoveMemberDialogOpen] = useState(false);
+    const [memberToRemove, setMemberToRemove] = useState<{
+        memberId: string;
+        memberName: string;
+        eventId: string;
+        eventName: string;
+        roleName: string;
+    } | null>(null);
+    const [isRemovingMember, setIsRemovingMember] = useState(false);
 
+    // Replace the existing handleRemoveMember function with this:
+    const handleRemoveMember = (memberId: string, eventId: string, memberName: string, roleName: string) => {
+        if (!selectedEvent) return;
 
-    // Add these functions inside ProjectDetails component:
+        setMemberToRemove({
+            memberId,
+            memberName,
+            eventId,
+            eventName: selectedEvent.name,
+            roleName
+        });
+        setIsRemoveMemberDialogOpen(true);
+    };
+
+    // Add new function to handle the actual removal
+    const confirmRemoveMember = async () => {
+        if (!memberToRemove) return;
+
+        setIsRemovingMember(true);
+        try {
+            const response = await removeMemberFromProject({
+                projectId,
+                memberId: memberToRemove.memberId,
+                eventId: memberToRemove.eventId
+            });
+
+            if (response.success) {
+                onAddSection();
+                loadProjectDetails();
+                setIsRemoveMemberDialogOpen(false);
+                setMemberToRemove(null);
+            } else {
+                console.error(response.message || "Failed to remove member");
+            }
+        } catch (error) {
+            console.error('Error removing member from event:', error);
+            toast.error("Failed to remove member from event");
+        } finally {
+            setIsRemovingMember(false);
+        }
+    };
+
+    // Add cancel function
+    const cancelRemoveMember = () => {
+        setIsRemoveMemberDialogOpen(false);
+        setMemberToRemove(null);
+    };
+
 
     // Handle opening dialog to add new event
     const handleAddEvent = () => {
@@ -422,29 +483,29 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     };
 
     // Handle remove member from event assignment
-    const handleRemoveMember = async (memberId: string, eventId: string) => {
-        setIsSaving(true);
-        try {
-            // Note: You might need to update this API to handle event-based assignments
-            const response = await removeMemberFromProject({
-                projectId,
-                memberId,
-                eventId // Pass eventId to remove from specific event
-            });
+    // const handleRemoveMember = async (memberId: string, eventId: string) => {
+    //     setIsSaving(true);
+    //     try {
+    //         // Note: You might need to update this API to handle event-based assignments
+    //         const response = await removeMemberFromProject({
+    //             projectId,
+    //             memberId,
+    //             eventId // Pass eventId to remove from specific event
+    //         });
 
-            if (response.success) {
-                onAddSection();
-                loadProjectDetails();
-            } else {
-                console.error(response.message || "Failed to remove member");
-            }
-        } catch (error) {
-            console.error('Error removing member from event:', error);
-            toast.error("Failed to remove member from event");
-        } finally {
-            setIsSaving(false);
-        }
-    };
+    //         if (response.success) {
+    //             onAddSection();
+    //             loadProjectDetails();
+    //         } else {
+    //             console.error(response.message || "Failed to remove member");
+    //         }
+    //     } catch (error) {
+    //         console.error('Error removing member from event:', error);
+    //         toast.error("Failed to remove member from event");
+    //     } finally {
+    //         setIsSaving(false);
+    //     }
+    // };
 
     // Handle member added callback
     const handleMemberAdded = () => {
@@ -624,7 +685,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
     // Render additional tab content using the configuration
     const renderAdditionalTabContent = () => {
         const TabComponent = ADDITIONAL_TABS[activeAdditionalTab].component;
-        return <TabComponent projectId={projectId} eventId={selectedEventId}/>;
+        return <TabComponent projectId={projectId} eventId={selectedEventId} />;
     };
 
     if (isLoadingProject) {
@@ -905,6 +966,15 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                 onCancel={cancelDeleteEvent}
                 isLoading={isDeletingEvent}
             />
+            <ConfirmRemoveMemberDialog
+                open={isRemoveMemberDialogOpen}
+                onOpenChange={setIsRemoveMemberDialogOpen}
+                memberName={memberToRemove?.memberName || ""}
+                eventName={memberToRemove?.eventName || ""}
+                roleName={memberToRemove?.roleName || ""}
+                onConfirm={confirmRemoveMember}
+                isLoading={isRemovingMember}
+            />
 
             {/* Header */}
             <div className="flex flex-col lg:flex-row items-center mb-6 gap-3 justify-between w-full">
@@ -948,7 +1018,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                         )
                     }
 
-                    <div className="inline-flex items-center bg-muted rounded-full p-1 border border-border shadow-sm relative">
+                    {/* <div className="inline-flex items-center bg-muted rounded-full p-1 border border-border shadow-sm relative">
                         <div
                             className="absolute bg-primary rounded-full shadow-sm transition-all duration-300 ease-in-out h-[calc(100%-8px)]"
                             style={getActiveTabStyle()}
@@ -971,7 +1041,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                 ).join(' ')}
                             </button>
                         ))}
-                    </div>
+                    </div> */}
 
                     {/* Additional Tabs Section */}
                     <div className="relative">
@@ -996,7 +1066,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
 
                         {/* Desktop Tabs */}
                         <div className="hidden lg:block">
-                            <div className="relative overflow-x-auto scrollbar-hide">
+                            <div className="relative overflow-x-auto ">
                                 <div className="flex space-x-5 relative w-max min-w-full">
                                     {Object.keys(ADDITIONAL_TABS).map((tabKey) => (
                                         <button
@@ -1102,7 +1172,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                                 )}
                                             </div>
                                         ))
-                                    ) }
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1133,6 +1203,7 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                 size="sm"
                                 className="gap-1.5 text-xs sm:text-sm"
                                 onClick={handleAddEvent}
+                                disabled={projectEvents.length >= 10}
                             >
                                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 <span className="hidden sm:inline">New Event</span>
@@ -1159,7 +1230,6 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                             )}
                         </div>
                     )}
-
                     {/* Events List as Accordions */}
                     {projectEvents.length > 0 && (
                         <div className="space-y-2">
@@ -1306,9 +1376,14 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                                                                                     <Button
                                                                                         variant="ghost"
                                                                                         size="sm"
-                                                                                        onClick={() => handleRemoveMember(assignment.member.id, event.id)}
+                                                                                        onClick={() => handleRemoveMember(
+                                                                                            assignment.member.id,
+                                                                                            event.id,
+                                                                                            assignment.member.name || "Unnamed Member",
+                                                                                            assignment.role.name
+                                                                                        )}
                                                                                         disabled={isSaving}
-                                                                                        className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive transition-colors  flex-shrink-0 self-start sm:self-center"
+                                                                                        className="h-7 w-7 p-0 hover:bg-destructive/10 hover:text-destructive transition-colors flex-shrink-0 self-start sm:self-center"
                                                                                         title="Remove from event"
                                                                                     >
                                                                                         <UserMinus className="w-3.5 h-3.5" />
@@ -1410,9 +1485,9 @@ export function ProjectDetails({ projectId, teamMembers, onClose, setSelectedMem
                             <div className="py-2">
                                 <div className="flex items-start justify-between gap-3">
                                     <span className="text-muted-foreground font-medium min-w-[80px] pt-1">Description</span>
-                                    <p className="text-foreground text-sm leading-relaxed bg-muted/20 p-3 rounded-md inline-block max-w-full">
+                                    <div className="text-foreground text-sm leading-relaxed bg-muted/20 p-3 rounded-md max-w-full max-h-48 overflow-y-auto break-words whitespace-pre-wrap">
                                         {projectDetails.description}
-                                    </p>
+                                    </div>
                                 </div>
                             </div>
                         )}

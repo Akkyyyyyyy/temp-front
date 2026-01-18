@@ -49,7 +49,7 @@ export function HeaderWithClock({
   };
 
   return (
-    <div className="hidden lg:flex justify-between items-center mb-4">
+    <div className="hidden lg:flex justify-between items-center mb-4 sticky top-0 z-30 bg-background border-b border-border">
       <div className="lg:block">
         <CompanyDropdown
           setSelectedProject={setSelectedProject}
@@ -71,7 +71,7 @@ export function HeaderWithClock({
         />
         {/* Today's Date with Day Name - Clickable */}
         <div
-          className="text-right cursor-pointer px-3 py-2 rounded-md transition-colors hover:bg-muted/60"
+          className="text-right cursor-pointer px-3 py-2 rounded-md transition-colors"
           onClick={handleDateClick}
           title={`Click to reset Dashboard`}
         >

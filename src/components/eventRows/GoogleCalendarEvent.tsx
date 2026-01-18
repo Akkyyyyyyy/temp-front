@@ -9,6 +9,7 @@ interface GoogleCalendarEventProps {
   widthPercent: number;
   isLoggedInUser: boolean;
   formatTime: (hour: number) => string;
+  timeView: any;
 }
 
 export const GoogleCalendarEvent = ({
@@ -16,7 +17,8 @@ export const GoogleCalendarEvent = ({
   startPercent,
   widthPercent,
   isLoggedInUser,
-  formatTime
+  formatTime,
+  timeView
 }: GoogleCalendarEventProps) => {
   if (isLoggedInUser) {
     return (
@@ -45,9 +47,17 @@ export const GoogleCalendarEvent = ({
                 </div>
               </div>
 
-              <div className="absolute -top-1.5 right-1.5 w-5 h-5 bg-white rounded-full border border-blue-300 
-                flex items-center justify-center shadow-md transform group-hover:scale-110 
-                group-hover:shadow-blue-200 group-hover:border-blue-400 transition-all duration-300 z-10">
+              <div
+                className={`w-5 h-5 bg-white rounded-full border border-blue-300 
+  flex items-center justify-center shadow-md transform
+  group-hover:scale-110 group-hover:shadow-blue-200 
+  group-hover:border-blue-400 transition-all duration-300 z-10
+  ${timeView === "month"
+                    ? "absolute left-1/2 -translate-x-1/2 -top-1.5"
+                    : "absolute -top-1.5 right-1.5"
+                  }`}
+              >
+
                 <div className="relative">
                   <svg
                     className="w-2.5 h-2.5 relative z-10"
